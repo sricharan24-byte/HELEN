@@ -254,7 +254,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
       MaterialPageRoute(
         builder: (_) => GeminiLiveScreen(
           ticketController: widget.ticketController,
-          repository: _repository,
+          repository: LocalTransportRepository(dataSource: LocalTransportDataSource()),
           journeyController: widget.journeyController,
         ),
       ),
@@ -315,7 +315,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     final dataSource = LocalTransportDataSource();
     final route = dataSource.allRoutes.firstWhere(
       (r) => r.id == _resolveRouteId(),
-      orElse: () => dataSource.allRoutes.isNotEmpty ? dataSource.allRoutes.first : Route(id: '', routeNumber: '', displayName: '', orderedStopIds: const []),
+      orElse: () => dataSource.allRoutes.first,
     );
     final ordered = <Stop>[];
     for (final id in route.orderedStopIds) {
