@@ -56,6 +56,14 @@ void main() {
       expect(response.spokenResponse, contains('emergency safety broadcast'));
     });
 
+    test('conversational queries with help do not trigger emergencySos', () {
+      final r1 = service.processVoiceQuery('Can you help me find a bus?');
+      expect(r1.intent, isNot(equals(GeminiLiveIntent.emergencySos)));
+
+      final r2 = service.processVoiceQuery('Help me book a ticket');
+      expect(r2.intent, isNot(equals(GeminiLiveIntent.emergencySos)));
+    });
+
     test('saved places query returns openSaved intent', () {
       final response = service.processVoiceQuery('Open my saved places');
       expect(response.intent, equals(GeminiLiveIntent.openSaved));

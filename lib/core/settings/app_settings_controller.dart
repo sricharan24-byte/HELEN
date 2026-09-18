@@ -102,6 +102,7 @@ class AppSettingsController extends ChangeNotifier {
 
   String textSize = 'Large';
   String highContrast = 'On';
+  bool get isHighContrast => highContrast == 'On';
   bool hapticFeedback = true;
   bool simplifiedNav = true;
   bool screenReaderHints = true;
@@ -130,6 +131,12 @@ class AppSettingsController extends ChangeNotifier {
         return 1.15;
       case 'Extra Large':
         return 1.30;
+      case 'Huge (160%)':
+      case 'Huge':
+        return 1.60;
+      case 'Maximum (200%)':
+      case 'Maximum':
+        return 2.00;
       default:
         return 1.15;
     }

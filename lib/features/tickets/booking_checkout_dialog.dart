@@ -15,6 +15,7 @@ class BookingCheckoutDialog extends StatefulWidget {
     required this.baseFare,
     required this.onTicketBooked,
     this.routeId = 'vit-to-katpadi',
+    this.travelDate,
   });
 
   final String busId;
@@ -24,6 +25,7 @@ class BookingCheckoutDialog extends StatefulWidget {
   final double baseFare;
   final void Function(Ticket ticket) onTicketBooked;
   final String routeId;
+  final DateTime? travelDate;
 
   @override
   State<BookingCheckoutDialog> createState() => _BookingCheckoutDialogState();
@@ -33,11 +35,12 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   PassengerType _selectedPassengerType = PassengerType.general;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.upi;
   late TextEditingController _passengerNameController;
+  bool _isIssuing = false;
 
   @override
   void initState() {
     super.initState();
-    _passengerNameController = TextEditingController(text: 'Pavan K');
+    _passengerNameController = TextEditingController();
   }
 
   @override
@@ -57,7 +60,19 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   }
 
   void _issueTicket() {
-    final ticketId = 'BB${Random().nextInt(899999) + 100000}';
+    if (_isIssuing) return;
+    setState(() => _isIssuing = true);
+
+    final now = DateTime.now();
+    final ticketId = 'BB${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}${Random.secure().nextInt(1296).toRadixString(36).padLeft(2, '0').toUpperCase()}';
+    final travelDay = widget.travelDate ?? now;
+    final validUntil = DateTime(
+      travelDay.year,
+      travelDay.month,
+      travelDay.day,
+      23, 59, 59,
+    );
+
     final ticket = Ticket(
       id: ticketId,
       routeId: widget.routeId,
@@ -66,19 +81,21 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
       destination: widget.destination,
       busId: widget.busId,
       passengerName: _passengerNameController.text.trim().isEmpty
-          ? 'Pavan K'
+          ? 'Passenger'
           : _passengerNameController.text.trim(),
       passengerType: _selectedPassengerType,
       fareAmount: _finalFare,
       paymentMethod: _selectedPaymentMethod,
-      issuedAt: DateTime.now(),
-      validUntil: DateTime.now().add(const Duration(hours: 4)),
+      issuedAt: now,
+      validUntil: validUntil.isBefore(now) ? now.add(const Duration(hours: 4)) : validUntil,
       status: TicketStatus.active,
-      qrCodeData: 'BUSBUDDY-PASS-$ticketId',
+      qrCodeData: 'BUSBUDDY|V1|$ticketId|${widget.origin.id}|${widget.destination.id}|${widget.busId}|${validUntil.toIso8601String()}',
     );
 
     widget.onTicketBooked(ticket);
-    Navigator.of(context).pop(true);
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override
@@ -291,10 +308,16 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   SizedBox(
                     height: 48,
                     child: ElevatedButton.icon(
-                      onPressed: _issueTicket,
-                      icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                      onPressed: _isIssuing ? null : _issueTicket,
+                      icon: _isIssuing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
                       label: Text(
-                        'Pay ₹${_finalFare.toStringAsFixed(0)} & Issue',
+                        _isIssuing ? 'Processing...' : 'Pay ₹${_finalFare.toStringAsFixed(0)} & Issue',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15,

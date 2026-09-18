@@ -113,23 +113,25 @@ class LiveBusMovementEngine {
   /// stop, and ETA all derive from the actual street geometry.
   void _projectStopsOntoPath() {
     final anchors = <({Stop stop, double distanceAlongPath})>[];
+    var lastIndex = 0;
     for (final stop in _routeStops) {
       if (stop.latitude == null || stop.longitude == null) continue;
       final point = LatLng(stop.latitude!, stop.longitude!);
-      var bestIndex = 0;
+      var bestIndex = lastIndex;
       var bestDistance = double.infinity;
-      for (int i = 0; i < _roadPath.length; i++) {
+      // Search monotonically along the road polyline to ensure stops never invert order
+      for (int i = lastIndex; i < _roadPath.length; i++) {
         final d = _distanceMeters(point, _roadPath[i]);
         if (d < bestDistance) {
           bestDistance = d;
           bestIndex = i;
         }
       }
+      lastIndex = bestIndex;
       anchors.add(
         (stop: stop, distanceAlongPath: _cumulativeDistances[bestIndex]),
       );
     }
-    anchors.sort((a, b) => a.distanceAlongPath.compareTo(b.distanceAlongPath));
     _stopAnchors = anchors;
   }
 
@@ -146,20 +148,30 @@ class LiveBusMovementEngine {
     final travelled = fraction * _totalPathLength;
     final position = _pointAtDistance(travelled);
 
-    Stop nextStop = _stopAnchors.last.stop;
-    for (final anchor in _stopAnchors) {
-      if (anchor.distanceAlongPath > travelled + 1) {
-        nextStop = anchor.stop;
-        break;
+    Stop nextStop;
+    if (_stopAnchors.isEmpty) {
+      if (_routeStops.isNotEmpty) {
+        nextStop = _routeStops.last;
+      } else {
+        return;
+      }
+    } else {
+      nextStop = _stopAnchors.last.stop;
+      for (final anchor in _stopAnchors) {
+        if (anchor.distanceAlongPath > travelled + 1) {
+          nextStop = anchor.stop;
+          break;
+        }
       }
     }
 
     final remainingFraction = 1 - fraction;
-    final totalRouteMinutes = (_totalPathLength / 1000 / 22 * 60) + 4;
+    const avgSpeedKmh = 28.0;
+    final totalRouteMinutes = (_totalPathLength / 1000 / avgSpeedKmh * 60) + 2;
     final etaMinutes =
         (remainingFraction * totalRouteMinutes).clamp(1.0, 60.0).round();
-    // Smoothly varying simulated speed within the 22-38 km/h town-bus range.
-    final speed = 30 + 8 * sin(_tick * 0.7);
+    // Smoothly varying simulated speed within the 22-36 km/h town-bus range.
+    final speed = 28 + 6 * sin(_tick * 0.7);
 
     final location = BusLocation(
       busId: busId,

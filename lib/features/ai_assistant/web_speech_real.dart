@@ -70,10 +70,16 @@ void _ensureJsBridge() {
         });
 
         window.__bb_reset_turn = function() {
+          window.__bb_generation = (window.__bb_generation || 0) + 1;
           if (window.__bb_speak_timer) {
             clearTimeout(window.__bb_speak_timer);
             window.__bb_speak_timer = null;
           }
+          if (window.__bb_audio_end_timer) {
+            clearTimeout(window.__bb_audio_end_timer);
+            window.__bb_audio_end_timer = null;
+          }
+          window.__bb_pcm_tail = "";
           if (window.__bb_active_sources && window.__bb_active_sources.length > 0) {
             window.__bb_active_sources.forEach(function(s) {
               try { s.stop(); s.disconnect(); } catch (_) {}
@@ -131,6 +137,10 @@ void _ensureJsBridge() {
               clearTimeout(window.__bb_speak_timer);
               window.__bb_speak_timer = null;
             }
+            if (window.__bb_audio_end_timer) {
+              clearTimeout(window.__bb_audio_end_timer);
+              window.__bb_audio_end_timer = null;
+            }
             try {
               if (window.speechSynthesis) window.speechSynthesis.cancel();
             } catch (_) {}
@@ -158,6 +168,16 @@ void _ensureJsBridge() {
               return;
             }
 
+            // Handle odd-byte carryover across chunks to prevent 16-bit PCM channel/byte misalignment buzzing
+            if (window.__bb_pcm_tail) {
+              bin = window.__bb_pcm_tail + bin;
+              window.__bb_pcm_tail = "";
+            }
+            if (bin.length % 2 !== 0) {
+              window.__bb_pcm_tail = bin.charAt(bin.length - 1);
+              bin = bin.substring(0, bin.length - 1);
+            }
+
             var len = Math.floor(bin.length / 2);
             if (len === 0) return;
 
@@ -180,9 +200,9 @@ void _ensureJsBridge() {
             gain.connect(ctx.destination);
 
             var now = ctx.currentTime;
-            // Schedule strictly sequentially. Only reset timeline if uninitialized or if playback fell behind clock (underrun)
+            // Schedule strictly sequentially with a 120ms jitter buffer on fresh start
             if (!window.__bb_pcm_next_time || window.__bb_pcm_next_time < now) {
-              window.__bb_pcm_next_time = now + 0.03;
+              window.__bb_pcm_next_time = now + 0.12;
             }
             var startTime = window.__bb_pcm_next_time;
             src.start(startTime);
@@ -192,8 +212,13 @@ void _ensureJsBridge() {
               window.__bb_active_sources = [];
             }
             window.__bb_active_sources.push(src);
+            var currentGen = window.__bb_generation || 0;
 
             src.onended = function() {
+              if (currentGen !== (window.__bb_generation || 0)) {
+                try { src.disconnect(); } catch (_) {}
+                return;
+              }
               if (window.__bb_active_sources) {
                 var idx = window.__bb_active_sources.indexOf(src);
                 if (idx !== -1) {
@@ -201,12 +226,22 @@ void _ensureJsBridge() {
                 }
               }
               try { src.disconnect(); } catch (_) {}
+
               if (!window.__bb_active_sources || window.__bb_active_sources.length === 0) {
-                window.__bb_is_pcm_active = false;
-                window.__bb_is_speaking = false;
-                if (window.__bb_on_audio_ended) {
-                  try { window.__bb_on_audio_ended(); } catch (_) {}
+                if (window.__bb_audio_end_timer) {
+                  clearTimeout(window.__bb_audio_end_timer);
                 }
+                window.__bb_audio_end_timer = setTimeout(function() {
+                  window.__bb_audio_end_timer = null;
+                  if (currentGen !== (window.__bb_generation || 0)) return;
+                  if (!window.__bb_active_sources || window.__bb_active_sources.length === 0) {
+                    window.__bb_is_pcm_active = false;
+                    window.__bb_is_speaking = false;
+                    if (window.__bb_on_audio_ended) {
+                      try { window.__bb_on_audio_ended(); } catch (_) {}
+                    }
+                  }
+                }, 250);
               }
             };
           } catch (e) {
@@ -223,10 +258,16 @@ void _ensureJsBridge() {
 
         window.__bb_stop_speech = function() {
           try {
+            window.__bb_generation = (window.__bb_generation || 0) + 1;
             if (window.__bb_speak_timer) {
               clearTimeout(window.__bb_speak_timer);
               window.__bb_speak_timer = null;
             }
+            if (window.__bb_audio_end_timer) {
+              clearTimeout(window.__bb_audio_end_timer);
+              window.__bb_audio_end_timer = null;
+            }
+            window.__bb_pcm_tail = "";
             if (window.speechSynthesis) window.speechSynthesis.cancel();
             if (window.__bb_active_sources && window.__bb_active_sources.length > 0) {
               window.__bb_active_sources.forEach(function(s) {

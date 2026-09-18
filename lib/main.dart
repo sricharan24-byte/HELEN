@@ -64,14 +64,16 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'BusBuddy',
           navigatorKey: _navigatorKey,
-          theme: AppTheme.light,
+          theme: settings.isHighContrast ? AppTheme.highContrast : AppTheme.dark,
           builder: (context, child) {
+            final media = MediaQuery.of(context);
+            final platformScale = media.textScaler.scale(1.0);
+            final effectiveScale = (platformScale * settings.textScaleFactor).clamp(0.85, 2.0);
             return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(settings.textScaleFactor),
+              data: media.copyWith(
+                textScaler: TextScaler.linear(effectiveScale),
               ),
               child: Overlay(
-                key: ValueKey('app_overlay_${settings.textScaleFactor}'),
                 initialEntries: [
                   OverlayEntry(
                     builder: (context) => Stack(

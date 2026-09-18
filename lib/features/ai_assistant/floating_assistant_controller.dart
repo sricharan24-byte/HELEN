@@ -162,18 +162,18 @@ class FloatingAssistantController extends ChangeNotifier {
         }
 
         _speechTimer?.cancel();
-        final fallbackDelay = _receivedPcmThisTurn
-            ? const Duration(seconds: 8)
-            : const Duration(milliseconds: 1200);
-        _speechTimer = Timer(fallbackDelay, () {
-          if (_isSpeaking) {
-            _isSpeaking = false;
-            if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
-              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        if (!_receivedPcmThisTurn) {
+          // Text-only turn fallback; real PCM playback completion is governed by onAudioEnded callback
+          _speechTimer = Timer(const Duration(milliseconds: 1200), () {
+            if (_isSpeaking) {
+              _isSpeaking = false;
+              if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
+                _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+              }
+              notifyListeners();
             }
-            notifyListeners();
-          }
-        });
+          });
+        }
 
         notifyListeners();
       },

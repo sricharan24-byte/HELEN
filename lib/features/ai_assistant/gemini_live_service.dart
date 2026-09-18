@@ -149,8 +149,10 @@ class GeminiLiveService {
     if (lower.contains('emergency') ||
         lower.contains('sos') ||
         lower.contains('share my location') ||
-        lower.contains('help') ||
-        lower.contains('safety')) {
+        lower.contains('danger') ||
+        lower.contains('call 112') ||
+        lower.contains('call police') ||
+        lower.contains('emergency help')) {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
@@ -162,23 +164,24 @@ class GeminiLiveService {
       );
     }
 
-    // 6. Saved places / Favourite route
-    if (lower.contains('saved') ||
-        lower.contains('favourite') ||
-        lower.contains('favorite') ||
-        lower.contains('home')) {
+    // 6. Reset Home Screen Layout (Specific command checked before general home)
+    if (lower.contains('reset home') ||
+        lower.contains('reset layout') ||
+        lower.contains('restore default cards') ||
+        lower.contains('restore home')) {
+      AppSettingsController.instance.resetHomeScreenLayout();
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'Opening your saved places and favourite routes. Your primary saved destination is Katpadi Railway Station.',
+            'I have reset your home screen layout and restored all default feature cards.',
         displayText:
-            'Saved Places:\n• Katpadi Railway Station\n• VIT Main Gate',
-        intent: GeminiLiveIntent.openSaved,
-        actionType: 'open_saved',
+            'Home screen reset to default layout.\nAll default feature cards restored.',
+        intent: GeminiLiveIntent.resetHome,
+        actionType: 'reset_home',
       );
     }
 
-    // 7. Customize Home Screen / Layout
+    // 7. Customize Home Screen / Layout (Specific command checked before general home)
     if (lower.contains('customize home') ||
         lower.contains('change home') ||
         lower.contains('reorder home') ||
@@ -195,20 +198,22 @@ class GeminiLiveService {
       );
     }
 
-    // 8. Reset Home Screen Layout
-    if (lower.contains('reset home') ||
-        lower.contains('reset layout') ||
-        lower.contains('restore default cards') ||
-        lower.contains('restore home')) {
-      AppSettingsController.instance.resetHomeScreenLayout();
+    // 8. Saved places / Favourite route / Go home
+    if (lower.contains('saved') ||
+        lower.contains('favourite') ||
+        lower.contains('favorite') ||
+        lower.contains('take me home') ||
+        lower.contains('go home') ||
+        lower.contains('my home') ||
+        lower == 'home') {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'I have reset your home screen layout and restored all default feature cards.',
+            'Opening your saved places and favourite routes. Your primary saved destination is Katpadi Railway Station.',
         displayText:
-            'Home screen reset to default layout.\nAll default feature cards restored.',
-        intent: GeminiLiveIntent.resetHome,
-        actionType: 'reset_home',
+            'Saved Places:\n• Katpadi Railway Station\n• VIT Main Gate',
+        intent: GeminiLiveIntent.openSaved,
+        actionType: 'open_saved',
       );
     }
 

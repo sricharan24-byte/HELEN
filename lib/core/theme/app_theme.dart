@@ -37,6 +37,55 @@ class AppTheme {
   /// High-contrast accessible theme for BusBuddy.
   static ThemeData get light => dark; // Default to master dark theme
 
+  static ThemeData get highContrast {
+    const colorScheme = ColorScheme.dark(
+      primary: Color(0xFFFFD700), // Vibrant Gold
+      onPrimary: Colors.black,
+      surface: Colors.black,
+      onSurface: Colors.white,
+      outline: Colors.white,
+      secondary: Color(0xFF00FFFF), // Vibrant Cyan
+      onSecondary: Colors.black,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: Colors.black,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          backgroundColor: const Color(0xFFFFD700),
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Colors.white, width: 2),
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF121212),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.white, width: 1.5),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      ),
+    );
+  }
+
   static ThemeData get dark {
     final colorScheme = ColorScheme.dark(
       primary: _primary,

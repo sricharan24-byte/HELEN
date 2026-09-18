@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/data/datasources/live_bus_movement_engine.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
+import 'package:busbuddy/data/models/transport_models.dart';
 
 void main() {
   group('LiveBusMovementEngine', () {
@@ -25,6 +26,25 @@ void main() {
       expect(location.etaMinutes, greaterThan(0));
       expect(location.nextStopName.isNotEmpty, isTrue);
 
+      engine.dispose();
+    });
+
+    test('handles empty stops or empty stop anchors gracefully without crashing', () async {
+      final dataSource = LocalTransportDataSource();
+      const emptyRoute = Route(
+        id: 'empty-route',
+        displayName: 'Empty Route',
+        direction: 'North',
+        orderedStopIds: [],
+      );
+
+      final engine = LiveBusMovementEngine(
+        busId: 'TN-23-EMPTY',
+        route: emptyRoute,
+        dataSource: dataSource,
+      );
+
+      expect(engine.locationStream, isNotNull);
       engine.dispose();
     });
   });

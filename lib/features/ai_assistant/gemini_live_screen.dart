@@ -132,21 +132,20 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           }
         });
 
-        // Safety fallback timer to clear speaking state if onAudioEnded doesn't fire
+        // Safety fallback timer for text-only turns; PCM playback completion is governed by onAudioEnded
         _speechTimer?.cancel();
-        final fallbackDelay = _receivedPcmThisTurn
-            ? const Duration(seconds: 8)
-            : const Duration(milliseconds: 1200);
-        _speechTimer = Timer(fallbackDelay, () {
-          if (mounted && _isSpeaking) {
-            setState(() {
-              _isSpeaking = false;
-            });
-            if (_continuousListening && !_isListening) {
-              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        if (!_receivedPcmThisTurn) {
+          _speechTimer = Timer(const Duration(milliseconds: 1200), () {
+            if (mounted && _isSpeaking) {
+              setState(() {
+                _isSpeaking = false;
+              });
+              if (_continuousListening && !_isListening) {
+                _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+              }
             }
-          }
-        });
+          });
+        }
 
         if (actionType != null && !_actionExecutedThisTurn) {
           _executeAction(actionType);
@@ -535,7 +534,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     labelText: 'Google AI Studio API Key',
                     labelStyle: const TextStyle(color: Color(0xFF38BDF8)),
                     hintText: 'Paste key from AI Studio',
-                    hintStyle: const TextStyle(color: Color(0xFF475569)),
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                     filled: true,
                     fillColor: const Color(0xFF1E293B),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -709,7 +708,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                 border: Border.all(
                   color: _liveService.isLiveApiKeyConfigured
                       ? const Color(0xFF22C55E)
-                      : const Color(0xFF475569),
+                      : const Color(0xFF94A3B8),
                 ),
               ),
               child: Text(
@@ -729,6 +728,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           IconButton(
             icon: const Icon(Icons.vpn_key, color: Color(0xFF38BDF8), size: 22),
             tooltip: 'Gemini Live API Settings',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             onPressed: _showApiKeyDialog,
           ),
           const SizedBox(width: 4),
@@ -848,7 +848,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             IconButton(
                               icon: const Icon(Icons.volume_up, color: Color(0xFF38BDF8), size: 20),
                               tooltip: 'Voice response powered by Gemini Live',
-                              constraints: const BoxConstraints(),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               padding: EdgeInsets.zero,
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -862,23 +862,27 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          _spokenOutput,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            height: 1.3,
+                        ExcludeSemantics(
+                          child: Text(
+                            _spokenOutput,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
                           ),
                         ),
                         if (_lastResponse?.displayText != null) ...[
                           const Divider(color: Color(0xFF1E293B), height: 20),
-                          Text(
-                            _lastResponse!.displayText,
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 13,
-                              height: 1.3,
+                          ExcludeSemantics(
+                            child: Text(
+                              _lastResponse!.displayText,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 13,
+                                height: 1.3,
+                              ),
                             ),
                           ),
                         ],
@@ -1072,7 +1076,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         hintText: 'Or type your question...',
-                        hintStyle: const TextStyle(color: Color(0xFF64748B)),
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                         filled: true,
                         fillColor: const Color(0xFF111C33),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
