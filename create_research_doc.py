@@ -280,16 +280,17 @@ add_numbers([
     "Present route options using deterministic facts: route, direction, stops, ETA/status.",
     "Use geocoding only when necessary; do not build client-side autocomplete on the public Nominatim service [4].",
 ])
-doc.add_heading("OpenStreetMap integration", level=2)
+doc.add_heading("OpenStreetMap Integration & Road-Accurate Routing", level=2)
 add_bullets([
-    "Use a configurable OSM-compatible tile URL and keep visible OpenStreetMap attribution [3].",
+    "Use a configurable OSM-compatible tile URL with visible OpenStreetMap attribution [3].",
     "Send an identifying User-Agent, honor caching headers, and do not prefetch or offer offline downloads from tile.openstreetmap.org [3].",
-    "For a course demo, keep map usage interactive and modest; use a commercial or self-hosted OSM-derived provider if the project grows.",
-    "Treat OSM as map context, not as the source of BusBuddy's transit route truth. Store the curated bus routes and stop order in the app/backend dataset.",
+    "Real Overpass API Stop Research: All 17 Vellore-Katpadi corridor stops verified against authentic OSM coordinates (VIT Main Gate at 12.96813° N, 79.15553° E; Katpadi Junction at 12.972° N, 79.136° E; Old Katpadi at 12.96882° N, 79.14565° E). Invented stops (Dufflpet, South Arcot) removed.",
+    "OSRM Road Geometry Snapping: Turn-by-turn street geometry fetched from OSRM driving engine snaps bus movement and route polylines to physical roads (Katpadi Road / NH 75) rather than straight lines.",
+    "Route-Only Segment Map: Map clips rendering to the commuter's specific boarding and alighting segment, eliminating visual clutter from unrelated corridor stops.",
 ])
-doc.add_heading("Realtime bus tracking", level=2)
-doc.add_paragraph("Begin with a deterministic polyline simulator. A simulator moves a bus through the ordered route points and emits LiveLocation records. Later, a driver/simulator phone publishes the same record shape to Firebase; the passenger app attaches a listener only to the selected bus path, avoiding oversized root listeners [5].")
-doc.add_paragraph("Suggested flow: driver GPS/simulator → /liveLocations/{busId} → passenger repository stream → journey state calculator → UI text/map update → threshold-based speech/haptic alert.")
+doc.add_heading("Realtime bus tracking & Dynamic Timeline", level=2)
+doc.add_paragraph("BusBuddy implements a road-accurate movement engine (LiveBusMovementEngine) where the bus travels along real road polylines using cumulative-distance interpolation and speed variation (22–38 km/h). Demo cycles run over 60 ticks × 2 s with real-time ETA and stop calculations.")
+doc.add_paragraph("Dynamic Journey Timeline: The active trip progress timeline synchronizes directly with real live bus metrics across 4 threshold stages (0%, 20%, 50%, 90% progress), providing visually impaired commuters and older adults with instant, clear journey progression indicators.")
 doc.add_heading("ETA and journey state", level=2)
 add_bullets([
     "Compute approximate ETA from distance to the next stop and recent speed, with a minimum/default speed when speed is unavailable.",
@@ -300,13 +301,14 @@ add_bullets([
 doc.add_heading("Voice and Gemini Multimodal Live Integration", level=2)
 doc.add_paragraph("For accessible public transport guidance, conversational voice interaction must be low-latency, natural-sounding, and grounded in deterministic state. BusBuddy implements a dual-mode conversational architecture: a local offline intent-matching speech engine for zero-dependency operation, and a cloud-streamed Google Gemini Multimodal Live API layer operating over bidirectional WebSockets [7, 8].")
 
-doc.add_heading("Bidirectional Live WebSocket Pipeline", level=3)
+doc.add_heading("Bidirectional Live WebSocket Pipeline & Continuous Hands-Free Mode", level=3)
 add_bullets([
-    "Connects directly to Google's BidiGenerateContent endpoint (wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent) using model models/gemini-3.8-live.",
+    "Connects directly to Google's BidiGenerateContent endpoint (wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent) using model models/gemini-3.8-live.",
     "Streams real-time 24kHz linear PCM audio chunks directly to the browser AudioContext, providing immediate conversational turn delivery compared to traditional REST TTS synthesis.",
-    "Implements full-duplex conversational flow with server-side barge-in interruption detection (onInterrupted) to halt audio playback immediately when the commuter begins speaking.",
+    "Persistent Continuous Hands-Free Listening: Once initiated, the microphone stays continuously active across conversational turns, auto-restarting on silence timeouts and automatically resuming 350ms after the AI finishes speaking.",
+    "Implements full-duplex conversational flow with server-side barge-in interruption detection (onInterrupted) to halt audio playback immediately when the commuter begins speaking, with 1.5s echo debouncing.",
     "Overcomes browser autoplay policy constraints by attaching global interaction listeners across touch, click, pointer, and keydown events on window and document to keep the Web Audio API hardware initialized.",
-    "Sanitizes Protobuf JSON audio frames by replacing URL-safe base64 characters (- and _) and appending proper padding before browser decoding, while drift-snapping playback schedules to eliminate audio stutter.",
+    "Sanitizes Protobuf JSON audio frames by replacing URL-safe base64 characters (- and _) and appending proper padding before browser decoding, while drift-snapping playback schedules (40ms jitter buffer) to eliminate audio stutter.",
 ])
 
 doc.add_heading("Official Google Voice Personas and Acoustic Styling", level=3)
@@ -319,13 +321,14 @@ add_table(["Voice Name", "Vocal Timbre & Persona", "Recommended Transit Context"
     ("Fenrir", "Deep, resonant, low-frequency male voice", "Noisy roadside conditions, ambient outdoor bus stand acoustics"),
 ], [1800, 3780, 3780])
 
-doc.add_heading("Natural Conversational Grounding & Silent Tool Execution", level=3)
+doc.add_heading("Natural Conversational Grounding & Hybrid Audio Architecture", level=3)
 doc.add_paragraph("A common pitfall in conversational transit assistants is the tendency for models to verbalize internal function signatures or JSON schemas aloud (e.g., reciting 'Executing get_next_bus with stopId VIT'). BusBuddy enforces strict decoupling between deterministic transit execution and conversational output:")
 add_bullets([
     "Deterministic application tools (get_next_bus, get_active_ticket, book_ticket, navigate_to, share_location) are declared in the Live session handshake.",
     "When a function call is dispatched by Gemini, the client executes the local domain repository action silently in the background without reading out technical parameters.",
     "System prompts mandate conversational transit responses: 'Never read aloud raw function calls, JSON payloads, or function parameters. Answer concisely and conversationally in 1-2 plain sentences.'",
-    "Turn completion guarantees: if network packet loss drops native PCM audio, a debounced Web Speech fallback automatically speaks a friendly transit summary aloud.",
+    "Hybrid Speech Output Architecture: If native 24kHz PCM chunks are absent (REST fallback, text-only turn, or local offline query), a Web SpeechSynthesis fallback automatically speaks the response aloud with markdown sanitization and onAudioEnded signaling.",
+    "Conversational Query Disambiguation: Distinguishes conversational help inquiries ('Can you help me find a bus?') from emergency SOS distress signals.",
 ])
 
 doc.add_heading("Floating Mascot Bubble & Multitasking Overlay Window", level=3)
@@ -337,6 +340,7 @@ add_bullets([
     "Prompt Shortcuts & Keyboard Input: Includes quick horizontal transit suggestion chips alongside a text field for accessible, multi-modal interaction in noisy or quiet environments.",
     "Global Overlay Tree Architecture: Integrated an authoritative top-level Overlay widget in MaterialApp.builder with accessible Semantics on header action buttons, preventing RawTooltip assertions and ensuring seamless compatibility across Web, Chrome, and mobile.",
     "Context Awareness & Lifecycle Coordination: Automatically suspends the floating bubble when the full-screen GeminiLiveScreen is launched to avoid redundant UI.",
+    "48x48dp Touch Targets & Clamped Scaling: All interactive controls strictly meet the 48x48dp minimum accessible touch target size with platform text scaling clamped between 0.85x and 2.0x.",
 ])
 doc.add_heading("Computer vision", level=2)
 add_bullets([

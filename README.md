@@ -32,9 +32,11 @@ The application combines real-time interactive mapping, turn-by-turn street rout
   - `Fenrir` (Deep, resonant male)  
   *Configurable via Voice Assistant Settings or via `--dart-define=GEMINI_VOICE=Aoede`.*
 - **Natural Transit Communication**: Clean background function/tool execution where the assistant communicates naturally in concise transit statements rather than reading raw function names or JSON schemas aloud.
-- **Zero-Latency Web Audio & Speech Pipeline**: Streams 24kHz linear PCM audio chunks directly from Gemini Live over WebSocket, scheduled on browser `AudioContext` with automatic drift-snapping. Features global autoplay policy unlock listeners across touch/click/pointer events, URL-safe Base64 sanitization, and debounced platform SpeechSynthesis fallback when offline.
+- **Persistent Continuous Hands-Free Listening Mode**: Once the microphone is enabled, speech recognition stays continuously active across multi-turn conversations. Automatically restarts on browser silence timeouts, automatically resumes listening 350ms after the AI finishes speaking, and features acoustic echo debouncing to prevent feedback.
+- **Hybrid Voice Output Pipeline (24kHz PCM + Web SpeechSynthesis)**: Streams native 24kHz linear PCM audio chunks directly from Gemini Live over WebSocket with automatic drift-snapping. Seamlessly falls back to Web SpeechSynthesis for text-only turns, REST fallback, or offline usage, ensuring spoken audio delivery under all operating conditions. Global autoplay policy unlock listeners across touch/click/pointer events guarantee instant sound playback on web.
 - **Full-Duplex Conversational Flow**: Real-time user barge-in / speech interruption detection and automatic microphone re-listening once Gemini completes a turn.
 - **Tool Execution**: Spoken queries trigger live tool actions (`"Where is my bus?"` → Live GPS Map; `"Find bus to Katpadi"` → Route search; `"Book ticket"` → Concession checkout; `"Share location"` → SOS broadcast).
+- **Conversational Disambiguation**: Intelligently differentiates general inquiries (*"Can you help me find a bus?"*) from emergency SOS distress commands.
 
 ### 🫧 2. Floating BusBuddy AI Bubble & Multitasking Window Overlay
 - **Draggable Floating Mascot Bubble**: A 64x64 glowing, animated mascot orb that floats persistently across all app screens via `MaterialApp.builder`. Commuters can freely drag it anywhere on the screen with boundary edge clamping.
@@ -55,12 +57,21 @@ The application combines real-time interactive mapping, turn-by-turn street rout
   - **Passenger Types**: `General`, `Student` (40% concession discount), `Senior` (40% concession discount).
   - **Payment Options**: `UPI` (GPay / PhonePe / Paytm), `Credit / Debit Card`, `BusBuddy Wallet`.
   - **Instant Digital Boarding Pass**: Generates unique QR code pass (`BUSBUDDY-PASS-xxxxxx`), valid time window, and fare receipt.
+- **Dynamic Live Bus Progress Timeline**: Visual timeline node tracker updates dynamically based on live bus movement metrics across 4 threshold stages (0%, 20%, 50%, 90% completion).
+- **Route-Only Segment Map**: Displays only the passenger's boarding-to-alighting segment on the map, eliminating visual clutter from unrelated stops.
 
 ### 🛡️ 5. Emergency SOS & Live Trip Sharing
 - **1-Tap Emergency Broadcast**: Triggers SOS notifications to trusted contacts with live GPS coordinates.
+- **Direct Safety Navigation**: Navigates directly into the full `SafetySharingPage` with active ticket details pre-populated.
 - **Trip Tracking Links**: Generates instant WhatsApp/SMS live tracking links for family and caregivers.
 
-### ⚙️ 6. User-Created Customizable Home Screen & Personalization Hub
+### ♿ 6. Accessibility & Inclusivity Standards Compliance
+- **Touch Target Sizing**: All interactive buttons, prompt chips, and action cards strictly enforce the 48x48dp minimum tap target size (WCAG 2.2 / Material Design).
+- **Adaptive Text Scaling Clamping**: Text scaling factors are clamped between 0.85x and 2.0x, ensuring large text accessibility options never induce layout overflow.
+- **High-Contrast & Dark Mode**: Dedicated high-contrast color scheme and dark themes optimized for low-vision visibility and night commutes.
+- **Screen Reader First (TalkBack / VoiceOver)**: Explicit semantic descriptions, live region announcements, and focus management across all screens.
+
+### ⚙️ 7. User-Created Customizable Home Screen & Personalization Hub
 - **User-Created Interface (`HomeScreenCustomizationPage`)**: Commuters can reorder, show, hide, and reset home screen components (Route Search, Journey Assistant, Tickets, Saved Places, Gemini Live, Live Bus Map, Corridor Alerts, Emergency SOS, Settings).
 - **Dual Touch & Non-Touch Accessible Reordering**: Provides touch drag-and-drop (`ReorderableListView`) alongside accessible `Move Up` and `Move Down` buttons with full TalkBack semantics announcements (`SemanticsService.announce`), catering to blind and low-vision commuters.
 - **Dynamic Home Screen Rendering**: Reactive card stack that automatically excludes hidden features and renders cards in the commuter's saved custom order, with an accessible empty state and 1-tap restore action.

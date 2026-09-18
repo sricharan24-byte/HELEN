@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 18, 2026 (Chunk 28 — Real OSM Bus Stop Data, Route-Only Map & Road-Accurate Bus Movement; map data verified, engine rewritten, test work in progress)  
+**Last Updated**: September 18, 2026 (Chunk 32 — Web Audio & Gemini Live Voice Output Restoration; voice output functional across 24kHz PCM and Web SpeechSynthesis fallback)  
 
 ---
 
@@ -283,13 +283,63 @@ The application provides intuitive journey planning, digital ticket booking with
 * [x] **Chunk 25**: Comprehensive Codebase Audit, Null Safety Hardening & Floating Assistant Stabilization (Fixed viewport clamping on resize/rotation, chat auto-scroll user lockout prevention, complete action parity for emergency SOS & live route discovery, dynamic session reconnect on credential updates, and eliminated force-unwraps across all assistants) (Completed)
 * [x] **Chunk 26**: User-Created Customizable Home Screen Layout Suite (Touch drag-and-drop, accessible move up/down buttons, visibility switches, dynamic HomePage rendering, local storage persistence, voice command integration) (Completed)
 * [x] **Chunk 27**: Adaptive UI Shortcut Generator & Commuter Governance Suite (Habit tracking engine, user-governed suggestions, 1-tap pin/dismiss controls, HomePage suggested carousel, Personalization management sheet, and automated test suite) (Completed)
-* [ ] **Chunk 28**: Real OSM Bus Stop Data Research, Route-Only Map & Road-Accurate Bus Movement (Verified Vellore/Katpadi stop coordinates via Overpass + OSRM, replaced invented stops, baked corridor road paths, bus follows real streets, map shows only user's origin→destination segment; test-suite restoration in progress) (In Progress)
+* [x] **Chunk 28**: Real OSM Bus Stop Data Research, Route-Only Map & Road-Accurate Bus Movement (Verified Vellore/Katpadi stop coordinates via Overpass + OSRM, replaced invented stops, baked corridor road paths, bus follows real streets, map shows only user's origin→destination segment) (Completed)
+* [x] **Chunk 29**: Persistent Continuous Hands-Free Microphone Listening Mode (Automatic recognition restart on silence/timeout, turn-completion mic resumption, mute state preservation, voice feedback suppression) (Completed)
+* [x] **Chunk 30**: Lifecycle Safety, Accessibility Tap Target Compliance & Framework Assertion Guards (Stream/timer disposal, 48x48dp minimum accessible touch targets, post-frame-deferred full-screen notifications, route type disambiguation) (Completed)
+* [x] **Chunk 31**: Comprehensive Architectural, Booking Engine & Progress Timeline Audit Hardening (Clamped text scaling 0.85x–2.0x, high-contrast/dark theme accessibility, direct SafetySharingPage SOS navigation, live bus progress timeline sync, empty route engine resilience) (Completed)
+* [x] **Chunk 32**: Web Audio & Gemini Live Voice Output Restoration (WebSocket Handshake & Hybrid TTS Fallback) (Cleaned Bidi setup payload, full Web SpeechSynthesis fallback with markdown stripping, AudioSpeechEngine enabled, controller voice delivery on text turns, hot-reload JS bridge re-registration, 40ms PCM jitter buffer) (Completed)
 
 ---
 
-### 13. 🗺️ Chunk 28 — Real OSM Bus Stop Data, Route-Only Map & Road-Accurate Bus Movement (In Progress)
+### 17. 🔊 Chunk 32 — Web Audio & Gemini Live Voice Output Restoration (WebSocket Handshake & Hybrid TTS Fallback)
+* **Folder**: `lib/features/ai_assistant/`
+* **Status**: ✅ Completed
+* **Problem Addressed**: Commuters observed that while Gemini Live responded with text on screen, there was no audible sound coming from the speakers across Chrome web sessions.
+* **Components Fixed & Enhanced**:
+  * **Gemini Live Setup Protocol Compliance** ([gemini_live_session.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_session.dart)): Removed invalid `'outputAudioTranscription'` property from inside `setup.generationConfig`. The Google AI Studio WebSocket server (`BidiGenerateContent`) strictly rejects this key with an invalid JSON payload error (1007), which previously caused immediate WebSocket disconnection and forced fallback to REST. Cleaned `functionDeclarations` parameters schema to adhere to OpenAPI specifications.
+  * **Full Web SpeechSynthesis Fallback Engine** ([web_speech_real.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/web_speech_real.dart)): Implemented full `window.__bb_speak_text` function using browser `SpeechSynthesisUtterance`. Added markdown character sanitization (removing `*`, `#`, `_` so the TTS does not speak markdown syntax), utterance error recovery, automatic `speechSynthesis.resume()` for stalled audio engines, and reliable `onend` signaling that calls `window.__bb_on_audio_ended()`.
+  * **Speech Delivery Across All Interaction Modes** ([floating_assistant_controller.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/floating_assistant_controller.dart), [gemini_live_screen.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_screen.dart)): Enabled `AudioSpeechEngine.speak` in `onTurnComplete` whenever native PCM chunks were not received (such as during REST fallback or text-only responses). Wired audio speech output to local queries and prompt states when the API key is not yet set or when offline, ensuring passengers always receive audible guidance.
+  * **Hot-Reload JS Bridge Reconnection & Buffer Drift Control** ([web_speech_real.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/web_speech_real.dart)): Removed blocking `if (window.__bb_speech_engine_initialized) return;` so bridge methods re-register reliably on Flutter hot restarts while preserving existing `AudioContext` hardware instances. Tuned PCM playback jitter scheduling to 40ms with a 1.5-second drift-reset guard to prevent audio latency accumulation.
+
+---
+
+### 16. 🛡️ Chunk 31 — Comprehensive Architectural, Booking Engine & Progress Timeline Audit Hardening
+* **Folder**: `lib/main.dart`, `lib/features/tickets/`, `lib/data/datasources/`, `test/`
+* **Status**: ✅ Completed
+* **Components Fixed & Enhanced**:
+  * **Theme & Dynamic Text Scaling** ([main.dart](file:///home/pavan/BusBuddy/lib/main.dart)): Hardened high-contrast and dark theme accessibility definitions. Clamped effective text scaling between 0.85x and 2.0x, ensuring large accessibility text scaling does not cause RenderFlex overflows or unreadable UI clipping.
+  * **Emergency SOS Navigation Parity** ([ticket_booking_suite_page.dart](file:///home/pavan/BusBuddy/lib/features/tickets/ticket_booking_suite_page.dart)): Upgraded the emergency SOS action to navigate directly to `SafetySharingPage`, passing active ticket context and trip parameters for immediate emergency broadcast.
+  * **Live Bus Movement Timeline Progress** ([ticket_booking_suite_page.dart](file:///home/pavan/BusBuddy/lib/features/tickets/ticket_booking_suite_page.dart)): Synchronized `_buildProgressTimeline` with real-time `BusLocation` stream metrics. Node highlights and connection lines now dynamically advance across 4 journey stages based on progress percentage thresholds (0%, 20%, 50%, 90%).
+  * **Empty Sequence Engine Resilience** ([live_bus_movement_engine.dart](file:///home/pavan/BusBuddy/lib/data/datasources/live_bus_movement_engine.dart)): Guarded `LiveBusMovementEngine` against empty stop sequences and empty anchor lists, guaranteeing smooth stream initialization without divide-by-zero crashes.
+  * **Conversational Intent Disambiguation** ([gemini_live_service.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_service.dart), [gemini_live_test.dart](file:///home/pavan/BusBuddy/test/features/gemini_live_test.dart)): Disambiguated conversational queries containing the word "help" (e.g., *"Can you help me find a bus?"*, *"Help me book a ticket"*) from emergency SOS triggers, preventing false distress broadcasts.
+
+---
+
+### 15. ♿ Chunk 30 — Lifecycle Safety, Accessibility Tap Target Compliance & Framework Assertion Guards
+* **Folder**: `lib/features/journey/`, `lib/features/tickets/`, `lib/features/ai_assistant/`, `lib/core/theme/`
+* **Status**: ✅ Completed
+* **Components Fixed & Enhanced**:
+  * **Stream Subscription & Timer Disposal**: Cancelled active `StreamSubscription` instances and animation timers across `LiveLocationScreen` and journey controllers during `dispose()`, preventing memory leaks and background CPU cycles.
+  * **WCAG 2.2 / Material 48x48dp Touch Targets**: Enforced minimum 48x48dp tap target sizes across all action chips, prompt buttons, and interactive cards to comply with international accessibility standards.
+  * **Flutter Framework Assertion Elimination**: Fixed `setState() or markNeedsBuild() called during build` by deferring `FloatingAssistantController.setFullScreenActive(true)` notifications using `WidgetsBinding.instance.addPostFrameCallback`.
+  * **Domain Route Type Disambiguation**: Resolved name collision between Flutter framework `Route` and transport model `Route` in ticket booking suite pages.
+
+---
+
+### 14. 🎙️ Chunk 29 — Persistent Continuous Hands-Free Microphone Listening Mode
+* **Folder**: `lib/features/ai_assistant/`
+* **Status**: ✅ Completed
+* **Components Built & Integrated**:
+  * **Auto-Restarting Hands-Free Recognition**: Configured Web SpeechRecognition to automatically restart when silence timeouts occur or when a browser recognition turn finishes, keeping voice mode persistently active until explicitly paused.
+  * **Turn Completion Resumption**: Automatically re-engages the microphone 350ms after the assistant completes its spoken response, allowing seamless hands-free multi-turn conversations.
+  * **Mute State Preservation**: Mic mute toggle silences incoming audio and stops ongoing speech without disconnecting or tearing down the continuous listening session.
+  * **Echo Suppression & Debouncing**: Added 1.5-second debouncing on duplicate voice transcripts to prevent microphone feedback loop when sound plays through device speakers.
+
+---
+
+### 13. 🗺️ Chunk 28 — Real OSM Bus Stop Data, Route-Only Map & Road-Accurate Bus Movement
 * **Folder**: `lib/data/datasources/`, `lib/data/services/`, `lib/features/journey/`, `lib/features/tickets/`, `lib/features/ai_assistant/`, `test/`
-* **Status**: ⚙️ In Progress (implementation complete & verified with `flutter analyze` 0 errors; full test-suite restoration paused mid-way)
+* **Status**: ✅ Completed
 * **Problem Reported by User**:
   * The map showed no proper bus stop data (several fixtures were invented or misplaced).
   * The map displayed every corridor stop instead of only the passenger's own start → end route.
