@@ -242,7 +242,6 @@ void _ensureJsBridge() {
         };
 
         window.__bb_start_recognition = function(lang, onResult, onError, onEnd) {
-          window.__bb_play_tone(true);
           window.__bb_stop_recognition();
 
           var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -288,7 +287,9 @@ void _ensureJsBridge() {
             };
 
             rec.onend = function() {
-              window.__bb_active_rec = null;
+              if (window.__bb_active_rec === rec) {
+                window.__bb_active_rec = null;
+              }
               if (onEnd) onEnd();
             };
 
@@ -303,9 +304,13 @@ void _ensureJsBridge() {
         window.__bb_stop_recognition = function() {
           if (window.__bb_active_rec) {
             try {
-              window.__bb_active_rec.abort();
+              var oldRec = window.__bb_active_rec;
+              window.__bb_active_rec = null;
+              oldRec.onend = null;
+              oldRec.onerror = null;
+              oldRec.onresult = null;
+              oldRec.abort();
             } catch (_) {}
-            window.__bb_active_rec = null;
           }
         };
       })();

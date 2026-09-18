@@ -628,7 +628,9 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                         const SizedBox(width: 8),
                         Text(
                           isListening
-                              ? 'Listening (Tap to Mute)'
+                              ? (_controller.isContinuousListening
+                                  ? 'Continuous Mic (Tap to Mute)'
+                                  : 'Listening (Tap to Mute)')
                               : isSpeaking
                                   ? 'Speaking (Tap to Silence)'
                                   : isMuted

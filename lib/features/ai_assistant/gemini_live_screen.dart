@@ -136,13 +136,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
         // Safety fallback timer to clear speaking state if onAudioEnded doesn't fire
         _speechTimer?.cancel();
-        _speechTimer = Timer(const Duration(seconds: 4), () {
-          if (mounted) {
+        final fallbackDelay = _receivedPcmThisTurn
+            ? const Duration(seconds: 8)
+            : const Duration(milliseconds: 1200);
+        _speechTimer = Timer(fallbackDelay, () {
+          if (mounted && _isSpeaking) {
             setState(() {
               _isSpeaking = false;
-              _isListening = false;
-              _liveTranscription = 'Tap the microphone orb to speak, or choose a prompt below.';
             });
+            if (_continuousListening && !_isListening) {
+              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+            }
           }
         });
 
@@ -158,14 +162,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         if (!mounted) return;
         _audioEngine.stop();
         _speechTimer?.cancel();
+        _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
-          _isListening = false;
         });
+        if (_continuousListening && !_isListening) {
+          _scheduleRestartListening(delayMs: 300, playChimeTone: true);
+        }
       },
       onError: (err) {
         if (!mounted) return;
         debugPrint('[GeminiLiveScreen] Session error: $err');
+        _speechTimer?.cancel();
+        _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
           _isListening = false;
@@ -173,7 +182,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _liveTranscription = 'Connection notice: $err';
           _spokenOutput = 'Gemini Live encountered a connection issue. Please check your API key or network.';
         });
-        _speechTimer?.cancel();
       },
       onStatusChanged: (status, _) {
         if (!mounted) return;
@@ -190,18 +198,29 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // Unlock audio context
     _audioEngine.unlockAudio();
 
-    // Register audio completion callback so _isSpeaking resets cleanly
+    // Register audio completion callback so _isSpeaking resets cleanly and resumes continuous listening
     _audioEngine.setAudioEndedCallback(() {
       if (mounted) {
+        _speechTimer?.cancel();
         setState(() {
           _isSpeaking = false;
         });
+        if (_continuousListening) {
+          _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        }
       }
     });
 
-    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
-      _handleVoiceInput(widget.initialQuery!);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+        _continuousListening = true;
+        _handleVoiceInput(widget.initialQuery!);
+      } else {
+        _continuousListening = true;
+        _startMicrophoneListening(playChimeTone: true);
+      }
+    });
   }
 
   String _lastInterimTranscript = '';
@@ -210,13 +229,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   DateTime? _lastVoiceInputTime;
   String _lastProcessedQuery = '';
 
+  bool _continuousListening = true;
+  Timer? _restartListenTimer;
   Timer? _speechTimer;
 
   @override
   void dispose() {
+    _continuousListening = false;
+    _restartListenTimer?.cancel();
+    _speechTimer?.cancel();
     FloatingAssistantController.instance.setFullScreenActive(false);
     _liveSession.disconnect();
-    _speechTimer?.cancel();
     _audioEngine.stopListening();
     _audioEngine.stop();
     _pulseController.dispose();
@@ -224,10 +247,18 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     super.dispose();
   }
 
-  void _startMicrophoneListening() {
-    if (_isListening || _isSpeaking) return;
+  void _startMicrophoneListening({bool playChimeTone = false, bool isRestart = false}) {
+    if (!mounted) return;
+    if (_isSpeaking) return;
+    if (_isListening && !isRestart) return;
+
+    _restartListenTimer?.cancel();
     _lastInterimTranscript = '';
     _processedFinal = false;
+
+    if (playChimeTone) {
+      _audioEngine.playChime(isListening: true);
+    }
 
     setState(() {
       _isListening = true;
@@ -249,7 +280,25 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         }
       },
       onError: (err) {
-        if (mounted) {
+        if (!mounted) return;
+        debugPrint('[GeminiLiveScreen] Speech recognition error: $err');
+        final isPermissionError = err.toLowerCase().contains('blocked') ||
+            err.toLowerCase().contains('denied') ||
+            err.toLowerCase().contains('not-allowed');
+
+        if (isPermissionError) {
+          _continuousListening = false;
+          _restartListenTimer?.cancel();
+          setState(() {
+            _isListening = false;
+            _liveTranscription = 'Microphone permission blocked. Please allow mic access in your browser.';
+          });
+          return;
+        }
+
+        if (_continuousListening && !_isSpeaking) {
+          _scheduleRestartListening(delayMs: 1200);
+        } else {
           setState(() {
             _isListening = false;
             _liveTranscription = '$err Tap mic orb or select a prompt below.';
@@ -258,20 +307,38 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
       onEnd: () {
         if (!mounted) return;
-        if (!_processedFinal && _lastInterimTranscript.isNotEmpty) {
+        if (!_processedFinal && _lastInterimTranscript.trim().isNotEmpty) {
           _processedFinal = true;
           _handleVoiceInput(_lastInterimTranscript);
         } else if (!_processedFinal) {
-          setState(() {
-            _isListening = false;
-            _liveTranscription = 'Tap the microphone orb to speak, or choose a prompt below.';
-          });
+          if (_continuousListening && !_isSpeaking) {
+            // Silence timeout occurred without speech: seamlessly restart continuous listening!
+            _scheduleRestartListening(delayMs: 150);
+          } else {
+            setState(() {
+              _isListening = false;
+              _liveTranscription = 'Tap the microphone orb to speak, or choose a prompt below.';
+            });
+          }
         }
       },
     );
   }
 
+  void _scheduleRestartListening({int delayMs = 300, bool playChimeTone = false}) {
+    _restartListenTimer?.cancel();
+    if (!mounted || !_continuousListening || _isSpeaking) return;
+
+    _restartListenTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (mounted && _continuousListening && !_isSpeaking && !_isListening) {
+        _startMicrophoneListening(playChimeTone: playChimeTone, isRestart: true);
+      }
+    });
+  }
+
   void _stopMicrophoneListening() {
+    _continuousListening = false;
+    _restartListenTimer?.cancel();
     _audioEngine.stopListening();
     if (mounted) {
       setState(() {
@@ -299,6 +366,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _receivedPcmThisTurn = false;
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();
+    _restartListenTimer?.cancel();
     _audioEngine.stop();
     _audioEngine.stopListening();
     _audioEngine.resetTurn();
@@ -883,32 +951,40 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             if (_isListening) {
                               _stopMicrophoneListening();
                             } else {
+                              _continuousListening = true;
                               if (_isSpeaking) {
                                 _audioEngine.stop();
                                 _speechTimer?.cancel();
+                                _restartListenTimer?.cancel();
                                 setState(() {
                                   _isSpeaking = false;
                                 });
                               }
-                              _audioEngine.playChime(isListening: true);
-                              _startMicrophoneListening();
+                              _startMicrophoneListening(playChimeTone: true);
                             }
                           },
-                          child: Container(
-                            width: 64,
-                            height: 64,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _isListening
-                                  ? Icons.mic
-                                  : _isSpeaking
-                                      ? Icons.graphic_eq
-                                      : Icons.mic_none,
-                              color: const Color(0xFF007AFF),
-                              size: 32,
+                          child: Tooltip(
+                            message: _isListening
+                                ? 'Microphone listening. Tap to pause.'
+                                : 'Microphone paused. Tap to start continuous voice.',
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _isListening
+                                    ? Icons.mic
+                                    : _isSpeaking
+                                        ? Icons.graphic_eq
+                                        : Icons.mic_off,
+                                color: _isListening
+                                    ? const Color(0xFF007AFF)
+                                    : const Color(0xFF64748B),
+                                size: 32,
+                              ),
                             ),
                           ),
                         ),
@@ -920,17 +996,49 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
               const SizedBox(height: 12),
 
-              // Live Speech Transcription text pill
+              // Live Speech Transcription text pill & Continuous status badge
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  _liveTranscription,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_continuousListening && _isListening) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.mic, size: 13, color: Color(0xFF10B981)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Continuous Mic Active',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    Text(
+                      _liveTranscription,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 

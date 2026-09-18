@@ -48,6 +48,9 @@ class FloatingAssistantController extends ChangeNotifier {
   String _liveStatus = 'Ready';
   String? _lastInterimTranscript;
 
+  bool _continuousListening = false;
+  Timer? _restartListenTimer;
+
   Offset _position = const Offset(24, 480);
   bool _hasCustomPosition = false;
 
@@ -62,6 +65,7 @@ class FloatingAssistantController extends ChangeNotifier {
   bool get isSpeaking => _isSpeaking;
   bool get isFullScreenActive => _isFullScreenActive;
   bool get hasUnread => _hasUnread;
+  bool get isContinuousListening => _continuousListening;
   String get liveStatus => _liveStatus;
   String? get lastInterimTranscript => _lastInterimTranscript;
   Offset get position => _position;
@@ -93,6 +97,10 @@ class FloatingAssistantController extends ChangeNotifier {
   void _initAudio() {
     _audioEngine.setAudioEndedCallback(() {
       _isSpeaking = false;
+      _speechTimer?.cancel();
+      if (_continuousListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
+        _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+      }
       notifyListeners();
     });
   }
@@ -154,9 +162,17 @@ class FloatingAssistantController extends ChangeNotifier {
         }
 
         _speechTimer?.cancel();
-        _speechTimer = Timer(const Duration(seconds: 4), () {
-          _isSpeaking = false;
-          notifyListeners();
+        final fallbackDelay = _receivedPcmThisTurn
+            ? const Duration(seconds: 8)
+            : const Duration(milliseconds: 1200);
+        _speechTimer = Timer(fallbackDelay, () {
+          if (_isSpeaking) {
+            _isSpeaking = false;
+            if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
+              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+            }
+            notifyListeners();
+          }
         });
 
         notifyListeners();
@@ -164,8 +180,12 @@ class FloatingAssistantController extends ChangeNotifier {
       onInterrupted: () {
         _audioEngine.stop();
         _speechTimer?.cancel();
+        _restartListenTimer?.cancel();
         _isSpeaking = false;
         _isListening = false;
+        if (_continuousListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
+          _scheduleRestartListening(delayMs: 300, playChimeTone: true);
+        }
         notifyListeners();
       },
       onError: (err) {
@@ -193,6 +213,9 @@ class FloatingAssistantController extends ChangeNotifier {
 
   void closeWindow() {
     _isWindowOpen = false;
+    _continuousListening = false;
+    _restartListenTimer?.cancel();
+    stopListening(disableContinuous: true);
     notifyListeners();
   }
 
@@ -208,6 +231,8 @@ class FloatingAssistantController extends ChangeNotifier {
   void toggleMute() {
     _isMuted = !_isMuted;
     if (_isMuted) {
+      _continuousListening = false;
+      _restartListenTimer?.cancel();
       stopAllAudio();
       _liveStatus = 'Muted';
     } else {
@@ -223,7 +248,11 @@ class FloatingAssistantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stopListening() {
+  void stopListening({bool disableContinuous = true}) {
+    if (disableContinuous) {
+      _continuousListening = false;
+    }
+    _restartListenTimer?.cancel();
     _isListening = false;
     _audioEngine.stopListening();
     _liveStatus = 'Ready';
@@ -232,7 +261,7 @@ class FloatingAssistantController extends ChangeNotifier {
 
   void stopAllAudio() {
     stopSpeaking();
-    stopListening();
+    stopListening(disableContinuous: true);
   }
 
   // ── Mic Orb Interaction ────────────────────────────────────────────────────
@@ -241,22 +270,27 @@ class FloatingAssistantController extends ChangeNotifier {
 
     if (_isListening) {
       // Currently listening -> Mute mic
-      stopListening();
+      stopListening(disableContinuous: true);
     } else if (_isSpeaking) {
       // AI speaking -> Mute AI voice immediately
       stopSpeaking();
     } else {
-      // Idle -> Start listening
-      startListening();
+      // Idle -> Start continuous listening
+      _continuousListening = true;
+      startListening(playChimeTone: true);
     }
   }
 
-  void startListening() {
-    if (_isListening) return;
+  void startListening({bool playChimeTone = true, bool isRestart = false}) {
+    if (_isListening && !isRestart) return;
+    if (_isSpeaking || _isMuted || _isFullScreenActive) return;
+    _restartListenTimer?.cancel();
     stopSpeaking();
 
     _audioEngine.unlockAudio();
-    _audioEngine.playChime(isListening: true);
+    if (playChimeTone) {
+      _audioEngine.playChime(isListening: true);
+    }
 
     _isListening = true;
     _liveStatus = 'Listening...';
@@ -276,24 +310,52 @@ class FloatingAssistantController extends ChangeNotifier {
         }
       },
       onError: (err) {
+        final isPermission = err.toLowerCase().contains('blocked') ||
+            err.toLowerCase().contains('denied') ||
+            err.toLowerCase().contains('not-allowed');
+        if (isPermission) {
+          _continuousListening = false;
+          _restartListenTimer?.cancel();
+        }
         _isListening = false;
         _liveStatus = 'Mic error: $err';
         notifyListeners();
+
+        if (!isPermission && _continuousListening && !_isSpeaking && !_isMuted && !_isFullScreenActive && _isWindowOpen) {
+          _scheduleRestartListening(delayMs: 1200);
+        }
       },
       onEnd: () {
         if (_isListening) {
-          _isListening = false;
           if (_lastInterimTranscript != null && _lastInterimTranscript!.trim().isNotEmpty) {
             final q = _lastInterimTranscript!;
             _lastInterimTranscript = null;
+            _isListening = false;
             sendQuery(q);
           } else {
-            _liveStatus = 'Ready';
-            notifyListeners();
+            if (_continuousListening && !_isSpeaking && !_isMuted && !_isFullScreenActive && _isWindowOpen) {
+              // Silence timeout occurred without speech: seamlessly restart continuous listening!
+              _scheduleRestartListening(delayMs: 150);
+            } else {
+              _isListening = false;
+              _liveStatus = 'Ready';
+              notifyListeners();
+            }
           }
         }
       },
     );
+  }
+
+  void _scheduleRestartListening({int delayMs = 300, bool playChimeTone = false}) {
+    _restartListenTimer?.cancel();
+    if (!_continuousListening || _isSpeaking || _isMuted || _isFullScreenActive || !_isWindowOpen) return;
+
+    _restartListenTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (_continuousListening && !_isSpeaking && !_isMuted && !_isFullScreenActive && !_isListening && _isWindowOpen) {
+        startListening(playChimeTone: playChimeTone, isRestart: true);
+      }
+    });
   }
 
   // ── Send Query ─────────────────────────────────────────────────────────────
@@ -303,7 +365,7 @@ class FloatingAssistantController extends ChangeNotifier {
 
     _audioEngine.unlockAudio();
     stopSpeaking();
-    stopListening();
+    stopListening(disableContinuous: false);
     _audioEngine.resetTurn();
     _receivedPcmThisTurn = false;
 
