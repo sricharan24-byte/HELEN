@@ -73,8 +73,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    FloatingAssistantController.instance.setFullScreenActive(true);
-
     _liveSession = GeminiLiveSession(
       onTextChunk: (text) {
         if (!mounted) return;
@@ -213,6 +211,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      FloatingAssistantController.instance.setFullScreenActive(true);
       if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
         _continuousListening = true;
         _handleVoiceInput(widget.initialQuery!);

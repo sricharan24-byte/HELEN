@@ -212,10 +212,13 @@ class FloatingAssistantController extends ChangeNotifier {
   }
 
   void closeWindow() {
+    if (!_isWindowOpen && !_isListening) return;
     _isWindowOpen = false;
     _continuousListening = false;
     _restartListenTimer?.cancel();
-    stopListening(disableContinuous: true);
+    _isListening = false;
+    _audioEngine.stopListening();
+    _liveStatus = 'Ready';
     notifyListeners();
   }
 
@@ -554,14 +557,24 @@ class FloatingAssistantController extends ChangeNotifier {
   }
 
   void setFullScreenActive(bool active) {
+    if (_isFullScreenActive == active) return;
     _isFullScreenActive = active;
     if (active) {
-      closeWindow();
-      stopAllAudio();
+      _isWindowOpen = false;
+      _continuousListening = false;
+      _restartListenTimer?.cancel();
+      _isListening = false;
+      _audioEngine.stopListening();
+      _liveStatus = 'Ready';
+      _isSpeaking = false;
+      _speechTimer?.cancel();
+      _audioEngine.stop();
       _liveSession?.disconnect();
       _liveSession = null;
     }
-    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   // ── Position Clamping ──────────────────────────────────────────────────────
@@ -599,14 +612,16 @@ class FloatingAssistantController extends ChangeNotifier {
     }
   }
 
-  void resetPosition(Size screenSize, EdgeInsets safeArea) {
+  void resetPosition(Size screenSize, EdgeInsets safeArea, {bool notify = false}) {
     const double bubbleSize = 64.0;
     const double margin = 20.0;
     final double defaultX = (screenSize.width - bubbleSize - margin).clamp(16.0, double.infinity);
     final double defaultY = (screenSize.height - safeArea.bottom - bubbleSize - 90.0).clamp(100.0, double.infinity);
     _position = Offset(defaultX, defaultY);
     _hasCustomPosition = false;
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   String _getActionLabel(String? actionType) {
