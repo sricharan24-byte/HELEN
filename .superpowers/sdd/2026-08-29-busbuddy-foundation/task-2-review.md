@@ -1,0 +1,3 @@
+# Task 2 review request
+
+Review the current `/home/pavan/BusBuddy` workspace against Task 2 in `.superpowers/sdd/2026-08-29-busbuddy-foundation/task-2-brief.md` and the foundation spec. Inspect all files under `lib/data/` and `test/data/`. Do not modify files. Check API signatures, fixture boundaries, immutability, search normalization, route ordering, test quality, and whether UI files were left untouched. Write the full report to `.superpowers/sdd/2026-08-29-busbuddy-foundation/task-2-review-report.md` with severity-grouped findings and APPROVED or CHANGES_REQUIRED. Do not require Git commits because this repository has no usable Git metadata. Do not claim runtime verification beyond the files/report; the host Flutter Snap wrapper may fail independently.
