@@ -8,10 +8,12 @@ class AudioSpeechEngine {
   const AudioSpeechEngine();
 
   /// Speaks the provided text out loud through the device/browser speakers.
-  /// Note: Offline TTS has been removed in favor of native Gemini Live 24kHz PCM voice streaming.
   void speak(String text) {
-    // Offline TTS removed. Voice output is streamed directly via Gemini Live playPcmAudio.
-    debugPrint('[AudioSpeechEngine] Offline TTS disabled: $text');
+    if (kIsWeb) {
+      speech_impl.speakText(text);
+    } else {
+      debugPrint('[AudioSpeechEngine] Offline TTS: $text');
+    }
   }
 
   /// Stops any currently playing audio.

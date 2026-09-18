@@ -163,8 +163,12 @@ class FloatingAssistantController extends ChangeNotifier {
 
         _speechTimer?.cancel();
         if (!_receivedPcmThisTurn) {
-          // Text-only turn fallback; real PCM playback completion is governed by onAudioEnded callback
-          _speechTimer = Timer(const Duration(milliseconds: 1200), () {
+          if (!_isMuted && displayText.isNotEmpty) {
+            _audioEngine.speak(displayText);
+          }
+          final wordCount = displayText.split(' ').length;
+          final fallbackMs = (wordCount * 300).clamp(1500, 10000);
+          _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
             if (_isSpeaking) {
               _isSpeaking = false;
               if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
@@ -393,33 +397,42 @@ class FloatingAssistantController extends ChangeNotifier {
       final ticket = activeTicket;
       final qLower = query.toLowerCase();
       final isBusTrackingQuery = qLower.contains('bus') || qLower.contains('track') || qLower.contains('where');
-      if (ticket != null && isBusTrackingQuery) {
-        _messages.add(
-          FloatingChatMessage(
-            id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
-            sender: 'ai',
-            text: 'Your active ticket for ${ticket.busId} (${ticket.origin.name} → ${ticket.destination.name}) is ready. Tap below to track your live bus.',
-            timestamp: DateTime.now(),
-            actionType: 'track_bus',
-            actionLabel: _getActionLabel('track_bus'),
-          ),
-        );
-        _liveStatus = 'Ready';
+      final responseText = (ticket != null && isBusTrackingQuery)
+          ? 'Your active ticket for ${ticket.busId} (${ticket.origin.name} to ${ticket.destination.name}) is ready. Tap below to track your live bus.'
+          : 'BusBuddy voice runs on Gemini Live. Please connect your Google AI Studio API key in voice settings to enable conversational voice control.';
+      final actionType = (ticket != null && isBusTrackingQuery) ? 'track_bus' : 'open_settings';
+
+      _messages.add(
+        FloatingChatMessage(
+          id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
+          sender: 'ai',
+          text: responseText,
+          timestamp: DateTime.now(),
+          actionType: actionType,
+          actionLabel: _getActionLabel(actionType),
+        ),
+      );
+      _liveStatus = (ticket != null && isBusTrackingQuery) ? 'Ready' : 'Key Needed';
+
+      if (!_isMuted) {
+        _isSpeaking = true;
+        _audioEngine.speak(responseText);
+        final wordCount = responseText.split(' ').length;
+        final fallbackMs = (wordCount * 300).clamp(1500, 10000);
+        _speechTimer?.cancel();
+        _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
+          if (_isSpeaking) {
+            _isSpeaking = false;
+            if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
+              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+            }
+            notifyListeners();
+          }
+        });
       } else {
-        _messages.add(
-          FloatingChatMessage(
-            id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
-            sender: 'ai',
-            text: 'BusBuddy voice runs exclusively on Gemini Live. Please connect your Google AI Studio API key in voice settings to enable conversational voice control.',
-            timestamp: DateTime.now(),
-            actionType: 'open_settings',
-            actionLabel: _getActionLabel('open_settings'),
-          ),
-        );
-        _liveStatus = 'Key Needed';
+        _isSpeaking = false;
       }
 
-      _isSpeaking = false;
       if (!_isWindowOpen) {
         _hasUnread = true;
       }

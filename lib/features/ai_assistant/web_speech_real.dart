@@ -15,15 +15,14 @@ void _ensureJsBridge() {
   try {
     js.context.callMethod('eval', ['''
       (function() {
-        if (window.__bb_speech_engine_initialized) return;
         window.__bb_speech_engine_initialized = true;
 
         var AudioCtx = window.AudioContext || window.webkitAudioContext;
-        window.__bb_audio_ctx = null;
+        window.__bb_audio_ctx = window.__bb_audio_ctx || null;
         window.__bb_pcm_next_time = 0;
         window.__bb_active_rec = null;
         window.__bb_active_utterance = null;
-        window.__bb_active_sources = [];
+        window.__bb_active_sources = window.__bb_active_sources || [];
 
         window.__bb_get_audio_ctx = function() {
           try {
@@ -200,9 +199,9 @@ void _ensureJsBridge() {
             gain.connect(ctx.destination);
 
             var now = ctx.currentTime;
-            // Schedule strictly sequentially with a 120ms jitter buffer on fresh start
-            if (!window.__bb_pcm_next_time || window.__bb_pcm_next_time < now) {
-              window.__bb_pcm_next_time = now + 0.12;
+            // Schedule strictly sequentially with low latency; recover from timeline drift
+            if (!window.__bb_pcm_next_time || window.__bb_pcm_next_time < now || (window.__bb_pcm_next_time - now) > 1.5) {
+              window.__bb_pcm_next_time = now + 0.04;
             }
             var startTime = window.__bb_pcm_next_time;
             src.start(startTime);
@@ -250,10 +249,83 @@ void _ensureJsBridge() {
         };
 
         window.__bb_speak_text = function(text, lang, rate) {
-          // Offline TTS voice mode removed in favor of native Gemini Live 24kHz PCM voice streaming.
+          if (!text || !text.trim()) return;
+          if (!window.speechSynthesis) {
+            console.warn("[BusBuddy TTS] SpeechSynthesis not supported in browser");
+            return;
+          }
           try {
-            if (window.speechSynthesis) window.speechSynthesis.cancel();
-          } catch (_) {}
+            var currentGen = (window.__bb_generation || 0) + 1;
+            window.__bb_generation = currentGen;
+            window.__bb_is_pcm_active = false;
+            window.__bb_is_speaking = true;
+
+            // Disconnect any lingering PCM audio sources
+            if (window.__bb_active_sources && window.__bb_active_sources.length > 0) {
+              window.__bb_active_sources.forEach(function(s) {
+                try { s.stop(); s.disconnect(); } catch (_) {}
+              });
+              window.__bb_active_sources = [];
+            }
+            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+              window.speechSynthesis.cancel();
+            }
+
+            var cleanText = text.replace(/[*_#`~>]/g, "").trim();
+            if (!cleanText) return;
+
+            var utter = new SpeechSynthesisUtterance(cleanText);
+            utter.lang = lang || "en-US";
+            utter.rate = (typeof rate === "number" && rate > 0) ? rate : 1.0;
+            utter.pitch = 1.0;
+            window.__bb_active_utterance = utter;
+
+            utter.onstart = function() {
+              window.__bb_is_speaking = true;
+            };
+
+            utter.onend = function() {
+              if (currentGen !== (window.__bb_generation || 0)) return;
+              window.__bb_active_utterance = null;
+              window.__bb_is_speaking = false;
+              if (window.__bb_on_audio_ended) {
+                try { window.__bb_on_audio_ended(); } catch (_) {}
+              }
+            };
+
+            utter.onerror = function(e) {
+              if (currentGen !== (window.__bb_generation || 0)) return;
+              console.warn("[BusBuddy TTS] utterance error:", e);
+              window.__bb_active_utterance = null;
+              window.__bb_is_speaking = false;
+              if (window.__bb_on_audio_ended) {
+                try { window.__bb_on_audio_ended(); } catch (_) {}
+              }
+            };
+
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+
+            if (window.__bb_speak_timer) {
+              clearTimeout(window.__bb_speak_timer);
+            }
+            window.__bb_speak_timer = setTimeout(function() {
+              window.__bb_speak_timer = null;
+              if (currentGen !== (window.__bb_generation || 0)) return;
+              try {
+                if (window.speechSynthesis.paused) {
+                  window.speechSynthesis.resume();
+                }
+                window.speechSynthesis.speak(utter);
+              } catch (err) {
+                console.error("[BusBuddy TTS] speak failed:", err);
+                window.__bb_is_speaking = false;
+              }
+            }, 40);
+          } catch (e) {
+            console.error("[BusBuddy TTS] init exception:", e);
+          }
         };
 
         window.__bb_stop_speech = function() {

@@ -135,7 +135,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         // Safety fallback timer for text-only turns; PCM playback completion is governed by onAudioEnded
         _speechTimer?.cancel();
         if (!_receivedPcmThisTurn) {
-          _speechTimer = Timer(const Duration(milliseconds: 1200), () {
+          if (_spokenOutput.isNotEmpty) {
+            _audioEngine.speak(_spokenOutput);
+          }
+          final wordCount = _spokenOutput.split(' ').length;
+          final fallbackMs = (wordCount * 300).clamp(1500, 10000);
+          _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
             if (mounted && _isSpeaking) {
               setState(() {
                 _isSpeaking = false;
@@ -377,12 +382,24 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     });
 
     if (AppSettingsController.instance.geminiApiKey.isEmpty) {
+      const msg = 'Please connect your Google AI Studio API key to chat with Gemini Live.';
       setState(() {
-        _isSpeaking = false;
+        _isSpeaking = true;
         _isListening = false;
         _liveStatus = 'Key Needed';
         _liveTranscription = 'Gemini Live API key is required.';
-        _spokenOutput = 'Please connect your Google AI Studio API key to chat with Gemini Live.';
+        _spokenOutput = msg;
+      });
+      _audioEngine.speak(msg);
+      final wordCount = msg.split(' ').length;
+      final fallbackMs = (wordCount * 300).clamp(1500, 10000);
+      _speechTimer?.cancel();
+      _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
+        if (mounted && _isSpeaking) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
       });
       _showApiKeyDialog();
       return;

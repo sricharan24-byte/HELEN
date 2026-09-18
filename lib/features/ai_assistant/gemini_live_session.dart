@@ -155,7 +155,6 @@ CRITICAL CONVERSATIONAL RULES:
               }
             }
           },
-          'outputAudioTranscription': <String, dynamic>{},
         },
         'systemInstruction': {
           'parts': [
@@ -169,51 +168,23 @@ CRITICAL CONVERSATIONAL RULES:
             'functionDeclarations': [
               {
                 'name': 'track_bus',
-                'description': 'Opens the live GPS map tracker for the active bus route.',
-                'parameters': {
-                  'type': 'OBJECT',
-                  'properties': {
-                    'busId': {'type': 'STRING', 'description': 'The bus identifier, e.g. 18B.'}
-                  }
-                }
+                'description': 'Opens the live GPS map tracker for the active bus route.'
               },
               {
                 'name': 'book_ticket',
-                'description': 'Opens ticket booking and payment checkout flow.',
-                'parameters': {
-                  'type': 'OBJECT',
-                  'properties': {
-                    'busId': {'type': 'STRING', 'description': 'The bus identifier, e.g. 18B.'},
-                    'destination': {'type': 'STRING', 'description': 'Destination stop name.'}
-                  }
-                }
+                'description': 'Opens ticket booking and payment checkout flow.'
               },
               {
                 'name': 'search_route',
-                'description': 'Finds available buses and shows route options between origin and destination.',
-                'parameters': {
-                  'type': 'OBJECT',
-                  'properties': {
-                    'origin': {'type': 'STRING', 'description': 'Origin stop name.'},
-                    'destination': {'type': 'STRING', 'description': 'Destination stop name.'}
-                  }
-                }
+                'description': 'Finds available buses and shows route options between origin and destination.'
               },
               {
                 'name': 'emergency_sos',
-                'description': 'Triggers emergency safety broadcast and shares live location.',
-                'parameters': {
-                  'type': 'OBJECT',
-                  'properties': <String, dynamic>{}
-                }
+                'description': 'Triggers emergency safety broadcast and shares live location.'
               },
               {
                 'name': 'open_saved',
-                'description': 'Opens saved places like Home, College, or Hostel.',
-                'parameters': {
-                  'type': 'OBJECT',
-                  'properties': <String, dynamic>{}
-                }
+                'description': 'Opens saved places like Home, College, or Hostel.'
               }
             ]
           }
