@@ -431,8 +431,8 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                 size: 20,
               ),
               onPressed: _controller.toggleMute,
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              padding: const EdgeInsets.all(12),
             ),
           ),
           const SizedBox(width: 4),
@@ -446,8 +446,8 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
               onPressed: () {
                 _controller.executeAction(context, 'full_screen', widget.navigatorKey);
               },
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              padding: const EdgeInsets.all(12),
             ),
           ),
           const SizedBox(width: 4),
@@ -459,8 +459,8 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
             child: IconButton(
               icon: const Icon(Icons.close, color: Colors.white70, size: 20),
               onPressed: _controller.closeWindow,
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              padding: const EdgeInsets.all(12),
             ),
           ),
         ],

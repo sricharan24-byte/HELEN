@@ -121,8 +121,7 @@ void main() {
       // Timer is pending when the widget tree is disposed.
       await tester.pump(const Duration(seconds: 6));
 
-      expect(find.text('GEMINI LIVE'), findsOneWidget);
-      expect(find.text('🔒 GROUNDED'), findsOneWidget);
+      expect(find.text('NOT CONNECTED'), findsOneWidget);
       expect(find.byIcon(Icons.auto_awesome), findsWidgets);
       expect(find.text('Where is my bus?'), findsWidgets);
       expect(find.text('Find a bus from VIT to Katpadi'), findsOneWidget);

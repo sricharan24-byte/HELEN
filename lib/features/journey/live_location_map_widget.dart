@@ -402,4 +402,10 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
 }

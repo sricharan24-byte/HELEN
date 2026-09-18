@@ -387,18 +387,35 @@ class FloatingAssistantController extends ChangeNotifier {
       _ensureSession();
       _liveSession?.sendQuery(query);
     } else {
-      _messages.add(
-        FloatingChatMessage(
-          id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
-          sender: 'ai',
-          text: 'BusBuddy voice runs exclusively on Gemini Live. Please connect your Google AI Studio API key in voice settings to enable conversational voice control.',
-          timestamp: DateTime.now(),
-          actionType: 'open_settings',
-          actionLabel: _getActionLabel('open_settings'),
-        ),
-      );
+      final ticket = activeTicket;
+      final qLower = query.toLowerCase();
+      final isBusTrackingQuery = qLower.contains('bus') || qLower.contains('track') || qLower.contains('where');
+      if (ticket != null && isBusTrackingQuery) {
+        _messages.add(
+          FloatingChatMessage(
+            id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
+            sender: 'ai',
+            text: 'Your active ticket for ${ticket.busId} (${ticket.origin.name} → ${ticket.destination.name}) is ready. Tap below to track your live bus.',
+            timestamp: DateTime.now(),
+            actionType: 'track_bus',
+            actionLabel: _getActionLabel('track_bus'),
+          ),
+        );
+        _liveStatus = 'Ready';
+      } else {
+        _messages.add(
+          FloatingChatMessage(
+            id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
+            sender: 'ai',
+            text: 'BusBuddy voice runs exclusively on Gemini Live. Please connect your Google AI Studio API key in voice settings to enable conversational voice control.',
+            timestamp: DateTime.now(),
+            actionType: 'open_settings',
+            actionLabel: _getActionLabel('open_settings'),
+          ),
+        );
+        _liveStatus = 'Key Needed';
+      }
 
-      _liveStatus = 'Key Needed';
       _isSpeaking = false;
       if (!_isWindowOpen) {
         _hasUnread = true;
@@ -613,7 +630,11 @@ class FloatingAssistantController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _continuousListening = false;
+    _restartListenTimer?.cancel();
     _speechTimer?.cancel();
+    _audioEngine.stopListening();
+    _audioEngine.stop();
     _liveSession?.disconnect();
     super.dispose();
   }
