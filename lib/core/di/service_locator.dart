@@ -67,13 +67,30 @@ class AppServiceLocator {
     if (contactRepo != null) _customContactRepository = contactRepo;
   }
 
-  /// Resets test overrides back to clean defaults.
-  void resetForTesting() {
-    _customDataSource = null;
+  /// Resets test overrides back to clean defaults, ensuring all active
+  /// movement engines and timers are safely terminated per Astra P0.2.
+  Future<void> resetForTesting() async {
+    if (_defaultTransportRepository is LocalTransportRepository) {
+      await (_defaultTransportRepository as LocalTransportRepository).dispose();
+    }
+    if (_customTransportRepository is LocalTransportRepository) {
+      await (_customTransportRepository as LocalTransportRepository).dispose();
+    }
+    _defaultTransportRepository = null;
     _customTransportRepository = null;
+
+    _customDataSource = null;
+    _defaultDataSource = null;
+
     _customTicketRepository = null;
+    _defaultTicketRepository = null;
+
     _customTicketController = null;
+    _defaultTicketController = null;
+
     _customJourneyController = null;
+    _defaultJourneyController = null;
+
     _customContactRepository = null;
   }
 }

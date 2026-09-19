@@ -1,12 +1,12 @@
 /// Pure-Dart TransitRoute domain entity.
 /// Uses TransitRoute instead of Route to eliminate conflicts with Flutter's Navigator Route<T>.
 class TransitRoute {
-  const TransitRoute({
+  TransitRoute({
     required this.id,
     required this.displayName,
     required this.direction,
-    required this.orderedStopIds,
-  });
+    required List<String> orderedStopIds,
+  }) : orderedStopIds = List.unmodifiable(orderedStopIds);
 
   final String id;
   final String displayName;

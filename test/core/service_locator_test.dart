@@ -5,8 +5,8 @@ import 'package:busbuddy/data/repositories/transport_repository.dart';
 
 void main() {
   group('AppServiceLocator', () {
-    tearDown(() {
-      AppServiceLocator.instance.resetForTesting();
+    tearDown(() async {
+      await AppServiceLocator.instance.resetForTesting();
     });
 
     test('returns consistent singleton instances', () {
@@ -29,7 +29,7 @@ void main() {
       expect(identical(journeyCtrl1, journeyCtrl2), isTrue);
     });
 
-    test('supports overriding and resetting for test isolation', () {
+    test('supports overriding and resetting for test isolation with engine disposal', () async {
       final locator = AppServiceLocator.instance;
       final customDs = LocalTransportDataSource();
       final customRepo = LocalTransportRepository(dataSource: customDs);
@@ -42,7 +42,12 @@ void main() {
       expect(identical(locator.transportDataSource, customDs), isTrue);
       expect(identical(locator.transportRepository, customRepo), isTrue);
 
-      locator.resetForTesting();
+      // Start a stream engine
+      final stream = customRepo.streamBusLocation('BUS-18B', 'route-18b');
+      expect(stream, isNotNull);
+
+      // Async teardown closes all engines cleanly per Astra P0.2
+      await locator.resetForTesting();
 
       expect(identical(locator.transportDataSource, customDs), isFalse);
       expect(identical(locator.transportRepository, customRepo), isFalse);

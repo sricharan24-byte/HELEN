@@ -69,7 +69,10 @@ class MyApp extends StatelessWidget {
           builder: (context, child) {
             final media = MediaQuery.of(context);
             final platformScale = media.textScaler.scale(1.0);
-            final effectiveScale = (platformScale * settings.textScaleFactor).clamp(0.85, 2.0);
+            // Astra P0.3: Preserve platform accessibility TextScaler without an upper 2.0x ceiling.
+            // Layouts reflow responsively rather than clamping user accessibility settings.
+            final combinedScale = platformScale * settings.textScaleFactor;
+            final effectiveScale = combinedScale < 0.85 ? 0.85 : combinedScale;
             return MediaQuery(
               data: media.copyWith(
                 textScaler: TextScaler.linear(effectiveScale),

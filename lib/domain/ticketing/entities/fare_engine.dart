@@ -3,76 +3,111 @@ import 'ticket.dart';
 
 /// Authoritative Fare Calculation Engine for BusBuddy.
 ///
-/// Eliminates conflicting hardcoded fare models across UI, AI prompts, and booking dialogs:
-/// - Full Corridor standard base fare (VIT Main Gate ↔ Katpadi Station): ₹20.0
-/// - Short-hop base fare (1–3 stops): ₹15.0
-/// - Medium-hop base fare (4–5 stops): ₹20.0
-/// - Extended corridor base fare (6+ stops): ₹25.0
+/// Implements exact integer paise arithmetic (1 Rupee = 100 Paise) per Astra audit P0.1.
 ///
-/// Concession rules:
-/// - Student: 40% discount (0.6 multiplier, rounded to whole rupee)
-/// - Senior Citizen: 40% discount (0.6 multiplier, rounded to whole rupee)
-/// - General: Standard base fare (0% discount)
+/// Authoritative Precedence & Tier Table:
+/// 1. Zero Hops (origin == destination):
+///    - Throws [ArgumentError] / Invalid sequence. Same-stop ticketing is invalid.
+/// 2. Standard Corridor (VIT Main Gate ↔ Katpadi Station):
+///    - Traverses 4 hops (5 stops): Base fare 2000 paise (₹20.0).
+///    - Rule ID: `RULE_CORRIDOR_V1`
+/// 3. Short-hop (1 to 3 hops):
+///    - Base fare 1500 paise (₹15.0).
+///    - Rule ID: `RULE_HOP_SHORT_V1`
+/// 4. Medium-hop (4 to 5 hops):
+///    - Base fare 2000 paise (₹20.0).
+///    - Rule ID: `RULE_HOP_MEDIUM_V1`
+/// 5. Extended corridor (6+ hops):
+///    - Base fare 2500 paise (₹25.0).
+///    - Rule ID: `RULE_HOP_EXTENDED_V1`
 ///
-/// Standard Corridor (VIT ↔ Katpadi) summary:
-/// - General: ₹20
-/// - Student Concession: ₹12
-/// - Senior Concession: ₹12
+/// Concession Rules:
+/// - Student: 40% discount (pays 60% of base paise).
+/// - Senior Citizen: 40% discount (pays 60% of base paise).
+/// - General: 0% discount (pays 100% of base paise).
 class FareEngine {
   const FareEngine._();
 
-  /// Default base fare for the VIT ↔ Katpadi corridor.
-  static const double standardCorridorBaseFare = 20.0;
+  /// Standard VIT ↔ Katpadi corridor base fare in integer paise (2000 paise = ₹20.0).
+  static const int standardCorridorBasePaise = 2000;
 
-  /// Concession discount fraction (40%).
-  static const double concessionDiscountRate = 0.40;
+  /// Concession discount percentage (40%).
+  static const int concessionDiscountPercentage = 40;
 
-  /// Calculates the fare given a base fare amount and passenger type.
+  /// Calculates the fare given a base fare amount in double rupees and passenger type.
+  /// Converts to integer paise internally for exact arithmetic without binary floating-point drift.
   static Fare calculateFromBase({
     required double baseFare,
     required PassengerType passengerType,
+    int hopCount = 0,
+    String ruleId = 'RULE_CUSTOM_BASE',
+    String explanation = '',
   }) {
-    final cleanBase = baseFare < 0 ? 0.0 : baseFare;
-    return switch (passengerType) {
-      PassengerType.general => Fare(
-          amount: cleanBase,
-          baseFare: cleanBase,
-          passengerType: passengerType,
-          discountPercentage: 0,
-        ),
-      PassengerType.student || PassengerType.senior => Fare(
-          amount: (cleanBase * (1.0 - concessionDiscountRate)).roundToDouble(),
-          baseFare: cleanBase,
-          passengerType: passengerType,
-          discountPercentage: 40,
-        ),
+    final basePaise = (baseFare * 100).round();
+    final discountPercent = switch (passengerType) {
+      PassengerType.general => 0,
+      PassengerType.student || PassengerType.senior => concessionDiscountPercentage,
     };
-  }
 
-  /// Calculates the standard VIT ↔ Katpadi corridor fare.
-  static Fare calculateCorridorFare(PassengerType passengerType) {
-    return calculateFromBase(
-      baseFare: standardCorridorBaseFare,
+    final effectiveExplanation = explanation.isNotEmpty
+        ? explanation
+        : discountPercent > 0
+            ? '${passengerType.name.toUpperCase()} concession ($discountPercent% discount) applied to base ₹${(basePaise / 100).toStringAsFixed(0)}.'
+            : 'Standard general adult fare.';
+
+    return Fare.fromPaise(
+      basePaise: basePaise,
       passengerType: passengerType,
+      discountPercentage: discountPercent,
+      hopCount: hopCount,
+      ruleId: ruleId,
+      explanation: effectiveExplanation,
     );
   }
 
-  /// Calculates the fare based on the number of traversed stops.
+  /// Calculates the standard VIT ↔ Katpadi corridor fare (4 hops, 5 stops).
+  static Fare calculateCorridorFare(PassengerType passengerType) {
+    return calculateFromBase(
+      baseFare: standardCorridorBasePaise / 100.0,
+      passengerType: passengerType,
+      hopCount: 4,
+      ruleId: 'RULE_CORRIDOR_V1',
+      explanation: 'VIT ↔ Katpadi Standard Corridor (4 hops, ₹20 base fare).',
+    );
+  }
+
+  /// Calculates the fare based on the number of traversed hops (stops - 1).
+  ///
+  /// Rejects non-positive hops (hopCount <= 0) by throwing [ArgumentError]
+  /// to satisfy Astra P0.1 boundary requirements.
   static Fare calculateByStopCount({
     required int stopCount,
     required PassengerType passengerType,
   }) {
-    final double baseFare;
-    if (stopCount <= 3) {
-      baseFare = 15.0;
-    } else if (stopCount <= 5) {
-      baseFare = 20.0;
-    } else {
-      baseFare = 25.0;
+    if (stopCount <= 0) {
+      throw ArgumentError('Traversed stop count / hops must be at least 1.');
     }
+
+    final int basePaise;
+    final String ruleId;
+
+    if (stopCount <= 3) {
+      basePaise = 1500; // ₹15.0
+      ruleId = 'RULE_HOP_SHORT_V1';
+    } else if (stopCount <= 5) {
+      basePaise = 2000; // ₹20.0
+      ruleId = 'RULE_HOP_MEDIUM_V1';
+    } else {
+      basePaise = 2500; // ₹25.0
+      ruleId = 'RULE_HOP_EXTENDED_V1';
+    }
+
     return calculateFromBase(
-      baseFare: baseFare,
+      baseFare: basePaise / 100.0,
       passengerType: passengerType,
+      hopCount: stopCount,
+      ruleId: ruleId,
+      explanation: 'Tier-based route fare for $stopCount traversed stops.',
     );
   }
 
@@ -82,9 +117,13 @@ class FareEngine {
     required int destinationIndex,
     required PassengerType passengerType,
   }) {
-    final stopsTraversed = (destinationIndex - originIndex).abs();
+    final hopsTraversed = (destinationIndex - originIndex).abs();
+    if (hopsTraversed == 0) {
+      throw ArgumentError('Origin and destination stop cannot be identical (0 hops).');
+    }
+
     return calculateByStopCount(
-      stopCount: stopsTraversed,
+      stopCount: hopsTraversed,
       passengerType: passengerType,
     );
   }

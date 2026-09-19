@@ -43,6 +43,25 @@ class Ticket {
 
   bool get isActive => status == TicketStatus.active && DateTime.now().isBefore(validUntil);
 
+  /// Checks if a transition from current status to [newStatus] is allowed per Astra Table 2.1.
+  bool canTransitionTo(TicketStatus newStatus) {
+    if (status == newStatus) return true;
+    return switch (status) {
+      TicketStatus.active => newStatus == TicketStatus.used || newStatus == TicketStatus.expired,
+      TicketStatus.used || TicketStatus.expired => false,
+    };
+  }
+
+  /// Transitions the ticket to [newStatus], throwing [StateError] on illegal transition.
+  Ticket transitionTo(TicketStatus newStatus) {
+    if (!canTransitionTo(newStatus)) {
+      throw StateError(
+        'Illegal ticket state transition from ${status.name} to ${newStatus.name} for ticket $id.',
+      );
+    }
+    return copyWith(status: newStatus);
+  }
+
   Ticket copyWith({
     String? id,
     String? routeId,

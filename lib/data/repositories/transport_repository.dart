@@ -82,4 +82,12 @@ class LocalTransportRepository implements TransportRepository {
     }
     return _activeEngines[key]!.locationStream;
   }
+
+  /// Closes and cleans up all active movement simulation engines per Astra P0.2.
+  Future<void> dispose() async {
+    for (final engine in _activeEngines.values) {
+      engine.dispose();
+    }
+    _activeEngines.clear();
+  }
 }

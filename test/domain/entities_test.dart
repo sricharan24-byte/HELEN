@@ -32,7 +32,7 @@ void main() {
   });
 
   group('TransitRoute domain entity', () {
-    const route = TransitRoute(
+    final route = TransitRoute(
       id: 'route-18b',
       displayName: 'Route 18B',
       direction: 'VIT to Katpadi',
@@ -56,8 +56,15 @@ void main() {
       expect(route.isValidSequence('s1', 'unknown'), isFalse);
     });
 
+    test('defensively copies orderedStopIds as unmodifiable per Astra Table 2.1', () {
+      expect(
+        () => (route.orderedStopIds as dynamic).add('s5'),
+        throwsA(isA<UnsupportedError>()),
+      );
+    });
+
     test('equality and hash code', () {
-      const route2 = TransitRoute(
+      final route2 = TransitRoute(
         id: 'route-18b',
         displayName: 'Route 18B',
         direction: 'VIT to Katpadi',
@@ -115,7 +122,7 @@ void main() {
     });
   });
 
-  group('Ticket domain entity serialization and validation', () {
+  group('Ticket domain entity serialization, validation, and state machine', () {
     final issued = DateTime.now();
     final validUntil = issued.add(const Duration(hours: 3));
 
@@ -149,6 +156,21 @@ void main() {
       expect(revived.origin.name, 'VIT');
       expect(revived.destination.name, 'Katpadi RS');
       expect(revived.isActive, isTrue);
+    });
+
+    test('state machine validates legal transitions per Astra Table 2.1', () {
+      expect(ticket.canTransitionTo(TicketStatus.used), isTrue);
+      expect(ticket.canTransitionTo(TicketStatus.expired), isTrue);
+
+      final usedTicket = ticket.transitionTo(TicketStatus.used);
+      expect(usedTicket.status, TicketStatus.used);
+
+      // Terminal state cannot transition back to active
+      expect(usedTicket.canTransitionTo(TicketStatus.active), isFalse);
+      expect(
+        () => usedTicket.transitionTo(TicketStatus.active),
+        throwsA(isA<StateError>()),
+      );
     });
 
     test('fromJson rejects negative fare and malformed dates', () {
