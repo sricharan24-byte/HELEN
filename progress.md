@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 19, 2026 (Chunk 33 / Phase 0 — Gradle/AGP Toolchain Stabilization, Green Test Baseline Hardening, and Deprecation Sweep)  
+**Last Updated**: September 19, 2026 (Phase 2 Completed — Astra & Opus Accessibility Hardening, ADR-001 / ADR-002, 236/236 Green Tests)  
 
 ---
 
@@ -519,7 +519,73 @@ The application provides intuitive journey planning, digital ticket booking with
     * Added `resetForTesting()` on `FloatingAssistantController` to isolate tests and clear query state between runs.
     * Expanded intent routing in `GeminiLiveService` to reliably map route queries.
 
+---
 
+### 8. 🏗️ Chunk 34 / Phase 1 — Pure-Dart Domain Layer, Authoritative FareEngine & AppServiceLocator DI
+* **Folder**: `lib/domain/`, `lib/core/di/`, `test/domain/`, `test/core/`
+* **Status**: ✅ Completed
+* **Components Built**:
+  * **Pure-Dart Domain Entities** (`lib/domain/entities/`): Created zero-Flutter-dependency models `TransitRoute`, `BusStop`, `LiveBusLocation`, `JourneyTicket`, and `Fare` with typed domain validations, immutable defensive copies, and equality by unique stable IDs.
+  * **Result Pattern** (`lib/domain/result/result.dart`): Implemented algebraic data type `Result<T>` with `Success<T>` and `FailureResult<T>` alongside structured domain exceptions (`ValidationFailure`, `NotFoundFailure`, `StateTransitionFailure`).
+  * **Authoritative FareEngine** (`lib/domain/services/fare_engine.dart`): Unified all pricing logic into one engine calculating base fares by hop count tiers (1-3 hops: ₹15, 4-5 hops: ₹20, 6+ hops: ₹25) and applying 40% student/senior concession discounts.
+  * **AppServiceLocator DI Root** (`lib/core/di/service_locator.dart`): Single-flight composition root with lazy singleton registration, eliminating 19+ scattered duplicate repository instantiations.
+  * **Phase 1 Test Suite**: Added 27 focused unit tests across `entities_test.dart`, `fare_engine_test.dart`, `result_test.dart`, and `service_locator_test.dart` (214/214 passing tests).
 
+---
 
+### 9. 🛡️ Chunk 35 — GPT-6 Astra Audit P0 Hardening & ADR-001
+* **Folder**: `lib/domain/`, `lib/data/`, `lib/core/`, `docs/adr/`, `test/`
+* **Status**: ✅ Completed
+* **Components Resolved**:
+  * **Integer Paise Money Representation**: Converted all currency calculations from `double` to integer paise (1 Rupee = 100 Paise) in `Fare` and `FareEngine`, eliminating binary floating-point drift.
+  * **Authoritative Precedence Table**: Codified exact rules for VIT Main Gate ↔ Katpadi Station (4 hops, 2000 paise base, 1200 paise concession), Short-Hop (1-3 hops), Medium-Hop (4-5 hops), Extended Corridor (6+ hops), and zero-hop error rejection. Half-up nearest paise rounding: `floor((base * (100 - discount) + 50) / 100)`.
+  * **Singleton Ownership & Asynchronous Teardown**: Added `Future<void> dispose()` to `LocalTransportRepository` to safely cancel all `LiveBusMovementEngine` timers and streams. Upgraded `AppServiceLocator.resetForTesting()` to await full resource disposal.
+  * **Platform TextScaler Uncapping**: Removed the 2.0x ceiling in `lib/main.dart`, strictly preserving platform accessibility settings and enforcing responsive layout reflow.
+  * **Ticket State Machine**: Encoded strict state machine (`active -> used`, `active -> expired`) guarding against transitions from terminal states.
+  * **ADR-001 Published**: Formal Architecture Decision Record established in `docs/adr/ADR-001-phase1-domain-and-a11y-contracts.md`.
 
+---
+
+### 10. 🎨 Chunk 36 — Astra Phase 2 Steps 2.1–2.3 (Tokens, Coordinator & Vertical Slice Rebuild)
+* **Folder**: `lib/core/tokens/`, `lib/core/theme/`, `lib/core/a11y/`, `lib/core/widgets/`, `lib/features/route_search/`, `lib/features/route_details/`, `lib/features/journey/`
+* **Status**: ✅ Completed
+* **Components Built**:
+  * **Semantic Design Token Architecture**:
+    * `AppSpacing`: Strictly enforces global 48×48dp minimum touch target floor (`minTouchTarget = 48.0`).
+    * `AppSemanticColors`: Abstract semantic roles (`actionPrimary`, `actionSecondary`, `surface`, `surfaceSubtle`, `statusAlert`, `statusSuccess`, `border`, `textPrimary`, `textSecondary`).
+    * `StatusLevel`: Multi-modal status cues with required paired icons (`info`, `warning`, `error`, `success`).
+    * `AppTheme`: 3 accessible themes including WCAG AAA High Contrast (7:1 contrast ratio, true black `#000000`, high-visibility `#FFFF00` actions, `#00FFFF` cyan accents).
+  * **Centralized AnnouncementCoordinator**:
+    * 4 priority levels (`urgent`, `high`, `normal`, `polite`).
+    * Prevents duplicate announcements and suppresses inactive route chatter.
+    * Synchronizes with Gemini Live speech synthesis via `isAudioPlaying` to prevent audio collisions.
+  * **Accessible Core Components**:
+    * `AccessibleButton`: 48dp touch target, accessible semantics, high-contrast borders.
+    * `StatusBanner`: High-contrast status banner with redundant icon, title, and message.
+    * `MapTextAlternativeWidget`: Astra Gate 8 guaranteed telemetry equivalence, converting OpenStreetMap telemetry into linear TalkBack-friendly text cards.
+  * **Rebuilt Core Vertical Slice**:
+    * `RouteSearchPage`: Migrated to semantic tokens, high-contrast chips, and accessible list items.
+    * `RouteDetailsPage`: Added `AccessibleButton`, semantic stop timeline, and fare quote breakdown.
+    * `JourneyPage`: Paired vector map with `MapTextAlternativeWidget`, live status banner, and emergency action.
+    * Validated in `test/features/vertical_slice_test.dart` (234/234 passing tests).
+
+---
+
+### 11. 🚀 Chunk 37 — Phase 2 Complete Migration & Safety Hardening (Astra Gates 10–12, ADR-002)
+* **Folder**: `lib/features/tickets/`, `lib/features/safety/`, `lib/features/ai_assistant/`, `lib/features/saved/`, `lib/features/settings/`, `test/features/`
+* **Status**: ✅ Completed
+* **Components Built**:
+  * **Authoritative Ticketing Migration**: Migrated `TicketRepository.bookTicket` to integer paise `FareEngine.calculateByStopCount`. Rebuilt `BookingCheckoutDialog`, `MyTicketsPage`, `TicketBookingSuitePage`, and `TicketDetailsPage` with semantic tokens, 48dp touch targets, and `[40% CONCESSION]` badges.
+  * **Safety & Emergency Sharing (Astra Gate 12)**: Upgraded `SafetySharingPage` with explicit privacy disclosures, silent non-voice SOS workflow, and `AnnouncementPriority.urgent` dispatch.
+  * **Floating AI Overlay Accessibility (Astra Section 2.4)**:
+    * Wrapped modal dialog with `BlockSemantics(blocking: true)` to prevent TalkBack traversal into background page controls.
+    * Added non-drag corner repositioning methods (`moveToTopLeft`, `moveToTopRight`, `moveToBottomLeft`, `moveToBottomRight`).
+    * Registered custom semantics actions on floating bubble for screen-reader movement.
+    * Synchronized `FloatingAssistantController.isSpeaking` with `AnnouncementCoordinator.instance.isAudioPlaying`.
+  * **Saved, Alerts & Settings Migration**: Updated `SavedPage`, `AlertsPage`, `HomePage`, and `AccessibilitySettingsPage` to use `AppTheme.colors(context)` and `AppSpacing.minTouchTarget`.
+  * **Dedicated Test Suites**:
+    * `test/features/safety_a11y_test.dart`: Verifies Gate 12 non-voice SOS, urgent announcement dispatch, and 48dp touch targets.
+    * `test/features/floating_overlay_a11y_test.dart`: Verifies `BlockSemantics` barrier, corner movement, and audio contention flags.
+  * **ADR-002 Published**: Established `docs/adr/ADR-002-phase2-accessibility-and-safety-architecture.md`.
+  * **Full Automated Test Suite**: 236 / 236 tests passing (100% green).
+  * **Syntax & Import Integrity**: 0 bracket errors and 0 broken imports across all 109 Dart source files.

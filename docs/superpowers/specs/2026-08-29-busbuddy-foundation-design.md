@@ -89,3 +89,22 @@ Start with model/repository tests for the corridor fixture and route matching. A
 
 After the first slice is usable, decide the OSM tile provider and routing engine, whether to add Firebase or a local simulator first, the exact speech package, and the shape of the usability study. These decisions must not block the local accessible journey flow.
 
+---
+
+## Evolution & Architectural Maturity (September 2026)
+
+The initial foundation architecture has evolved into a production-grade accessible transit application:
+1. **Phase 1 Domain Hardening**: Established pure-Dart domain models (`TransitRoute`, `BusStop`, `LiveBusLocation`, `JourneyTicket`), algebraic `Result<T>` types, authoritative `FareEngine`, and `AppServiceLocator` dependency injection root.
+2. **GPT-6 Astra Audit Hardening ([ADR-001](file:///home/pavan/BusBuddy/docs/adr/ADR-001-phase1-domain-and-a11y-contracts.md))**:
+   - Enforced integer paise money representation and explicit hop precedence.
+   - Idempotent lifecycle ownership with asynchronous teardown of repository timers.
+   - Removed artificial text scaling ceilings, strictly preserving platform `TextScaler`.
+3. **Phase 2 Accessibility & Safety Hardening ([ADR-002](file:///home/pavan/BusBuddy/docs/adr/ADR-002-phase2-accessibility-and-safety-architecture.md))**:
+   - Semantic design tokens (`AppSpacing`, `AppSemanticColors`, `StatusLevel`, `AppTheme` with WCAG AAA 7:1 High Contrast).
+   - Centralized `AnnouncementCoordinator` with 4 priority levels and speech audio contention debouncing.
+   - Guaranteed Map Text Equivalence (`MapTextAlternativeWidget`) per Astra Gate 8.
+   - Astra Gate 12 non-voice emergency SOS fallback in `SafetySharingPage`.
+   - Floating AI assistant overlay with `BlockSemantics` barrier isolation and accessible corner repositioning.
+4. **Verification**: 236 automated unit and widget tests passing (100% green).
+
+

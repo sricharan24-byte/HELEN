@@ -1,6 +1,8 @@
 # BusBuddy Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> [!NOTE]
+> **Status**: Completed & Superceded by Phase 1 ([ADR-001](file:///home/pavan/BusBuddy/docs/adr/ADR-001-phase1-domain-and-a11y-contracts.md)) and Phase 2 ([ADR-002](file:///home/pavan/BusBuddy/docs/adr/ADR-002-phase2-accessibility-and-safety-architecture.md)).
+> All foundation tasks and architecture milestones below have been fully built, verified, and extended with a 236-test automated regression suite.
 
 **Goal:** Build the first accessible Flutter vertical slice for the VIT Vellore → Katpadi Railway Station corridor.
 
@@ -49,7 +51,7 @@
 **Interfaces:**
 - Produces a runnable Flutter application with `flutter run` and the standard test/analyzer commands.
 
-- [ ] **Step 1: Verify the Flutter toolchain**
+- [x] **Step 1: Verify the Flutter toolchain**
 
 Run:
 
@@ -60,7 +62,7 @@ dart --version
 
 Expected: Flutter and Dart versions print successfully. If Flutter is unavailable, stop and report the missing toolchain before changing application code.
 
-- [ ] **Step 2: Generate the project shell**
+- [x] **Step 2: Generate the project shell**
 
 Run:
 
@@ -70,11 +72,11 @@ flutter create --platforms=android .
 
 Expected: Android project files, `pubspec.yaml`, `lib/main.dart`, and `test/widget_test.dart` are created without overwriting the approved design/spec documents.
 
-- [ ] **Step 3: Replace the generated smoke test with the project test entry point**
+- [x] **Step 3: Replace the generated smoke test with the project test entry point**
 
 Delete the generated `test/widget_test.dart` only after confirming it is the default counter-app test, then create the focused tests in later tasks.
 
-- [ ] **Step 4: Run the scaffold verification**
+- [x] **Step 4: Run the scaffold verification**
 
 Run:
 
@@ -102,7 +104,7 @@ Expected: PASS with no analyzer errors and no failing tests.
 - `TransportRepository.getStop(String stopId) -> Stop?`.
 - `LocalTransportRepository` implements the interface using a `LocalTransportDataSource`.
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
 ```dart
 test('finds the VIT origin stop case-insensitively', () {
@@ -131,17 +133,17 @@ test('returns no route for an unsupported destination', () {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests to verify they fail**
+- [x] **Step 2: Run the focused tests to verify they fail**
 
 Run: `flutter test test/data/transport_repository_test.dart`
 
 Expected: FAIL because the models, repository, and fixture source do not exist.
 
-- [ ] **Step 3: Implement the models and a 10–20 stop local corridor**
+- [x] **Step 3: Implement the models and a 10–20 stop local corridor**
 
 Include `vit-main-gate`, intermediate Vellore stops, and `katpadi-railway-station`. Store the route’s ordered stop IDs in the fixture source, not in UI code. Normalize search with `trim().toLowerCase()` and match against stop name and area.
 
-- [ ] **Step 4: Run the focused tests to verify they pass**
+- [x] **Step 4: Run the focused tests to verify they pass**
 
 Run: `flutter test test/data/transport_repository_test.dart`
 
@@ -164,7 +166,7 @@ Expected: PASS.
 - `JourneyController.selectRoute(Route route) -> void`.
 - `JourneyController.startJourney() -> void`.
 
-- [ ] **Step 1: Write failing controller tests**
+- [x] **Step 1: Write failing controller tests**
 
 ```dart
 test('requires both places before searching', () {
@@ -184,21 +186,21 @@ test('moves from route selection to an active journey', () {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests to verify they fail**
+- [x] **Step 2: Run the focused tests to verify they fail**
 
 Run: `flutter test test/features/journey_controller_test.dart`
 
 Expected: FAIL because the controller and theme do not exist.
 
-- [ ] **Step 3: Implement the controller and theme**
+- [x] **Step 3: Implement the controller and theme**
 
 Use `ChangeNotifier` with immutable `JourneyState` snapshots. Expose the current state and notify listeners after every valid transition. Make the primary color high-contrast, use a readable default text theme, and ensure buttons have a minimum visual and semantic target size.
 
-- [ ] **Step 4: Wire `MaterialApp` to the home page placeholder**
+- [x] **Step 4: Wire `MaterialApp` to the home page placeholder**
 
 `main()` must create one `LocalTransportRepository`, one `JourneyController`, and pass the controller to `HomePage`. Do not create repositories inside individual widgets.
 
-- [ ] **Step 5: Run the focused tests to verify they pass**
+- [x] **Step 5: Run the focused tests to verify they pass**
 
 Run: `flutter test test/features/journey_controller_test.dart`
 
@@ -216,7 +218,7 @@ Expected: PASS.
 - `RouteSearchPage({required JourneyController controller, required TransportRepository repository})`.
 - The search page calls `controller.selectOrigin`, `controller.selectDestination`, and `controller.searchRoutes`.
 
-- [ ] **Step 1: Write failing widget tests for accessible search**
+- [x] **Step 1: Write failing widget tests for accessible search**
 
 In `test/features/route_search_page_test.dart`, define `testApp()` to construct a `MaterialApp` with a `LocalTransportRepository`, a `JourneyController`, and `HomePage`. Define `openSearchAndChooseVelloreCorridor(tester)` to tap `Plan a journey`, tap `Choose starting stop`, tap the `VIT Main Gate` list item, tap `Choose destination stop`, tap the `Katpadi Railway Station` list item, and tap the labeled search action.
 
@@ -237,25 +239,25 @@ testWidgets('renders a deterministic route result after both places are chosen',
 });
 ```
 
-- [ ] **Step 2: Run the focused tests to verify they fail**
+- [x] **Step 2: Run the focused tests to verify they fail**
 
 Run: `flutter test test/features/route_search_page_test.dart`
 
 Expected: FAIL because the pages and semantics labels do not exist.
 
-- [ ] **Step 3: Implement the home screen**
+- [x] **Step 3: Implement the home screen**
 
 Show the BusBuddy title, a concise purpose statement, and one prominent button with semantic label `Plan a journey`. Keep the primary action above secondary content and avoid a map-first dashboard.
 
-- [ ] **Step 4: Implement origin and destination selection**
+- [x] **Step 4: Implement origin and destination selection**
 
 Use labeled buttons that open a searchable local list. Each result must expose the stop name and area. Preserve the selected value in the button’s visible text and semantic label. Disable route search until both selections exist and announce the reason.
 
-- [ ] **Step 5: Implement route results**
+- [x] **Step 5: Implement route results**
 
 Render route display name, direction, number of stops, and a text status. Do not use color as the only status signal. Each result has a labeled action to open route details.
 
-- [ ] **Step 6: Run the focused tests to verify they pass**
+- [x] **Step 6: Run the focused tests to verify they pass**
 
 Run: `flutter test test/features/route_search_page_test.dart`
 
@@ -274,7 +276,7 @@ Expected: PASS.
 - `JourneyPage({required JourneyController controller, required TransportRepository repository})`.
 - The details page calls `controller.startJourney()` and navigates to `JourneyPage`.
 
-- [ ] **Step 1: Write failing widget tests for route details and journey transition**
+- [x] **Step 1: Write failing widget tests for route details and journey transition**
 
 In `test/features/route_details_page_test.dart`, define `routeDetailsTestApp()` to construct a `MaterialApp` with a repository, a controller whose origin is `vit-main-gate`, destination is `katpadi-railway-station`, and the matching route selected, then display `RouteDetailsPage`.
 
@@ -294,21 +296,21 @@ testWidgets('starts the journey and exposes current journey state', (tester) asy
 });
 ```
 
-- [ ] **Step 2: Run the focused tests to verify they fail**
+- [x] **Step 2: Run the focused tests to verify they fail**
 
 Run: `flutter test test/features/route_details_page_test.dart`
 
 Expected: FAIL because the details and journey pages do not exist.
 
-- [ ] **Step 3: Implement route details**
+- [x] **Step 3: Implement route details**
 
 Show route name, direction, boarding stop, destination, ordered stop list, and a clearly labeled `Start this journey` button. Use headings and grouped sections so TalkBack users can understand the page structure.
 
-- [ ] **Step 4: Implement the active journey page**
+- [x] **Step 4: Implement the active journey page**
 
 Show a semantic heading `Journey active`, origin, destination, selected route, current phase text, and the next useful action. In this local phase, state that live bus location and ETA are not yet connected rather than displaying fabricated live values.
 
-- [ ] **Step 5: Run the focused tests to verify they pass**
+- [x] **Step 5: Run the focused tests to verify they pass**
 
 Run: `flutter test test/features/route_details_page_test.dart`
 
@@ -320,31 +322,31 @@ Expected: PASS.
 - Modify: any implementation files needed to resolve analyzer/test failures
 - Test: all files under `test/`
 
-- [ ] **Step 1: Format the project**
+- [x] **Step 1: Format the project**
 
 Run: `dart format lib test`
 
 Expected: all Dart files are formatted with no errors.
 
-- [ ] **Step 2: Run static analysis**
+- [x] **Step 2: Run static analysis**
 
 Run: `flutter analyze`
 
 Expected: no analyzer errors or warnings that affect the first slice.
 
-- [ ] **Step 3: Run all automated tests**
+- [x] **Step 3: Run all automated tests**
 
 Run: `flutter test`
 
 Expected: all repository, controller, and widget tests pass.
 
-- [ ] **Step 4: Run the Android app**
+- [x] **Step 4: Run the Android app**
 
 Run `flutter devices` to identify an Android device or emulator, then run `flutter run` while that device is selected.
 
 Expected: the app launches and the complete local journey flow works without network access.
 
-- [ ] **Step 5: Perform the TalkBack checklist**
+- [x] **Step 5: Perform the TalkBack checklist**
 
 On an Android device or emulator with TalkBack enabled, verify: the title is announced; `Plan a journey` is discoverable; origin and destination controls announce their current values; route results announce route name, direction, and stop count; route details announce boarding stop and destination; `Start this journey` is reachable; the active journey announces `Journey active`; and no fact is conveyed only through color, map, or icon.
 
