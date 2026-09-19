@@ -96,7 +96,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
           ],
         ),
         content: const Text(
-          'This will immediately send an urgent emergency alert containing your live GPS bus coordinates to all trusted contacts and campus security.',
+          'Demonstration Mode: This logs a simulated emergency alert with your current corridor stop coordinates. In production, this dispatches SMS and emergency dialer intents to 112 and your trusted contacts.',
         ),
         actions: [
           TextButton(
@@ -114,13 +114,14 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
               Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('🚨 SOS Alert Broadcasted to Emergency Contacts & Campus Security!'),
+                  content: Text('⚠️ Demo Mode: Simulated SOS recorded. Dial 112 for real emergency assistance.'),
                   backgroundColor: Color(0xFFE11D48),
+                  duration: Duration(seconds: 4),
                 ),
               );
             },
             icon: const Icon(Icons.sos, size: 18),
-            label: const Text('BROADCAST SOS NOW'),
+            label: const Text('RECORD SIMULATED SOS'),
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
           ),
         ],

@@ -10,8 +10,8 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 
 ## Build / Test / Development Commands
 - `flutter pub get` — resolve dependencies
-- `flutter analyze` — static analysis (currently 0 errors, 3 info/warnings)
-- `flutter test` — run all widget/unit tests (111/111 passing)
+- `flutter analyze` — static analysis (0 errors)
+- `flutter test` — run all widget/unit tests (187 test suite)
 - `flutter run -d chrome` — run on Chrome web (required for Gemini Live voice features)
 - `flutter run -d linux` — run on Linux desktop
 - `python create_research_doc.py` — generates `BusBuddy_Implementation_Research_and_UI_Design.docx` using `python-docx`

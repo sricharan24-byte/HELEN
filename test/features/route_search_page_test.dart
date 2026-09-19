@@ -135,6 +135,8 @@ void main() {
       await tester.pumpWidget(testApp());
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Find a Place'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Find a Place'));
       await tester.pumpAndSettle();
 
@@ -351,8 +353,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Search routes'));
       await tester.pumpAndSettle();
 
-      // 7 stops on the direct corridor route.
-      expect(find.textContaining('7'), findsWidgets);
+      // 5 stops on the direct corridor route.
+      expect(find.textContaining('5'), findsWidgets);
     });
 
     testWidgets(

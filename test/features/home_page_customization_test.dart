@@ -56,7 +56,7 @@ void main() {
 
       // Both Settings and Find a Place are visible
       expect(find.text('Settings'), findsWidgets);
-      expect(find.text('Find a Place'), findsOneWidget);
+      expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
     });
 
     testWidgets('excludes cards marked as hidden (isVisible == false)', (tester) async {
@@ -71,7 +71,7 @@ void main() {
       expect(find.text('Ask BusBuddy'), findsNothing);
 
       // Other visible cards remain
-      expect(find.text('My Tickets'), findsOneWidget);
+      expect(find.text('My Tickets', skipOffstage: false), findsOneWidget);
       expect(find.text('Saved Places', skipOffstage: false), findsOneWidget);
     });
 
@@ -90,25 +90,31 @@ void main() {
       expect(find.text('Find a Place'), findsNothing);
 
       // Tap 'Restore Default Cards'
+      await tester.ensureVisible(find.text('Restore Default Cards'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Restore Default Cards'));
       await tester.pumpAndSettle();
 
       // Cards are restored
       expect(find.text('All Home Cards Hidden'), findsNothing);
-      expect(find.text('Find a Place'), findsOneWidget);
-      expect(find.text('My Tickets'), findsOneWidget);
+      expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
+      expect(find.text('My Tickets', skipOffstage: false), findsOneWidget);
     });
   });
 
   group('HomePage Navigation for Additional Configurable Cards', () {
     testWidgets('tapping Live Bus Map opens LiveLocationScreen', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 2400);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
 
-      // Scroll if necessary and tap Live Bus Map
-      final liveMapFinder = find.text('Live Bus Map', skipOffstage: false);
-      expect(liveMapFinder, findsOneWidget);
-
+      final liveMapFinder = find.text('Live Bus Map');
       await tester.ensureVisible(liveMapFinder);
       await tester.pumpAndSettle();
       await tester.tap(liveMapFinder);
@@ -118,12 +124,17 @@ void main() {
     });
 
     testWidgets('tapping Corridor Alerts opens AlertsPage', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 2400);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
 
-      final alertsFinder = find.text('Corridor Alerts', skipOffstage: false);
-      expect(alertsFinder, findsOneWidget);
-
+      final alertsFinder = find.text('Corridor Alerts');
       await tester.ensureVisible(alertsFinder);
       await tester.pumpAndSettle();
       await tester.tap(alertsFinder);
@@ -133,12 +144,17 @@ void main() {
     });
 
     testWidgets('tapping Emergency SOS opens SafetySharingPage', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 2400);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
 
-      final sosFinder = find.text('Emergency SOS', skipOffstage: false);
-      expect(sosFinder, findsOneWidget);
-
+      final sosFinder = find.text('Emergency SOS');
       await tester.ensureVisible(sosFinder);
       await tester.pumpAndSettle();
       await tester.tap(sosFinder);

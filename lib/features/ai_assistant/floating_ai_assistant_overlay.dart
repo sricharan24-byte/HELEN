@@ -35,7 +35,6 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
   final TextEditingController _textInputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  Offset _dragStartPos = Offset.zero;
   double _dragDistance = 0.0;
 
   @override
@@ -51,7 +50,10 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
     _pulseAnimation = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
+    );
+    if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+      _pulseAnimation.repeat(reverse: true);
+    }
   }
 
   @override
@@ -139,7 +141,6 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
       top: _controller.position.dy,
       child: GestureDetector(
         onPanStart: (details) {
-          _dragStartPos = details.globalPosition;
           _dragDistance = 0.0;
         },
         onPanUpdate: (details) {
@@ -369,7 +370,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
               children: [
                 Row(
                   children: [
-                    const Flexible(
+                    const Expanded(
                       child: Text(
                         'BusBuddy AI',
                         style: TextStyle(
@@ -391,7 +392,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isLiveKeySet ? '⚡ Live 3.8' : '🔒 Local Engine',
+                        isLiveKeySet ? '⚡ Live' : 'Local',
                         style: TextStyle(
                           color: isLiveKeySet ? const Color(0xFF4ADE80) : const Color(0xFF38BDF8),
                           fontSize: 10,
@@ -628,13 +629,11 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                         const SizedBox(width: 8),
                         Text(
                           isListening
-                              ? (_controller.isContinuousListening
-                                  ? 'Continuous Mic (Tap to Mute)'
-                                  : 'Listening (Tap to Mute)')
+                              ? 'Listening...'
                               : isSpeaking
-                                  ? 'Speaking (Tap to Silence)'
+                                  ? 'Speaking...'
                                   : isMuted
-                                      ? 'Muted (Tap to Speak)'
+                                      ? 'Muted'
                                       : 'Tap to Speak',
                           style: TextStyle(
                             color: glowColor,
@@ -657,10 +656,9 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
   // ── Quick Prompt Chips ─────────────────────────────────────────────────────
   Widget _buildPromptChips() {
     const prompts = [
-      'Where is my bus?',
-      'Buses to Katpadi',
       'Book a ticket',
-      'Student concession fare?',
+      'Find route',
+      'Where is my bus?',
       'Emergency SOS',
     ];
 

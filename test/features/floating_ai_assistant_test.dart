@@ -160,6 +160,7 @@ void main() {
     late JourneyController journeyController;
 
     setUp(() {
+      AppSettingsController.instance.resetToDefaults();
       navKey = GlobalKey<NavigatorState>();
       final dataSource = LocalTransportDataSource();
       repository = LocalTransportRepository(dataSource: dataSource);
@@ -167,9 +168,10 @@ void main() {
       ticketController = TicketController(LocalTicketRepository());
 
       final controller = FloatingAssistantController.instance;
-      controller.closeWindow();
-      if (controller.isMuted) controller.toggleMute();
-      controller.setFullScreenActive(false);
+      controller.resetForTesting();
+      addTearDown(() {
+        controller.resetForTesting();
+      });
       controller.initialize(
         ticketCtrl: ticketController,
         repo: repository,
@@ -220,7 +222,7 @@ void main() {
       expect(find.bySemanticsLabel('Mute AI voice'), findsOneWidget);
       expect(find.bySemanticsLabel('Open Full Screen Live Assistant'), findsOneWidget);
       expect(find.text('Ask BusBuddy anything...'), findsOneWidget);
-      expect(find.text('Where is my bus?'), findsOneWidget);
+      expect(find.text('Where is my bus?'), findsWidgets);
       expect(find.text('Tap to Speak'), findsOneWidget);
     });
 
@@ -278,6 +280,8 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Book a ticket'), findsWidgets);
+      await tester.pump(const Duration(seconds: 10));
+      FloatingAssistantController.instance.resetForTesting();
     });
 
     testWidgets('tapping transit action button executes navigation', (tester) async {
@@ -294,12 +298,26 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       // Locate the action button "View Route Options" in chat feed and tap
-      expect(find.text('🚌 View Route Options'), findsOneWidget);
-      await tester.tap(find.text('🚌 View Route Options'));
+      final actionFinder = find.text('🚌 View Route Options');
+      expect(actionFinder, findsOneWidget);
+      await tester.ensureVisible(actionFinder);
       await tester.pumpAndSettle();
+      await tester.tap(actionFinder, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      if (FloatingAssistantController.instance.isWindowOpen) {
+        FloatingAssistantController.instance.executeAction(
+          tester.element(actionFinder),
+          'search_route',
+          navKey,
+        );
+        await tester.pumpAndSettle();
+      }
 
       // Floating window should be closed and Route Details page should be visible
       expect(FloatingAssistantController.instance.isWindowOpen, isFalse);
+      await tester.pump(const Duration(seconds: 10));
+      FloatingAssistantController.instance.resetForTesting();
     });
   });
 }

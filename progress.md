@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 18, 2026 (Chunk 32 — Web Audio & Gemini Live Voice Output Restoration; voice output functional across 24kHz PCM and Web SpeechSynthesis fallback)  
+**Last Updated**: September 19, 2026 (Chunk 33 / Phase 0 — Gradle/AGP Toolchain Stabilization, Green Test Baseline Hardening, and Deprecation Sweep)  
 
 ---
 
@@ -502,6 +502,23 @@ The application provides intuitive journey planning, digital ticket booking with
   * **Audio Output Transcription** ([gemini_live_session.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_session.dart)): Verified `outputAudioTranscription: {}` and `inputAudioTranscription: {}` in generationConfig, and added support for both `outputTranscription` and `outputAudioTranscription` payloads in `serverContent`.
   * **Settings & Model Fallback Hardening** ([app_settings_controller.dart](file:///home/pavan/BusBuddy/lib/core/settings/app_settings_controller.dart), [voice_assistant_settings_page.dart](file:///home/pavan/BusBuddy/lib/features/settings/voice_assistant_settings_page.dart), [gemini_live_screen.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_screen.dart)): Fixed `resetToDefaults()` in `AppSettingsController` to use `models/gemini-2.5-flash-preview-native-audio-dialog`, added safety guards in both API key dialog dropdowns, and normalized 2.0/3.x model strings to the current preview model in `_resolveLiveModel`.
   * **Test Timer Stability** ([gemini_live_test.dart](file:///home/pavan/BusBuddy/test/features/gemini_live_test.dart)): Flushed 600ms delayed mic-start timer and 4s speech animation timer using `pump(Duration(seconds: 6))` in prompt chip interaction test, ensuring zero pending timers.
+
+---
+
+### 7. 🛠️ Chunk 33 / Phase 0 — Toolchain Stabilization, Baseline Green Tests & Deprecation Sweep
+* **Folder**: `android/`, `lib/`, `test/`
+* **Status**: ✅ Completed
+* **Components Resolved**:
+  * **Android Toolchain Alignment**: Downgraded and pinned Gradle 8.14, AGP 8.11.1, KGP 2.2.20, NDK r28c, and compileSdk 36 matching Flutter 3.44.6 limits. Applied Kotlin plugin to `:app` and removed unsupported experimental Gradle flags. Successfully built release APK (`build/app/outputs/flutter-apk/app-release.apk`, 54.9 MB).
+  * **Semantics Announcements**: Verified all 8 instances across `adaptive_shortcuts_modal.dart`, `adaptive_shortcuts_view.dart`, `home_screen_customization_page.dart`, and `ticket_booking_suite_page.dart` use standard `SemanticsService.announce(..., TextDirection.ltr)`.
+  * **Placebo Eradication**: Removed misleading fake SOS broadcast in `SafetySharingPage`, replacing it with explicit demonstration mode feedback and emergency dialer instructions (112).
+  * **Dead Code Cleanup**: Eliminated unused variables (`_lastRecognizedQuery`, `_dragStartPos`, `_liveService` re-instantiation) in `gemini_live_screen.dart` and `floating_assistant_controller.dart`.
+  * **Widget & Integration Test Hardening**:
+    * Resolved viewport pixel ratio scaling issues (`devicePixelRatio = 1.0`, physicalSize `800x2400`) in `home_page_customization_test.dart`, `home_page_test.dart`, and `settings_ui_test.dart`.
+    * Added `ensureVisible` before tapping dynamically positioned cards and chat feed actions.
+    * Added `resetForTesting()` on `FloatingAssistantController` to isolate tests and clear query state between runs.
+    * Expanded intent routing in `GeminiLiveService` to reliably map route queries.
+
 
 
 

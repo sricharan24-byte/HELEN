@@ -84,6 +84,34 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
     );
   }
 
+  void _confirmClearAll() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Clear all learned shortcuts?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: const Text(
+          'This will reset your transit habits and remove all suggested shortcuts.',
+          style: TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _clearAll();
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final shortcuts = _adaptiveService.allShortcuts
@@ -100,77 +128,69 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Drag Handle Pill ──────────────────────────────────────────
+            // Handle Bar
             Center(
               child: Container(
-                width: 40,
+                width: 36,
                 height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF334155),
+                  color: const Color(0xFF475569),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
 
-            // ── Modal Header ─────────────────────────────────────────────
+            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 22),
-                    SizedBox(width: 10),
                     Text(
                       'Adaptive Shortcuts',
-                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Review and govern AI-learned habits',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                     ),
                   ],
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white70),
-                  tooltip: 'Close Modal',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // ── Explanatory Note ─────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: const Text(
-                'BusBuddy recognizes your frequent stops, routes, and actions to suggest 1-tap shortcuts. You can pin what you like or dismiss unwanted suggestions.',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.4),
-              ),
-            ),
             const SizedBox(height: 16),
 
-            // ── Shortcut Items List ──────────────────────────────────────
+            // Shortcuts List or Empty State
             if (shortcuts.isEmpty) ...[
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111C33),
-                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   children: const [
-                    Icon(Icons.query_stats_rounded, color: Color(0xFF64748B), size: 36),
+                    Icon(Icons.lightbulb_outline, color: Color(0xFF94A3B8), size: 36),
                     SizedBox(height: 10),
                     Text(
-                      'No Active Adaptive Shortcuts',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                      'No adaptive shortcuts yet',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'As you search routes and track buses, frequent actions will appear here.',
+                      'As you use BusBuddy, frequent journeys will appear here.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                     ),
@@ -182,11 +202,8 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: shortcuts.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final shortcut = shortcuts[index];
-                    return _buildShortcutTile(shortcut);
-                  },
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) => _buildShortcutTile(shortcuts[index]),
                 ),
               ),
             ],
@@ -197,7 +214,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _clearAll,
+                    onPressed: _confirmClearAll,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFEF4444),
                       side: const BorderSide(color: Color(0xFF7F1D1D)),
@@ -205,7 +222,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     icon: const Icon(Icons.delete_outline, size: 18),
-                    label: const Text('Clear All', style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text('Reset All Habits & Shortcuts', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 12),

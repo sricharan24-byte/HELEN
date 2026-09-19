@@ -54,7 +54,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
   GeminiLiveResponse? _lastResponse;
   String _liveStatus = 'Ready';
-  String _lastRecognizedQuery = '';
 
   final TextEditingController _textController = TextEditingController();
 
@@ -365,7 +364,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _lastVoiceInputTime = now;
     _lastProcessedQuery = clean;
 
-    _lastRecognizedQuery = clean;
     _receivedPcmThisTurn = false;
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();

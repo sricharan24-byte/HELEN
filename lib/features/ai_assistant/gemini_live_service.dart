@@ -117,7 +117,9 @@ class GeminiLiveService {
 
     // 3. Find a bus / Route search
     if (lower.contains('find a bus') ||
+        lower.contains('find route') ||
         lower.contains('search route') ||
+        lower.contains('route') ||
         lower.contains('buses to') ||
         lower.contains('vit to katpadi')) {
       return GeminiLiveResponse(
@@ -165,7 +167,8 @@ class GeminiLiveService {
     }
 
     // 6. Reset Home Screen Layout (Specific command checked before general home)
-    if (lower.contains('reset home') ||
+    if (lower.contains('reset') && (lower.contains('home') || lower.contains('layout') || lower.contains('card')) ||
+        lower.contains('reset home') ||
         lower.contains('reset layout') ||
         lower.contains('restore default cards') ||
         lower.contains('restore home')) {

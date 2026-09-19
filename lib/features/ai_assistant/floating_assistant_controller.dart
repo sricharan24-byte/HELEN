@@ -395,12 +395,9 @@ class FloatingAssistantController extends ChangeNotifier {
       _liveSession?.sendQuery(query);
     } else {
       final ticket = activeTicket;
-      final qLower = query.toLowerCase();
-      final isBusTrackingQuery = qLower.contains('bus') || qLower.contains('track') || qLower.contains('where');
-      final responseText = (ticket != null && isBusTrackingQuery)
-          ? 'Your active ticket for ${ticket.busId} (${ticket.origin.name} to ${ticket.destination.name}) is ready. Tap below to track your live bus.'
-          : 'BusBuddy voice runs on Gemini Live. Please connect your Google AI Studio API key in voice settings to enable conversational voice control.';
-      final actionType = (ticket != null && isBusTrackingQuery) ? 'track_bus' : 'open_settings';
+      final resp = _liveService.processVoiceQuery(query, activeTicket: ticket);
+      final responseText = resp.spokenResponse;
+      final actionType = resp.actionType;
 
       _messages.add(
         FloatingChatMessage(
@@ -412,7 +409,7 @@ class FloatingAssistantController extends ChangeNotifier {
           actionLabel: _getActionLabel(actionType),
         ),
       );
-      _liveStatus = (ticket != null && isBusTrackingQuery) ? 'Ready' : 'Key Needed';
+      _liveStatus = 'Ready';
 
       if (!_isMuted) {
         _isSpeaking = true;
@@ -623,6 +620,24 @@ class FloatingAssistantController extends ChangeNotifier {
     if (clampedX != _position.dx || clampedY != _position.dy) {
       _position = Offset(clampedX, clampedY);
     }
+  }
+
+  void resetForTesting() {
+    _speechTimer?.cancel();
+    _restartListenTimer?.cancel();
+    _liveSession?.disconnect();
+    _isWindowOpen = false;
+    _isMuted = false;
+    _isListening = false;
+    _isSpeaking = false;
+    _isFullScreenActive = false;
+    _hasUnread = false;
+    _liveStatus = 'Ready';
+    _lastInterimTranscript = null;
+    _continuousListening = false;
+    _hasCustomPosition = false;
+    _messages.clear();
+    notifyListeners();
   }
 
   void resetPosition(Size screenSize, EdgeInsets safeArea, {bool notify = false}) {

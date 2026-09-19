@@ -76,7 +76,6 @@ class _HomePageState extends State<HomePage> {
           if (matches.isNotEmpty) {
             widget.controller.selectRoute(matches.first);
             widget.onRouteSelected(matches.first.id);
-            return;
           }
         }
         Navigator.of(context).push(

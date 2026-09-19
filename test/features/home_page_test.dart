@@ -96,20 +96,29 @@ void main() {
   // ── Task Action Cards ────────────────────────────────────────────────
   group('Task Action Cards', () {
     testWidgets('shows 5 task-oriented action cards', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 2000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(testApp());
       await tester.pumpAndSettle();
 
       expect(find.text('Find a Place'), findsOneWidget);
       expect(find.text('My Tickets'), findsOneWidget);
-      expect(find.text('Saved Places', skipOffstage: false), findsOneWidget);
-      expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
-      expect(find.text('Settings', skipOffstage: false), findsWidgets);
+      expect(find.text('Saved Places'), findsOneWidget);
+      expect(find.text('Ask BusBuddy'), findsOneWidget);
+      expect(find.text('Settings'), findsWidgets);
     });
 
     testWidgets('tapping Find a Place opens route search', (tester) async {
       await tester.pumpWidget(testApp());
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Find a Place'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Find a Place'));
       await tester.pumpAndSettle();
 

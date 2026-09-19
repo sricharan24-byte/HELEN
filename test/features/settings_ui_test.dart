@@ -66,7 +66,7 @@ void main() {
       expect(find.text('Adaptive UI'), findsOneWidget);
       expect(find.textContaining('BusBuddy learns your frequently used features'), findsOneWidget);
       expect(find.text('Default Starting Screen'), findsOneWidget);
-      expect(find.text('Reset My Layout'), findsOneWidget);
+      expect(find.text('Reset My Layout', skipOffstage: false), findsOneWidget);
       expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
     });
 
@@ -78,6 +78,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Default Starting Screen'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Default Starting Screen'));
       await tester.pumpAndSettle();
 
@@ -101,6 +103,13 @@ void main() {
 
   group('VoiceAssistantSettingsPage', () {
     testWidgets('renders purple mic hero header, light cards, dark example box, and Ask BusBuddy button', (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 2400);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(
         const MaterialApp(
           home: VoiceAssistantSettingsPage(),
@@ -115,9 +124,9 @@ void main() {
       expect(find.text('Wake Phrase'), findsOneWidget);
       expect(find.text('Voice Confirmations'), findsOneWidget);
       expect(find.text('Gemini Live Voice'), findsOneWidget);
-      expect(find.text('Example', skipOffstage: false), findsOneWidget);
-      expect(find.text('"Find a bus to Katpadi"', skipOffstage: false), findsOneWidget);
-      expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
+      expect(find.text('Example'), findsOneWidget);
+      expect(find.text('"Find a bus to Katpadi"'), findsOneWidget);
+      expect(find.text('Ask BusBuddy'), findsOneWidget);
     });
 
     testWidgets('tapping Preferred Language opens language picker', (tester) async {
