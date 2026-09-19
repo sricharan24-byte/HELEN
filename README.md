@@ -5,7 +5,7 @@
 [![Flutter](https://img.shields.io/badge/Framework-Flutter%203.x-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Language-Dart-0175C2?logo=dart)](https://dart.dev)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OpenStreetMap%20%2B%20OSRM-7EBC6F?logo=openstreetmap)](https://www.openstreetmap.org)
-[![Tests](https://img.shields.io/badge/Tests-214%2F214%20Passed%20(100%25)-16A34A)](#-automated-tests)
+[![Tests](https://img.shields.io/badge/Tests-236%2F236%20Passed%20(100%25)-16A34A)](#-automated-tests)
 
 ---
 
@@ -67,7 +67,7 @@ The application combines real-time interactive mapping, turn-by-turn street rout
 
 ### ♿ 6. Accessibility & Inclusivity Standards Compliance
 - **Touch Target Sizing**: All interactive buttons, prompt chips, and action cards strictly enforce the 48x48dp minimum tap target size (WCAG 2.2 / Material Design).
-- **Adaptive Text Scaling Clamping**: Text scaling factors are clamped between 0.85x and 2.0x, ensuring large text accessibility options never induce layout overflow.
+- **Uncapped Platform Text Scaling**: Platform `TextScaler` is fully preserved without artificial ceiling clamping per Astra P0 contracts, with responsive reflow, scrolling, and wrapping preventing layout truncation at large accessibility display settings.
 - **High-Contrast & Dark Mode**: Dedicated high-contrast color scheme and dark themes optimized for low-vision visibility and night commutes.
 - **Screen Reader First (TalkBack / VoiceOver)**: Explicit semantic descriptions, live region announcements, and focus management across all screens.
 

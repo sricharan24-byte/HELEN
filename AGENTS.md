@@ -11,7 +11,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 ## Build / Test / Development Commands
 - `flutter pub get` — resolve dependencies
 - `flutter analyze` — static analysis (0 errors)
-- `flutter test` — run all widget/unit tests (187 test suite)
+- `flutter test` — run all widget/unit tests (236 test suite)
 - `flutter run -d chrome` — run on Chrome web (required for Gemini Live voice features)
 - `flutter run -d linux` — run on Linux desktop
 - `python create_research_doc.py` — generates `BusBuddy_Implementation_Research_and_UI_Design.docx` using `python-docx`
@@ -44,7 +44,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 - **Natural Voice Conversational Delivery**: The assistant executes tool calls seamlessly in the background and delivers concise, natural transit answers without verbally reading out raw JSON, function signatures, or execution mechanics.
 - **Persistent Continuous Hands-Free Listening Mode**: Once the microphone is enabled, speech recognition stays continuously active across conversational turns, auto-restarting on silence/timeout, auto-resuming listening 350ms after the AI finishes speaking, and debouncing acoustic feedback.
 - **Hybrid Audio Architecture (Gemini Live 24kHz PCM + Web SpeechSynthesis)**: When connected, Gemini Live streams native 24kHz PCM linear audio chunks with 40ms low-latency jitter scheduling. If disconnected, during REST fallback, or for local queries, `AudioSpeechEngine` automatically speaks responses out loud via Web SpeechSynthesis with markdown sanitization and `onAudioEnded` callbacks.
-- **Accessibility & Touch Target Standards**: All interactive controls conform to 48x48dp minimum tap target sizes (WCAG 2.2). Text scaling is clamped between 0.85x and 2.0x in `main.dart` to prevent layout overflow on large accessibility text settings.
+- **Accessibility & Touch Target Standards**: All interactive controls conform to 48x48dp minimum tap target sizes (WCAG 2.2). Platform `TextScaler` is preserved without artificial clamping per Astra P0 requirements, supporting responsive reflow at large accessibility text sizes.
 - **Resource Lifecycle Disposals**: `LiveLocationScreen`, `TicketController`, and speech sessions cancel active `StreamSubscription` and `Timer` instances in `dispose()` to eliminate memory leaks and background CPU cycles.
 - Web speech features use conditional imports (`dart:html`, `dart:js`, `dart:js_util`) — only compile on web target.
 - **Floating BusBuddy AI Bubble & Multitasking Window**: The floating mascot bubble floats persistently over all app screens via `MaterialApp.builder`. Users can drag it anywhere on screen. Tapping opens a compact chat and voice window with real-time mic mute/unmute control, direct transit action navigation buttons, and quick prompt chips. Automatically hides when full-screen `GeminiLiveScreen` is active.
