@@ -1,3 +1,4 @@
+import '../../core/di/service_locator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
@@ -237,7 +238,7 @@ class GeminiLiveService {
     required String originId,
     required String destinationId,
   }) {
-    final dataSource = LocalTransportDataSource();
+    final dataSource = AppServiceLocator.instance.transportDataSource;
     for (final route in dataSource.allRoutes) {
       final o = route.orderedStopIds.indexOf(originId);
       final d = route.orderedStopIds.indexOf(destinationId);

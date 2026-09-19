@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/di/service_locator.dart';
 import 'core/settings/app_settings_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'data/datasources/local_json_store.dart';
@@ -23,13 +24,13 @@ Future<void> main() async {
   await AdaptiveUiService.instance.hydrate(store);
 
   // ── Composition root ─────────────────────────────────────────────────
-  final dataSource = LocalTransportDataSource();
-  final repository = LocalTransportRepository(dataSource: dataSource);
-  final journeyController = JourneyController(repository);
-
-  final ticketRepository = LocalTicketRepository();
-  await ticketRepository.hydrate(store);
-  final ticketController = TicketController(ticketRepository);
+  final locator = AppServiceLocator.instance;
+  if (locator.ticketRepository is LocalTicketRepository) {
+    await (locator.ticketRepository as LocalTicketRepository).hydrate(store);
+  }
+  final journeyController = locator.journeyController;
+  final repository = locator.transportRepository;
+  final ticketController = locator.ticketController;
 
   runApp(
     MyApp(

@@ -22,7 +22,7 @@ void main() {
       final service = AiAssistantService();
       final response = service.processQuery('How much is student ticket fare?');
 
-      expect(response.text, contains('Student Pass: ₹10'));
+      expect(response.text, contains('Student Pass: ₹12'));
       expect(response.actionType, 'book_ticket');
     });
   });

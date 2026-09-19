@@ -44,7 +44,7 @@ class AiAssistantService {
 
     if (lower.contains('fare') || lower.contains('price') || lower.contains('ticket cost') || lower.contains('discount') || lower.contains('student')) {
       return const AiResponseMessage(
-        text: 'BusBuddy fares for the VIT corridor:\n• General Pass: ₹20\n• Student Pass: ₹10 (50% discount)\n• Senior Citizen Pass: ₹14 (30% discount)',
+        text: 'BusBuddy fares for the VIT corridor:\n• General Pass: ₹20\n• Student Pass: ₹12 (40% discount)\n• Senior Citizen Pass: ₹12 (40% discount)',
         actionLabel: 'Book Ticket Now',
         actionType: 'book_ticket',
       );

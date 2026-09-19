@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/ticket_repository.dart';
@@ -39,8 +40,8 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
   @override
   void initState() {
     super.initState();
-    _repository = widget.repository ?? LocalTransportRepository(dataSource: LocalTransportDataSource());
-    _ticketController = widget.ticketController ?? TicketController(LocalTicketRepository());
+    _repository = widget.repository ?? AppServiceLocator.instance.transportRepository;
+    _ticketController = widget.ticketController ?? AppServiceLocator.instance.ticketController;
     _chatMessages.add({
       'sender': 'ai',
       'text': 'Hello! I am BusBuddy AI Assistant. Ask me about bus timings, live bus tracking, fares, or emergency sharing.',

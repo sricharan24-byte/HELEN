@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
@@ -65,9 +66,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     super.initState();
     _activeStepIndex = widget.initialStepIndex;
 
-    final dataSource = LocalTransportDataSource();
-    _repository = LocalTransportRepository(dataSource: dataSource);
-    _allStops = dataSource.allStops;
+    _repository = AppServiceLocator.instance.transportRepository;
+    _allStops = AppServiceLocator.instance.transportDataSource.allStops;
     _selectedDate = DateTime.now();
     _selectedDateText = _formatSelectedDate(_selectedDate);
 
@@ -272,7 +272,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
       MaterialPageRoute(
         builder: (_) => GeminiLiveScreen(
           ticketController: widget.ticketController,
-          repository: LocalTransportRepository(dataSource: LocalTransportDataSource()),
+          repository: AppServiceLocator.instance.transportRepository,
           journeyController: widget.journeyController,
         ),
       ),
@@ -317,7 +317,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   String _resolveRouteId() {
-    final routes = LocalTransportDataSource().allRoutes;
+    final routes = AppServiceLocator.instance.transportDataSource.allRoutes;
     for (final route in routes) {
       final o = route.orderedStopIds.indexOf(_origin.id);
       final d = route.orderedStopIds.indexOf(_destination.id);
@@ -331,7 +331,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   /// Stops on the passenger's own journey segment of the active route
   /// (boarding stop through alighting stop), in travel order.
   List<Stop> get _activeRouteStops {
-    final dataSource = LocalTransportDataSource();
+    final dataSource = AppServiceLocator.instance.transportDataSource;
     final route = dataSource.allRoutes.firstWhere(
       (r) => r.id == _resolveRouteId(),
       orElse: () => dataSource.allRoutes.first,
@@ -363,7 +363,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         return (_activeRouteStops.length - idx).clamp(0, 50);
       }
     }
-    final routes = LocalTransportDataSource().allRoutes;
+    final routes = AppServiceLocator.instance.transportDataSource.allRoutes;
     for (final route in routes) {
       final o = route.orderedStopIds.indexOf(_origin.id);
       final d = route.orderedStopIds.indexOf(_destination.id);
@@ -1415,7 +1415,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           status: TicketStatus.active,
                           qrCodeData: 'BUSBUDDY-PASS-BB184256',
                         );
-                    final repo = LocalTransportRepository(dataSource: LocalTransportDataSource());
+                    final repo = AppServiceLocator.instance.transportRepository;
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => LiveLocationScreen(

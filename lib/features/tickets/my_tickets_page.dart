@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -408,7 +409,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 title: 'Live Map',
                 subtitle: 'Track real bus location',
                 onTap: () {
-                  final repo = widget.repository ?? LocalTransportRepository(dataSource: LocalTransportDataSource());
+                  final repo = widget.repository ?? AppServiceLocator.instance.transportRepository;
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => LiveLocationScreen(

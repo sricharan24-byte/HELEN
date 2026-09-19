@@ -1,12 +1,13 @@
-import 'package:flutter/foundation.dart';
-import 'transport_models.dart';
+import '../../transit/entities/stop.dart';
 
-export '../../domain/ticketing/entities/ticket.dart'
-    show TicketStatus, PassengerType, PaymentMethod;
-import '../../domain/ticketing/entities/ticket.dart'
-    show TicketStatus, PassengerType, PaymentMethod;
+enum TicketStatus { active, used, expired }
 
-@immutable
+enum PassengerType { general, student, senior }
+
+enum PaymentMethod { upi, card, netBanking, wallet }
+
+/// Pure-Dart Ticket domain entity.
+/// Zero Flutter imports.
 class Ticket {
   const Ticket({
     required this.id,
@@ -42,14 +43,48 @@ class Ticket {
 
   bool get isActive => status == TicketStatus.active && DateTime.now().isBefore(validUntil);
 
+  Ticket copyWith({
+    String? id,
+    String? routeId,
+    String? routeName,
+    Stop? origin,
+    Stop? destination,
+    String? busId,
+    String? passengerName,
+    PassengerType? passengerType,
+    double? fareAmount,
+    PaymentMethod? paymentMethod,
+    DateTime? issuedAt,
+    DateTime? validUntil,
+    TicketStatus? status,
+    String? qrCodeData,
+  }) {
+    return Ticket(
+      id: id ?? this.id,
+      routeId: routeId ?? this.routeId,
+      routeName: routeName ?? this.routeName,
+      origin: origin ?? this.origin,
+      destination: destination ?? this.destination,
+      busId: busId ?? this.busId,
+      passengerName: passengerName ?? this.passengerName,
+      passengerType: passengerType ?? this.passengerType,
+      fareAmount: fareAmount ?? this.fareAmount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      issuedAt: issuedAt ?? this.issuedAt,
+      validUntil: validUntil ?? this.validUntil,
+      status: status ?? this.status,
+      qrCodeData: qrCodeData ?? this.qrCodeData,
+    );
+  }
+
   Map<String, Object?> toJson() {
     Map<String, Object?> stopJson(Stop stop) => {
-      'id': stop.id,
-      'name': stop.name,
-      'area': stop.area,
-      'latitude': stop.latitude,
-      'longitude': stop.longitude,
-    };
+          'id': stop.id,
+          'name': stop.name,
+          'area': stop.area,
+          'latitude': stop.latitude,
+          'longitude': stop.longitude,
+        };
 
     return {
       'id': id,
@@ -143,37 +178,21 @@ class Ticket {
     );
   }
 
-  Ticket copyWith({
-    String? id,
-    String? routeId,
-    String? routeName,
-    Stop? origin,
-    Stop? destination,
-    String? busId,
-    String? passengerName,
-    PassengerType? passengerType,
-    double? fareAmount,
-    PaymentMethod? paymentMethod,
-    DateTime? issuedAt,
-    DateTime? validUntil,
-    TicketStatus? status,
-    String? qrCodeData,
-  }) {
-    return Ticket(
-      id: id ?? this.id,
-      routeId: routeId ?? this.routeId,
-      routeName: routeName ?? this.routeName,
-      origin: origin ?? this.origin,
-      destination: destination ?? this.destination,
-      busId: busId ?? this.busId,
-      passengerName: passengerName ?? this.passengerName,
-      passengerType: passengerType ?? this.passengerType,
-      fareAmount: fareAmount ?? this.fareAmount,
-      paymentMethod: paymentMethod ?? this.paymentMethod,
-      issuedAt: issuedAt ?? this.issuedAt,
-      validUntil: validUntil ?? this.validUntil,
-      status: status ?? this.status,
-      qrCodeData: qrCodeData ?? this.qrCodeData,
-    );
-  }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Ticket &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          routeId == other.routeId &&
+          busId == other.busId &&
+          fareAmount == other.fareAmount &&
+          status == other.status;
+
+  @override
+  int get hashCode => Object.hash(id, routeId, busId, fareAmount, status);
+
+  @override
+  String toString() =>
+      'Ticket($id, route: $routeName, bus: $busId, passenger: $passengerName, fare: ₹${fareAmount.toStringAsFixed(0)}, status: ${status.name})';
 }

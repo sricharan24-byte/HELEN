@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/ticket_repository.dart';
@@ -63,9 +64,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   void initState() {
     super.initState();
     _repository =
-        widget.repository ?? LocalTransportRepository(dataSource: LocalTransportDataSource());
+        widget.repository ?? AppServiceLocator.instance.transportRepository;
     _ticketController =
-        widget.ticketController ?? TicketController(LocalTicketRepository());
+        widget.ticketController ?? AppServiceLocator.instance.ticketController;
 
     _pulseController = AnimationController(
       vsync: this,

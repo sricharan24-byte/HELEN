@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
+import '../../domain/ticketing/entities/fare_engine.dart';
 
 /// Modal bottom sheet for passenger type selection, payment checkout, and ticket issuance.
 class BookingCheckoutDialog extends StatefulWidget {
@@ -50,13 +51,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   }
 
   double get _finalFare {
-    switch (_selectedPassengerType) {
-      case PassengerType.student:
-      case PassengerType.senior:
-        return (widget.baseFare * 0.6).roundToDouble();
-      case PassengerType.general:
-        return widget.baseFare;
-    }
+    return FareEngine.calculateFromBase(
+      baseFare: widget.baseFare,
+      passengerType: _selectedPassengerType,
+    ).amount;
   }
 
   void _issueTicket() {
@@ -216,7 +214,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.general,
                     label: 'General',
-                    sublabel: '₹${widget.baseFare.toStringAsFixed(0)}',
+                    sublabel: FareEngine.calculateFromBase(
+                      baseFare: widget.baseFare,
+                      passengerType: PassengerType.general,
+                    ).formattedAmount,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -224,7 +225,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.student,
                     label: 'Student',
-                    sublabel: '₹${(widget.baseFare * 0.6).toStringAsFixed(0)}',
+                    sublabel: FareEngine.calculateFromBase(
+                      baseFare: widget.baseFare,
+                      passengerType: PassengerType.student,
+                    ).formattedAmount,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -232,7 +236,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.senior,
                     label: 'Senior',
-                    sublabel: '₹${(widget.baseFare * 0.6).toStringAsFixed(0)}',
+                    sublabel: FareEngine.calculateFromBase(
+                      baseFare: widget.baseFare,
+                      passengerType: PassengerType.senior,
+                    ).formattedAmount,
                   ),
                 ),
               ],
