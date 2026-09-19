@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
@@ -29,6 +33,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return ListenableBuilder(
       listenable: widget.ticketController,
       builder: (context, _) {
@@ -37,26 +42,30 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
         final pastTickets = allTickets.where((t) => t.id != activeTicket?.id).toList();
 
         return Scaffold(
-          backgroundColor: const Color(0xFF0B101D),
+          backgroundColor: colors.background,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0B101D),
+            backgroundColor: colors.background,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
               onPressed: () => Navigator.of(context).pop(),
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
             ),
             title: Column(
               children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                    Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+                  children: [
+                    Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
+                    Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
                   ],
                 ),
-                const Text(
+                Text(
                   'My Tickets',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -74,48 +83,75 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF111C33),
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: colors.border),
                         ),
                         child: Row(
                           children: [
                             Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTabIndex = 0),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTabIndex == 0 ? const Color(0xFF007AFF) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    'Current Ticket',
-                                    style: TextStyle(
-                                      color: _selectedTabIndex == 0 ? Colors.white : const Color(0xFF94A3B8),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
+                              child: Semantics(
+                                selected: _selectedTabIndex == 0,
+                                button: true,
+                                label: 'Current Ticket tab',
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() => _selectedTabIndex = 0);
+                                    AnnouncementCoordinator.instance.announce(
+                                      'Showing Current Ticket',
+                                      priority: AnnouncementPriority.low,
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedTabIndex == 0 ? colors.actionPrimary : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'Current Ticket',
+                                      style: TextStyle(
+                                        color: _selectedTabIndex == 0 ? colors.actionPrimaryText : colors.textSecondary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                             Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTabIndex = 1),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTabIndex == 1 ? const Color(0xFF007AFF) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    'Previous Tickets',
-                                    style: TextStyle(
-                                      color: _selectedTabIndex == 1 ? Colors.white : const Color(0xFF94A3B8),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
+                              child: Semantics(
+                                selected: _selectedTabIndex == 1,
+                                button: true,
+                                label: 'Previous Tickets tab',
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() => _selectedTabIndex = 1);
+                                    AnnouncementCoordinator.instance.announce(
+                                      'Showing Previous Tickets',
+                                      priority: AnnouncementPriority.low,
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedTabIndex == 1 ? colors.actionPrimary : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'Previous Tickets',
+                                      style: TextStyle(
+                                        color: _selectedTabIndex == 1 ? colors.actionPrimaryText : colors.textSecondary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
                                 ),

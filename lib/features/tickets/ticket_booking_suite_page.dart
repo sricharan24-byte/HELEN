@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
@@ -104,83 +108,93 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   void _openOriginPicker() {
+    final colors = AppTheme.colors(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select Origin Stop',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+        return Material(
+          color: colors.background,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Origin Stop',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.my_location, color: Color(0xFF38BDF8)),
-                title: const Text(
-                  'Current Location (VIT Main Gate)',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                const SizedBox(height: 16),
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: Icon(Icons.my_location, color: colors.actionPrimary),
+                    title: Text(
+                      'Current Location (VIT Main Gate)',
+                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                    ),
+                    onTap: () {
+                      setState(() {
+                        _isCurrentLocation = true;
+                        _origin = _allStops.firstWhere(
+                          (s) => s.name.contains('VIT'),
+                          orElse: () => _allStops.isNotEmpty
+                              ? _allStops.first
+                              : const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'Vellore'),
+                        );
+                      });
+                      Navigator.of(context).pop();
+                    },
+                  ),
                 ),
-                onTap: () {
-                  setState(() {
-                    _isCurrentLocation = true;
-                    _origin = _allStops.firstWhere(
-                      (s) => s.name.contains('VIT'),
-                      orElse: () => _allStops.isNotEmpty
-                          ? _allStops.first
-                          : const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'Vellore'),
-                    );
-                  });
-                  Navigator.of(context).pop();
-                },
-              ),
-              const Divider(color: Color(0xFF1E293B)),
-              Expanded(
-                child: ListView(
-                  children: _allStops.map((stop) {
-                    final isSelected = !_isCurrentLocation && stop.id == _origin.id;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.location_on,
-                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF64748B),
-                      ),
-                      title: Text(
-                        stop.name,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                Divider(color: colors.border),
+                Expanded(
+                  child: ListView(
+                    children: _allStops.map((stop) {
+                      final isSelected = !_isCurrentLocation && stop.id == _origin.id;
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.location_on,
+                            color: isSelected ? colors.actionPrimary : colors.textSecondary,
+                          ),
+                          title: Text(
+                            stop.name,
+                            style: TextStyle(
+                              color: isSelected ? colors.actionPrimary : colors.textPrimary,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            stop.area,
+                            style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _isCurrentLocation = false;
+                              _origin = stop;
+                            });
+                            Navigator.of(context).pop();
+                          },
                         ),
-                      ),
-                      subtitle: Text(
-                        stop.area,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _isCurrentLocation = false;
-                          _origin = stop;
-                        });
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -188,62 +202,69 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   void _openDestinationPicker() {
+    final colors = AppTheme.colors(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select Destination Stop',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+        return Material(
+          color: colors.background,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Destination Stop',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView(
-                  children: _allStops.map((stop) {
-                    final isSelected = stop.id == _destination.id;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.location_on,
-                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF64748B),
-                      ),
-                      title: Text(
-                        stop.name,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView(
+                    children: _allStops.map((stop) {
+                      final isSelected = stop.id == _destination.id;
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.location_on,
+                            color: isSelected ? colors.actionPrimary : colors.textSecondary,
+                          ),
+                          title: Text(
+                            stop.name,
+                            style: TextStyle(
+                              color: isSelected ? colors.actionPrimary : colors.textPrimary,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            stop.area,
+                            style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _destination = stop;
+                            });
+                            Navigator.of(context).pop();
+                          },
                         ),
-                      ),
-                      subtitle: Text(
-                        stop.area,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _destination = stop;
-                        });
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -1177,9 +1198,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               final live = snapshot.data;
               if (live != null && live.nextStopName.isNotEmpty && live.nextStopName != _lastAnnouncedStop) {
                 if (_isAnnouncementsOn && _lastAnnouncedStop != null) {
-                  SemanticsService.announce(
+                  AnnouncementCoordinator.instance.announce(
                     'Approaching ${live.nextStopName}. Estimated arrival in ${live.etaMinutes} minutes.',
-                    TextDirection.ltr,
+                    routeId: _resolveRouteId(),
                   );
                 }
                 _lastAnnouncedStop = live.nextStopName;

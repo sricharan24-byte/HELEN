@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../data/models/home_screen_item.dart';
 
 /// Screen allowing commuters to reorder, show, hide, and reset
 /// home screen component cards with full touch and screen-reader accessibility.
+/// Conforms to Astra Step 2.7 with semantic design tokens, 48dp touch targets,
+/// non-drag accessible reordering, and AnnouncementCoordinator integration.
 class HomeScreenCustomizationPage extends StatefulWidget {
   const HomeScreenCustomizationPage({super.key});
 
@@ -34,7 +39,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
 
   void _resetToDefaults() {
     _settings.resetHomeScreenLayout();
-    SemanticsService.announce('Home screen layout reset to default order and all cards restored.', TextDirection.ltr);
+    AnnouncementCoordinator.instance.announce(
+      'Home screen layout reset to default order and all cards restored.',
+      priority: AnnouncementPriority.normal,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Home screen layout reset to default settings.'),
@@ -47,9 +55,9 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
   void _moveUp(int index, HomeScreenItem item) {
     if (index > 0) {
       _settings.moveHomeScreenItemUp(item.id);
-      SemanticsService.announce(
+      AnnouncementCoordinator.instance.announce(
         '${item.title} moved up to position $index of ${_settings.homeScreenItems.length}',
-        TextDirection.ltr,
+        priority: AnnouncementPriority.normal,
       );
     }
   }
@@ -57,63 +65,57 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
   void _moveDown(int index, HomeScreenItem item) {
     if (index < _settings.homeScreenItems.length - 1) {
       _settings.moveHomeScreenItemDown(item.id);
-      SemanticsService.announce(
+      AnnouncementCoordinator.instance.announce(
         '${item.title} moved down to position ${index + 2} of ${_settings.homeScreenItems.length}',
-        TextDirection.ltr,
+        priority: AnnouncementPriority.normal,
       );
     }
   }
 
   void _toggleVisibility(HomeScreenItem item, bool isVisible) {
     _settings.toggleHomeScreenItemVisibility(item.id, isVisible);
-    SemanticsService.announce(
+    AnnouncementCoordinator.instance.announce(
       '${item.title} is now ${isVisible ? "visible" : "hidden"} on home screen',
-      TextDirection.ltr,
+      priority: AnnouncementPriority.normal,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     final items = _settings.homeScreenItems;
     final visibleCount = items.where((e) => e.isVisible).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
           tooltip: 'Back to Personalization Settings',
           onPressed: () => Navigator.of(context).pop(),
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
         ),
         title: Column(
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+              children: [
+                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
+                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
               ],
             ),
-            const Text(
+            Text(
               'Customize Home Screen',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
         ),
         centerTitle: true,
-        actions: [
-          Semantics(
-            button: true,
-            label: 'Reset home screen layout to default',
-            child: IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
-              tooltip: 'Reset Layout',
-              onPressed: _resetToDefaults,
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -122,75 +124,51 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 children: [
-                  // ── Hero Guidance Card ───────────────────────────────────────
+                  // ── Hero Guidance Card ─────────────────────────────────────
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111C33),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0284C7),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: colors.actionPrimary,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.dashboard_customize, color: Colors.white, size: 26),
+                          child: Icon(Icons.dashboard_customize, color: colors.actionPrimaryText, size: 24),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Customize Your Home',
-                                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                            children: [
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  'Customize Your Home',
+                                  style: TextStyle(
+                                    color: colors.textPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 3),
                               Text(
-                                'Rearrange cards in any order and choose which features appear.',
-                                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                'Drag cards using ≡ to reorder, or use the accessible up/down buttons. Toggle switches to show or hide cards.',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // ── Accessibility & Usage Tip Box ───────────────────────────
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDBEAFE),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2563EB),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.accessibility_new, color: Colors.white, size: 16),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Drag cards using ≡ to reorder, or use the Move Up and Move Down buttons for TalkBack screen-reader navigation. Toggle the switch to show or hide any card.',
-                            style: TextStyle(
-                              color: Color(0xFF1E3A8A),
-                              fontSize: 12,
-                              height: 1.4,
-                              fontWeight: FontWeight.w600,
-                            ),
                           ),
                         ),
                       ],
@@ -204,18 +182,21 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                     children: [
                       Text(
                         'Home Screen Cards ($visibleCount of ${items.length} visible)',
-                        style: const TextStyle(
-                          color: Color(0xFFCBD5E1),
+                        style: TextStyle(
+                          color: colors.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       TextButton.icon(
                         onPressed: _resetToDefaults,
-                        icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF38BDF8)),
-                        label: const Text(
+                        icon: Icon(Icons.refresh, size: 16, color: colors.actionPrimary),
+                        label: Text(
                           'Reset',
-                          style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: colors.actionPrimary, fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, AppSpacing.minTouchTarget),
                         ),
                       ),
                     ],
@@ -229,7 +210,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                     itemCount: items.length,
                     onReorder: (oldIndex, newIndex) {
                       _settings.reorderHomeScreenItem(oldIndex, newIndex);
-                      SemanticsService.announce('Card reordered', TextDirection.ltr);
+                      AnnouncementCoordinator.instance.announce(
+                        'Card reordered',
+                        priority: AnnouncementPriority.low,
+                      );
                     },
                     itemBuilder: (context, index) {
                       final item = items[index];
@@ -238,6 +222,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                         item: item,
                         index: index,
                         totalCount: items.length,
+                        colors: colors,
                       );
                     },
                   ),
@@ -248,10 +233,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
             // ── Sticky Bottom Action Bar ─────────────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFF111C33),
+              decoration: BoxDecoration(
+                color: colors.surface,
                 border: Border(
-                  top: BorderSide(color: Color(0xFF1E293B)),
+                  top: BorderSide(color: colors.border),
                 ),
               ),
               child: Row(
@@ -260,10 +245,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                     child: OutlinedButton.icon(
                       onPressed: _resetToDefaults,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF94A3B8),
-                        side: const BorderSide(color: Color(0xFF334155)),
+                        foregroundColor: colors.textSecondary,
+                        side: BorderSide(color: colors.border),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
                       icon: const Icon(Icons.restore, size: 20),
                       label: const Text(
@@ -276,6 +262,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () {
+                        AnnouncementCoordinator.instance.announce(
+                          'Home screen layout saved.',
+                          priority: AnnouncementPriority.normal,
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Home screen layout saved.'),
@@ -286,10 +276,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                         Navigator.of(context).pop();
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
+                        backgroundColor: colors.actionPrimary,
+                        foregroundColor: colors.actionPrimaryText,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
                       icon: const Icon(Icons.check, size: 20),
                       label: const Text(
@@ -312,6 +303,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
     required HomeScreenItem item,
     required int index,
     required int totalCount,
+    required dynamic colors,
   }) {
     final isFirst = index == 0;
     final isLast = index == totalCount - 1;
@@ -321,132 +313,141 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
       key: key,
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isVisible ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+        color: isVisible ? colors.surface : colors.background,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isVisible ? const Color(0xFF334155) : const Color(0xFF1E293B),
+          color: isVisible ? colors.border : colors.border.withValues(alpha: 0.5),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // ── Icon Bubble ───────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isVisible ? item.color : item.color.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              // ── Icon Bubble ───────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isVisible ? item.color : item.color.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  item.icon,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
-              child: Icon(
-                item.icon,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
+              const SizedBox(width: 12),
 
-            // ── Title & Subtitle ──────────────────────────────────────
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          item.title,
-                          style: TextStyle(
-                            color: isVisible ? Colors.white : const Color(0xFF64748B),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (!isVisible) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF334155),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Hidden',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w700),
+              // ── Title & Subtitle ──────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              color: isVisible ? colors.textPrimary : colors.textSecondary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
+                        if (!isVisible) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: colors.border,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Hidden',
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.subtitle,
-                    style: TextStyle(
-                      color: isVisible ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                      fontSize: 12,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle,
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // ── Non-touch Accessible Reorder Controls ─────────────────
-            Semantics(
-              button: true,
-              label: isFirst ? '${item.title} is at top' : 'Move ${item.title} up',
-              child: IconButton(
+              // ── Move Up Button (Screen-Reader / Motor Alternative) ───
+              IconButton(
                 icon: Icon(
                   Icons.arrow_upward,
-                  size: 20,
-                  color: isFirst ? const Color(0xFF334155) : const Color(0xFF38BDF8),
+                  size: 18,
+                  color: isFirst ? colors.textSecondary.withValues(alpha: 0.3) : colors.textSecondary,
                 ),
-                tooltip: isFirst ? null : 'Move Up',
+                tooltip: 'Move Up',
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
                 onPressed: isFirst ? null : () => _moveUp(index, item),
               ),
-            ),
-            Semantics(
-              button: true,
-              label: isLast ? '${item.title} is at bottom' : 'Move ${item.title} down',
-              child: IconButton(
+
+              // ── Move Down Button (Screen-Reader / Motor Alternative) ─
+              IconButton(
                 icon: Icon(
                   Icons.arrow_downward,
-                  size: 20,
-                  color: isLast ? const Color(0xFF334155) : const Color(0xFF38BDF8),
+                  size: 18,
+                  color: isLast ? colors.textSecondary.withValues(alpha: 0.3) : colors.textSecondary,
                 ),
-                tooltip: isLast ? null : 'Move Down',
+                tooltip: 'Move Down',
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
                 onPressed: isLast ? null : () => _moveDown(index, item),
               ),
-            ),
 
-            // ── Visibility Switch ─────────────────────────────────────
-            Semantics(
-              label: 'Toggle ${item.title} visibility on home screen',
-              child: Switch(
-                value: isVisible,
-                activeThumbColor: Colors.white,
-                activeTrackColor: const Color(0xFF22C55E),
-                inactiveThumbColor: const Color(0xFF64748B),
-                inactiveTrackColor: const Color(0xFF1E293B),
-                onChanged: (val) => _toggleVisibility(item, val),
-              ),
-            ),
-
-            // ── Drag Handle ───────────────────────────────────────────
-            Semantics(
-              label: 'Drag to reorder ${item.title}',
-              child: ReorderableDragStartListener(
-                index: index,
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 4, right: 4),
-                  child: Icon(Icons.drag_handle, color: Color(0xFF64748B), size: 24),
+              // ── Visibility Switch ───────────────────────────────────
+              Semantics(
+                label: '${item.title} visibility',
+                child: Switch(
+                  value: isVisible,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: colors.statusSuccess,
+                  inactiveThumbColor: Colors.white60,
+                  inactiveTrackColor: colors.border,
+                  onChanged: (val) => _toggleVisibility(item, val),
                 ),
               ),
-            ),
-          ],
+
+              // ── Reorder Drag Handle (≡) ─────────────────────────────
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Icon(
+                    Icons.drag_handle,
+                    color: colors.textSecondary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

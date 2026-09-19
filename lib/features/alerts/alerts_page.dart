@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
+
+/// Live Corridor Alerts page with multi-modal indicators (WCAG 1.4.1)
+/// and full semantic design tokens.
 class AlertsPage extends StatelessWidget {
   const AlertsPage({super.key});
 
@@ -8,53 +14,66 @@ class AlertsPage extends StatelessWidget {
       'title': 'Bus TN-23-BUS-42 On Time',
       'subtitle': 'Operating on VIT Main Gate → Katpadi Railway Station corridor. ETA 4 mins to Gandhi Nagar.',
       'time': '2 mins ago',
-      'type': 'status',
+      'level': StatusLevel.success,
       'icon': Icons.directions_bus,
-      'iconColor': Color(0xFF059669),
     },
     {
       'title': 'Minor Traffic Delay near Green Circle',
       'subtitle': 'Expect +3 mins delay due to road maintenance near Green Circle junction.',
       'time': '15 mins ago',
-      'type': 'warning',
+      'level': StatusLevel.warning,
       'icon': Icons.warning_amber_rounded,
-      'iconColor': Color(0xFFD97706),
     },
     {
       'title': 'Auditory Voice Announcements Enabled',
       'subtitle': 'TalkBack and audio cues will announce each upcoming stop 500 meters prior to arrival.',
       'time': '1 hour ago',
-      'type': 'info',
+      'level': StatusLevel.info,
       'icon': Icons.volume_up_outlined,
-      'iconColor': Color(0xFF002B7F),
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final colors = AppTheme.colors(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: const Text('Live Corridor Alerts'),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF4F6F8),
-        foregroundColor: const Color(0xFF002B7F),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(20),
+        padding: AppSpacing.pagePadding,
         itemCount: _alerts.length,
         itemBuilder: (context, index) {
           final alert = _alerts[index];
+          final level = alert['level'] as StatusLevel;
+
+          final statusColor = switch (level) {
+            StatusLevel.success => colors.statusSuccess,
+            StatusLevel.warning => colors.statusWarning,
+            StatusLevel.error => colors.statusAlert,
+            StatusLevel.info => colors.actionPrimary,
+          };
+
+          final statusBg = switch (level) {
+            StatusLevel.success => colors.statusSuccessBg,
+            StatusLevel.warning => colors.statusWarningBg,
+            StatusLevel.error => colors.statusAlertBg,
+            StatusLevel.info => colors.surface,
+          };
+
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: colors.border),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -62,10 +81,11 @@ class AlertsPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (alert['iconColor'] as Color).withValues(alpha: 0.12),
+                    color: statusBg,
                     shape: BoxShape.circle,
+                    border: Border.all(color: statusColor),
                   ),
-                  child: Icon(alert['icon'] as IconData, color: alert['iconColor'] as Color, size: 24),
+                  child: Icon(alert['icon'] as IconData, color: statusColor, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -76,27 +96,31 @@ class AlertsPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text(
-                              alert['title'] as String,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0A2540),
-                                fontSize: 15,
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                alert['title'] as String,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.textPrimary,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
                           ),
                           Text(
                             alert['time'] as String,
-                            style: textTheme.bodySmall?.copyWith(color: const Color(0xFF94A3B8), fontSize: 11),
+                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         alert['subtitle'] as String,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF64748B),
-                          height: 1.3,
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          height: 1.35,
+                          fontSize: 13,
                         ),
                       ),
                     ],

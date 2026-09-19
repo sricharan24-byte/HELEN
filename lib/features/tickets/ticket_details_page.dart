@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
 
 /// Digital Ticket Pass details screen matching Image 2 reference UI with QR code and ticket perforation notches.
@@ -13,27 +16,32 @@ class TicketDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
         ),
         title: Column(
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+              children: [
+                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
+                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
               ],
             ),
-            const Text(
+            Text(
               'Ticket Details',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -206,22 +214,22 @@ class TicketDetailsPage extends StatelessWidget {
                 ),
 
                 // Left Cutout Notch
-                const Positioned(
+                Positioned(
                   left: -14,
                   top: 250,
                   child: CircleAvatar(
                     radius: 14,
-                    backgroundColor: Color(0xFF0B101D),
+                    backgroundColor: colors.background,
                   ),
                 ),
 
                 // Right Cutout Notch
-                const Positioned(
+                Positioned(
                   right: -14,
                   top: 250,
                   child: CircleAvatar(
                     radius: 14,
-                    backgroundColor: Color(0xFF0B101D),
+                    backgroundColor: colors.background,
                   ),
                 ),
               ],
@@ -232,34 +240,34 @@ class TicketDetailsPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF111C33),
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2563EB),
+                    decoration: BoxDecoration(
+                      color: colors.actionPrimary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.info, color: Colors.white, size: 16),
+                    child: Icon(Icons.info, color: colors.actionPrimaryText, size: 16),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'Important',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                          style: TextStyle(color: colors.textPrimary, fontSize: 16, fontWeight: FontWeight.w800),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'Keep this ticket ready while boarding. This ticket is valid only for the selected bus and date.',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+                          style: TextStyle(color: colors.textSecondary, fontSize: 13, height: 1.4),
                         ),
                       ],
                     ),

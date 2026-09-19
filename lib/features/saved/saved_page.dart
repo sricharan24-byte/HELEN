@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/tokens/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../tickets/booking_page.dart';
 import '../tickets/my_tickets_page.dart';
 import '../tickets/ticket_controller.dart';
@@ -12,6 +14,7 @@ class SavedPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     final textTheme = Theme.of(context).textTheme;
 
     return ListenableBuilder(
@@ -21,12 +24,12 @@ class SavedPage extends StatelessWidget {
         final activeTicket = ticketController.activeTicket;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F8),
+          backgroundColor: colors.surfaceBackground,
           appBar: AppBar(
             title: const Text('Saved Passes & Favorites'),
             centerTitle: true,
-            backgroundColor: const Color(0xFFF4F6F8),
-            foregroundColor: const Color(0xFF002B7F),
+            backgroundColor: colors.surfaceBackground,
+            foregroundColor: colors.primaryBlue,
             elevation: 0,
             actions: [
               IconButton(
@@ -43,7 +46,7 @@ class SavedPage extends StatelessWidget {
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.cardPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -53,7 +56,7 @@ class SavedPage extends StatelessWidget {
                     'ACTIVE DIGITAL PASS',
                     style: textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF64748B),
+                      color: colors.textMuted,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -67,9 +70,9 @@ class SavedPage extends StatelessWidget {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(AppSpacing.cardPadding),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF002B7F),
+                        color: colors.primaryBlue,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -79,19 +82,19 @@ class SavedPage extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
-                                children: const [
-                                  Icon(Icons.confirmation_number_outlined, color: Colors.white, size: 24),
-                                  SizedBox(width: 10),
+                                children: [
+                                  Icon(Icons.confirmation_number_outlined, color: colors.cardBackground, size: 24),
+                                  const SizedBox(width: 10),
                                   Text(
                                     'Active Pass',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                                    style: TextStyle(color: colors.cardBackground, fontWeight: FontWeight.w800, fontSize: 16),
                                   ),
                                 ],
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981),
+                                  color: colors.successGreen,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
@@ -104,19 +107,19 @@ class SavedPage extends StatelessWidget {
                           const SizedBox(height: 14),
                           Text(
                             activeTicket.routeName,
-                            style: textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                            style: textTheme.titleMedium?.copyWith(color: colors.cardBackground, fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Bus ${activeTicket.busId} • ${activeTicket.origin.name} → ${activeTicket.destination.name}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            style: TextStyle(color: colors.cardBackground.withOpacity(0.8), fontSize: 13),
                           ),
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text('Tap to view QR Code Pass', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700)),
-                              Icon(Icons.qr_code_2, color: Colors.white, size: 28),
+                            children: [
+                              Text('Tap to view QR Code Pass', style: TextStyle(color: colors.accentYellow, fontWeight: FontWeight.w700)),
+                              Icon(Icons.qr_code_2, color: colors.cardBackground, size: 28),
                             ],
                           ),
                         ],
@@ -127,28 +130,28 @@ class SavedPage extends StatelessWidget {
                 ] else ...[
                   // Empty state book pass prompt
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppSpacing.cardPadding),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: colors.surfaceCard,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: colors.cardBorder),
                     ),
                     child: Column(
                       children: [
-                        const Icon(Icons.confirmation_number_outlined, size: 48, color: Color(0xFF94A3B8)),
+                        Icon(Icons.confirmation_number_outlined, size: 48, color: colors.textMuted),
                         const SizedBox(height: 12),
                         Text(
                           'No Active Digital Pass',
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
+                            color: colors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Book a digital pass to enable QR boarding and active bus tracking.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF64748B)),
+                          style: TextStyle(color: colors.textMuted),
                         ),
                         const SizedBox(height: 16),
                         FilledButton.icon(
@@ -161,7 +164,11 @@ class SavedPage extends StatelessWidget {
                           },
                           icon: const Icon(Icons.confirmation_number_outlined, size: 18),
                           label: const Text('Book Digital Pass Now'),
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF002B7F)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.primaryBlue,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, AppSpacing.minTouchTarget),
+                          ),
                         ),
                       ],
                     ),
@@ -174,44 +181,48 @@ class SavedPage extends StatelessWidget {
                   'TICKET PASSBOOK HISTORY (${tickets.length})',
                   style: textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF64748B),
+                    color: colors.textMuted,
                   ),
                 ),
                 const SizedBox(height: 8),
                 if (tickets.isEmpty)
-                  const Text('No previous ticket history.', style: TextStyle(color: Color(0xFF64748B)))
+                  Text('No previous ticket history.', style: TextStyle(color: colors.textMuted))
                 else
                   ...tickets.map((t) {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: colors.cardBorder),
                       ),
                       child: Material(
-                        color: Colors.white,
+                        color: colors.surfaceCard,
                         borderRadius: BorderRadius.circular(16),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Color(0xFFE8EEFF),
-                          foregroundColor: Color(0xFF002B7F),
-                          child: Icon(Icons.receipt_long),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: CircleAvatar(
+                            backgroundColor: colors.primaryBlue.withOpacity(0.12),
+                            foregroundColor: colors.primaryBlue,
+                            child: const Icon(Icons.receipt_long),
+                          ),
+                          title: Text(t.routeName, style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary)),
+                          subtitle: Text(
+                            'ID: ${t.id} • ₹${t.fareAmount.toStringAsFixed(0)}',
+                            style: TextStyle(color: colors.textMuted),
+                          ),
+                          trailing: Icon(Icons.chevron_right, color: colors.textMuted),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => TicketDetailsPage(ticket: t),
+                              ),
+                            );
+                          },
                         ),
-                        title: Text(t.routeName, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                        subtitle: Text('ID: ${t.id} • ₹${t.fareAmount.toStringAsFixed(0)}'),
-                        trailing: const Icon(Icons.chevron_right, color: Color(0xFF64748B)),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => TicketDetailsPage(ticket: t),
-                            ),
-                          );
-                        },
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
               ],
             ),
           ),

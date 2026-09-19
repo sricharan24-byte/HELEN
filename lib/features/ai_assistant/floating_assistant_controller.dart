@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -650,6 +651,26 @@ class FloatingAssistantController extends ChangeNotifier {
     if (notify) {
       notifyListeners();
     }
+  }
+
+  void moveToTopLeft(Size screenSize, EdgeInsets safeArea) {
+    updatePosition(Offset(16, safeArea.top + 16), screenSize, safeArea);
+    AnnouncementCoordinator.instance.announce('Assistant moved to top left', priority: AnnouncementPriority.low);
+  }
+
+  void moveToTopRight(Size screenSize, EdgeInsets safeArea) {
+    updatePosition(Offset(screenSize.width - 80, safeArea.top + 16), screenSize, safeArea);
+    AnnouncementCoordinator.instance.announce('Assistant moved to top right', priority: AnnouncementPriority.low);
+  }
+
+  void moveToBottomLeft(Size screenSize, EdgeInsets safeArea) {
+    updatePosition(Offset(16, screenSize.height - safeArea.bottom - 150), screenSize, safeArea);
+    AnnouncementCoordinator.instance.announce('Assistant moved to bottom left', priority: AnnouncementPriority.low);
+  }
+
+  void moveToBottomRight(Size screenSize, EdgeInsets safeArea) {
+    resetPosition(screenSize, safeArea, notify: true);
+    AnnouncementCoordinator.instance.announce('Assistant position reset to bottom right', priority: AnnouncementPriority.low);
   }
 
   String _getActionLabel(String? actionType) {

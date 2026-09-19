@@ -3,6 +3,7 @@ import 'dart:math';
 import '../datasources/local_json_store.dart';
 import '../models/ticket_model.dart';
 import '../models/transport_models.dart';
+import '../../domain/ticketing/entities/fare_engine.dart';
 
 abstract class TicketRepository {
   List<Ticket> get allTickets;
@@ -176,16 +177,17 @@ class LocalTicketRepository implements TicketRepository {
     final ticketId = 'TKT-$randomId';
     final busId = 'TN-23-BUS-${Random().nextInt(89) + 10}';
 
-    // Fare calculation: Base fare ₹15 + ₹5 per stop difference
+    // Authoritative FareEngine calculation in exact integer paise
     final originIdx = route.orderedStopIds.indexOf(origin.id);
     final destIdx = route.orderedStopIds.indexOf(destination.id);
     final stopCount = (originIdx != -1 && destIdx != -1 && destIdx > originIdx)
         ? (destIdx - originIdx)
         : 2;
-    double fare = (15.0 + (stopCount - 1) * 5.0).clamp(15.0, 50.0);
-    if (passengerType == PassengerType.student || passengerType == PassengerType.senior) {
-      fare = (fare * 0.6).roundToDouble(); // 40% concession discount
-    }
+    final fareQuote = FareEngine.calculateByStopCount(
+      stopCount: stopCount,
+      passengerType: passengerType,
+    );
+    final double fare = fareQuote.amount;
 
     final ticket = Ticket(
       id: ticketId,

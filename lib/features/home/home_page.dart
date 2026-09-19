@@ -3,6 +3,10 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/adaptive_shortcut.dart';
 import '../../data/models/home_screen_item.dart';
@@ -250,6 +254,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     final textTheme = Theme.of(context).textTheme;
     final activeTicket = widget.ticketController.activeTicket;
     final hasActiveTicket = activeTicket != null;
@@ -267,7 +272,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -288,31 +293,34 @@ class _HomePageState extends State<HomePage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Bus',
-                                style: textTheme.headlineSmall?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 26,
+                          Semantics(
+                            headingLevel: 1,
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Bus',
+                                  style: textTheme.headlineSmall?.copyWith(
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 26,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Buddy',
-                                style: textTheme.headlineSmall?.copyWith(
-                                  color: const Color(0xFF38BDF8),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 26,
+                                Text(
+                                  'Buddy',
+                                  style: textTheme.headlineSmall?.copyWith(
+                                    color: colors.actionPrimary,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 26,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'Travel Together, Go Further',
                             style: TextStyle(
-                              color: Color(0xFF94A3B8),
+                              color: colors.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),

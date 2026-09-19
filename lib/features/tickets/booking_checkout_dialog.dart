@@ -1,11 +1,17 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../domain/ticketing/entities/fare_engine.dart';
 
 /// Modal bottom sheet for passenger type selection, payment checkout, and ticket issuance.
+/// Fully conforms to Astra Step 2.4 with semantic tokens, 48dp minimum touch targets,
+/// multi-modal concession badges, and AnnouncementCoordinator integration.
 class BookingCheckoutDialog extends StatefulWidget {
   const BookingCheckoutDialog({
     super.key,
@@ -71,6 +77,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
       23, 59, 59,
     );
 
+    final passengerName = _passengerNameController.text.trim().isEmpty
+        ? 'Passenger'
+        : _passengerNameController.text.trim();
+
     final ticket = Ticket(
       id: ticketId,
       routeId: widget.routeId,
@@ -78,9 +88,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
       origin: widget.origin,
       destination: widget.destination,
       busId: widget.busId,
-      passengerName: _passengerNameController.text.trim().isEmpty
-          ? 'Passenger'
-          : _passengerNameController.text.trim(),
+      passengerName: passengerName,
       passengerType: _selectedPassengerType,
       fareAmount: _finalFare,
       paymentMethod: _selectedPaymentMethod,
@@ -91,6 +99,12 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     );
 
     widget.onTicketBooked(ticket);
+
+    AnnouncementCoordinator.instance.announce(
+      'Ticket confirmed for $passengerName. Paid ₹${_finalFare.toStringAsFixed(0)}. Bus ${widget.busId}.',
+      priority: AnnouncementPriority.high,
+    );
+
     if (mounted) {
       Navigator.of(context).pop(true);
     }
@@ -98,10 +112,13 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B101D),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: colors.border),
       ),
       padding: EdgeInsets.fromLTRB(
         24,
@@ -120,7 +137,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF334155),
+                  color: colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -135,19 +152,22 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Confirm Ticket & Pay',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          'Confirm Ticket & Pay',
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Bus ${widget.busId} • ${widget.origin.name} → ${widget.destination.name}',
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
+                        style: TextStyle(
+                          color: colors.textSecondary,
                           fontSize: 13,
                         ),
                       ),
@@ -155,18 +175,23 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: Icon(Icons.close, color: colors.textPrimary),
+                  tooltip: 'Cancel checkout',
                   onPressed: () => Navigator.of(context).pop(false),
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
 
             // Passenger Name Input
-            const Text(
+            Text(
               'PASSENGER NAME',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: colors.textSecondary,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
@@ -175,37 +200,68 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _passengerNameController,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.person, color: Color(0xFF38BDF8)),
+                prefixIcon: Icon(Icons.person, color: colors.actionPrimary),
                 filled: true,
-                fillColor: const Color(0xFF111C33),
+                fillColor: colors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                hintText: 'Enter passenger name',
+                hintStyle: TextStyle(color: colors.textSecondary),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  borderSide: BorderSide(color: colors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  borderSide: BorderSide(color: colors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFF38BDF8)),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  borderSide: BorderSide(color: colors.actionPrimary, width: 2),
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
             // Passenger Type Selection
-            const Text(
-              'PASSENGER TYPE & CONCESSION',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
-              ),
+            Row(
+              children: [
+                Text(
+                  'PASSENGER TYPE & CONCESSION',
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_selectedPassengerType != PassengerType.general)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colors.statusSuccessBg,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: colors.statusSuccess),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(StatusLevel.success.icon, size: 10, color: colors.statusSuccess),
+                        const SizedBox(width: 3),
+                        Text(
+                          '40% CONCESSION',
+                          style: TextStyle(
+                            color: colors.statusSuccess,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             Row(
@@ -218,6 +274,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       baseFare: widget.baseFare,
                       passengerType: PassengerType.general,
                     ).formattedAmount,
+                    colors: colors,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -229,6 +286,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       baseFare: widget.baseFare,
                       passengerType: PassengerType.student,
                     ).formattedAmount,
+                    colors: colors,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -240,6 +298,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       baseFare: widget.baseFare,
                       passengerType: PassengerType.senior,
                     ).formattedAmount,
+                    colors: colors,
                   ),
                 ),
               ],
@@ -247,10 +306,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             const SizedBox(height: 20),
 
             // Payment Method Selection
-            const Text(
+            Text(
               'PAYMENT METHOD',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: colors.textSecondary,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
@@ -262,6 +321,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               icon: Icons.qr_code_2,
               title: 'UPI (GPay / PhonePe / Paytm)',
               subtitle: 'Instant 1-tap UPI payment',
+              colors: colors,
             ),
             const SizedBox(height: 8),
             _buildPaymentOptionTile(
@@ -269,6 +329,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               icon: Icons.credit_card,
               title: 'Credit / Debit Card',
               subtitle: 'Visa, Mastercard, RuPay',
+              colors: colors,
             ),
             const SizedBox(height: 8),
             _buildPaymentOptionTile(
@@ -276,6 +337,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               icon: Icons.account_balance_wallet_outlined,
               title: 'BusBuddy Wallet',
               subtitle: 'Balance: ₹250.00',
+              colors: colors,
             ),
             const SizedBox(height: 24),
 
@@ -283,9 +345,9 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF111C33),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -293,10 +355,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'TOTAL FARE',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: colors.textSecondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                         ),
@@ -304,8 +366,8 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       const SizedBox(height: 2),
                       Text(
                         '₹${_finalFare.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.textPrimary,
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                         ),
@@ -313,28 +375,32 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                     ],
                   ),
                   SizedBox(
-                    height: 48,
+                    height: AppSpacing.minTouchTarget,
                     child: ElevatedButton.icon(
                       onPressed: _isIssuing ? null : _issueTicket,
                       icon: _isIssuing
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colors.actionPrimaryText,
+                              ),
                             )
-                          : const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                          : Icon(Icons.check_circle_outline, color: colors.actionPrimaryText, size: 20),
                       label: Text(
                         _isIssuing ? 'Processing...' : 'Pay ₹${_finalFare.toStringAsFixed(0)} & Issue',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.actionPrimaryText,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
+                        backgroundColor: colors.actionPrimary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
+                        elevation: 2,
+                        minimumSize: const Size(120, AppSpacing.minTouchTarget),
                       ),
                     ),
                   ),
@@ -351,41 +417,47 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required PassengerType type,
     required String label,
     required String sublabel,
+    required dynamic colors,
   }) {
     final isSelected = _selectedPassengerType == type;
-    return InkWell(
-      onTap: () => setState(() => _selectedPassengerType = type),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF007AFF) : const Color(0xFF111C33),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
-            width: isSelected ? 2 : 1,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedPassengerType = type),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.actionPrimary.withValues(alpha: 0.15) : colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? colors.actionPrimary : colors.border,
+              width: isSelected ? 2 : 1,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 13,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? colors.actionPrimary : colors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              sublabel,
-              style: TextStyle(
-                color: isSelected ? Colors.white70 : const Color(0xFF64748B),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: TextStyle(
+                  color: isSelected ? colors.actionPrimary : colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -396,54 +468,59 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required IconData icon,
     required String title,
     required String subtitle,
+    required dynamic colors,
   }) {
     final isSelected = _selectedPaymentMethod == method;
-    return InkWell(
-      onTap: () => setState(() => _selectedPaymentMethod = method),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF111C33),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
-            width: isSelected ? 1.5 : 1,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedPaymentMethod = method),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.actionPrimary.withValues(alpha: 0.1) : colors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? colors.actionPrimary : colors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF64748B),
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                  ),
-                ],
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? colors.actionPrimary : colors.textSecondary,
+                size: 22,
               ),
-            ),
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF64748B),
-              size: 20,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                color: isSelected ? colors.actionPrimary : colors.textSecondary,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

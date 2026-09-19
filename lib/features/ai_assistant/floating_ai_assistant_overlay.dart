@@ -1,6 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
@@ -108,13 +112,16 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
           children: [
             // ── The Floating Window (when open) ──────────────────────────────
             if (_controller.isWindowOpen) ...[
-              // Barrier: Tap outside to minimize back to bubble
+              // Barrier: Tap outside to minimize back to bubble, block background semantics
               Positioned.fill(
-                child: GestureDetector(
-                  onTap: _controller.closeWindow,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.35),
+                child: BlockSemantics(
+                  blocking: true,
+                  child: GestureDetector(
+                    onTap: _controller.closeWindow,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.45),
+                    ),
                   ),
                 ),
               ),
@@ -158,7 +165,13 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
         },
         child: Semantics(
           button: true,
-          label: 'BusBuddy AI assistant. Tap to chat and voice search. Drag to move.',
+          label: 'BusBuddy AI assistant. Tap to open chat and voice search. Drag or use accessibility actions to move.',
+          customSemanticsActions: {
+            const CustomSemanticsAction(label: 'Move to top left'): () => _controller.moveToTopLeft(screenSize, safeArea),
+            const CustomSemanticsAction(label: 'Move to top right'): () => _controller.moveToTopRight(screenSize, safeArea),
+            const CustomSemanticsAction(label: 'Move to bottom left'): () => _controller.moveToBottomLeft(screenSize, safeArea),
+            const CustomSemanticsAction(label: 'Reset position to bottom right'): () => _controller.moveToBottomRight(screenSize, safeArea),
+          },
           child: AnimatedBuilder(
             animation: _pulseAnimation,
             builder: (context, child) {

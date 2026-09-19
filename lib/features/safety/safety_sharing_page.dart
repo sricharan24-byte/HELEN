@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
+import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/adaptive_shortcut.dart';
 import '../../data/repositories/emergency_contact_repository.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 
+/// Safety & Emergency Sharing page.
+/// Fully conforms to Astra Gate 12 (Privacy & Safety Boundaries) and Step 2.5
+/// with multi-modal alerts, AnnouncementCoordinator urgent dispatch,
+/// semantic design tokens, and 48dp minimum touch targets.
 class SafetySharingPage extends StatefulWidget {
   const SafetySharingPage({super.key, this.activeTicket});
 
@@ -37,45 +45,90 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
   }
 
   void _addContact() {
+    final colors = AppTheme.colors(context);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Emergency Contact'),
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          side: BorderSide(color: colors.border),
+        ),
+        title: Text(
+          'Add Emergency Contact',
+          style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Astra Gate 12: Emergency contacts receive SMS alerts with your real-time bus telemetry when SOS is triggered.',
+              style: TextStyle(color: colors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Contact Name / Title'),
+              style: TextStyle(color: colors.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Contact Name / Title',
+                labelStyle: TextStyle(color: colors.textSecondary),
+                filled: true,
+                fillColor: colors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  borderSide: BorderSide(color: colors.border),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Phone Number (+91)'),
+              style: TextStyle(color: colors.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Phone Number (+91)',
+                labelStyle: TextStyle(color: colors.textSecondary),
+                filled: true,
+                fillColor: colors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  borderSide: BorderSide(color: colors.border),
+                ),
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
           ),
           FilledButton(
             onPressed: () {
               if (_nameCtrl.text.trim().isNotEmpty && _phoneCtrl.text.trim().isNotEmpty) {
+                final name = _nameCtrl.text.trim();
+                final phone = _phoneCtrl.text.trim();
                 _contacts.addContact({
-                  'name': _nameCtrl.text,
-                  'phone': _phoneCtrl.text,
+                  'name': name,
+                  'phone': phone,
                   'relation': 'Trusted',
                 });
                 _nameCtrl.clear();
                 _phoneCtrl.clear();
+                AnnouncementCoordinator.instance.announce(
+                  'Added emergency contact $name.',
+                  priority: AnnouncementPriority.normal,
+                );
               }
               Navigator.of(ctx).pop();
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF002B7F)),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.actionPrimary,
+              foregroundColor: colors.actionPrimaryText,
+              minimumSize: const Size(100, AppSpacing.minTouchTarget),
+            ),
             child: const Text('Add Contact'),
           ),
         ],
@@ -84,24 +137,61 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
   }
 
   void _triggerSosAlert() {
+    final colors = AppTheme.colors(context);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          side: BorderSide(color: colors.statusAlert),
+        ),
         title: Row(
-          children: const [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 28),
-            SizedBox(width: 10),
-            Text('Trigger SOS Alert?'),
+          children: [
+            Icon(StatusLevel.error.icon, color: colors.statusAlert, size: 28),
+            const SizedBox(width: 10),
+            Text(
+              'Trigger SOS Alert?',
+              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900),
+            ),
           ],
         ),
-        content: const Text(
-          'Demonstration Mode: This logs a simulated emergency alert with your current corridor stop coordinates. In production, this dispatches SMS and emergency dialer intents to 112 and your trusted contacts.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Demonstration Mode: This logs a simulated emergency alert with your current corridor stop coordinates. In production, this dispatches SMS and emergency dialer intents to 112 and your trusted contacts.',
+              style: TextStyle(color: colors.textPrimary, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colors.statusAlertBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colors.statusAlert),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 16, color: colors.statusAlert),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Non-voice alternative: SOS operates silently without requiring speech recognition or assistant mic.',
+                      style: TextStyle(color: colors.statusAlert, fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -111,18 +201,28 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                 subtitle: 'Safety assistance alert',
                 type: AdaptiveShortcutType.safety,
               );
+
+              AnnouncementCoordinator.instance.announce(
+                'Emergency SOS alert broadcasted. Dial 112 for immediate assistance.',
+                priority: AnnouncementPriority.urgent,
+              );
+
               Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('⚠️ Demo Mode: Simulated SOS recorded. Dial 112 for real emergency assistance.'),
-                  backgroundColor: Color(0xFFE11D48),
-                  duration: Duration(seconds: 4),
+                SnackBar(
+                  content: const Text('⚠️ Demo Mode: Simulated SOS recorded. Dial 112 for real emergency assistance.'),
+                  backgroundColor: colors.statusAlert,
+                  duration: const Duration(seconds: 4),
                 ),
               );
             },
             icon: const Icon(Icons.sos, size: 18),
             label: const Text('RECORD SIMULATED SOS'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.statusAlert,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(140, AppSpacing.minTouchTarget),
+            ),
           ),
         ],
       ),
@@ -131,39 +231,37 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-
+    final colors = AppTheme.colors(context);
     final ticket = widget.activeTicket;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: const Text('Safety & Emergency Sharing'),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF4F6F8),
-        foregroundColor: const Color(0xFF002B7F),
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: AppSpacing.pagePadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // SOS Banner Card
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.cardPadding),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFECDD3)),
+                color: colors.statusAlertBg,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.statusAlert),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE11D48),
+                    decoration: BoxDecoration(
+                      color: colors.statusAlert,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.shield_outlined, color: Colors.white, size: 28),
@@ -173,17 +271,21 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '1-Tap Emergency Broadcast',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF9F1239),
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            '1-Tap Emergency Broadcast',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: colors.statusAlert,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Send immediate location distress alerts to trusted contacts',
-                          style: textTheme.bodySmall?.copyWith(color: const Color(0xFFBE123C)),
+                          style: TextStyle(color: colors.textSecondary, fontSize: 13),
                         ),
                       ],
                     ),
@@ -196,20 +298,20 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             // SOS Broadcast Button
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: AppSpacing.minTouchTarget + 4,
               child: FilledButton.icon(
                 onPressed: _triggerSosAlert,
                 icon: const Icon(Icons.sos, size: 24),
-                label: Text(
+                label: const Text(
                   'BROADCAST SOS ALERT NOW',
-                  style: textTheme.titleMedium?.copyWith(
+                  style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5,
                   ),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE11D48),
+                  backgroundColor: colors.statusAlert,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
@@ -220,31 +322,34 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             if (ticket != null) ...[
               Text(
                 'ACTIVE TRIP LIVE SHARING',
-                style: textTheme.labelSmall?.copyWith(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF64748B),
+                  color: colors.textSecondary,
+                  fontSize: 11,
+                  letterSpacing: 0.8,
                 ),
               ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.directions_bus, color: Color(0xFF002B7F), size: 24),
+                        Icon(Icons.directions_bus, color: colors.actionPrimary, size: 24),
                         const SizedBox(width: 10),
                         Text(
                           'Bus ${ticket.busId}',
-                          style: textTheme.titleMedium?.copyWith(
+                          style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0A2540),
+                            color: colors.textPrimary,
+                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -252,19 +357,31 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                     const SizedBox(height: 4),
                     Text(
                       '${ticket.origin.name} → ${ticket.destination.name}',
-                      style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF64748B)),
+                      style: TextStyle(color: colors.textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
+                      height: AppSpacing.minTouchTarget,
                       child: OutlinedButton.icon(
                         onPressed: () {
+                          AnnouncementCoordinator.instance.announce(
+                            'Live trip link copied for sharing.',
+                            priority: AnnouncementPriority.normal,
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Opening WhatsApp to share live trip link...')),
                           );
                         },
-                        icon: const Icon(Icons.share, color: Color(0xFF002B7F), size: 18),
-                        label: const Text('Share Live Trip via WhatsApp / SMS'),
+                        icon: Icon(Icons.share, color: colors.actionPrimary, size: 18),
+                        label: Text(
+                          'Share Live Trip via WhatsApp / SMS',
+                          style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: colors.actionPrimary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ],
@@ -279,15 +396,20 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
               children: [
                 Text(
                   'TRUSTED EMERGENCY CONTACTS',
-                  style: textTheme.labelSmall?.copyWith(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF64748B),
+                    color: colors.textSecondary,
+                    fontSize: 11,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: _addContact,
-                  icon: const Icon(Icons.person_add_alt_1, size: 18),
-                  label: const Text('Add Contact'),
+                  icon: Icon(Icons.person_add_alt_1, size: 18, color: colors.actionPrimary),
+                  label: Text('Add Contact', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w700)),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(48, AppSpacing.minTouchTarget),
+                  ),
                 ),
               ],
             ),
@@ -298,25 +420,43 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: colors.border),
                 ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFE8EEFF),
-                    foregroundColor: const Color(0xFF002B7F),
-                    child: Text(contact['name']![0], style: const TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  title: Text(contact['name']!, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0A2540))),
-                  subtitle: Text('${contact['phone']} • ${contact['relation']}', style: const TextStyle(color: Color(0xFF64748B))),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.phone, color: Color(0xFF059669)),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Calling ${contact['name']} (${contact['phone']})...')),
-                      );
-                    },
+                child: Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: colors.actionPrimary.withValues(alpha: 0.15),
+                      foregroundColor: colors.actionPrimary,
+                      child: Text(contact['name']![0], style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                    title: Text(
+                      contact['name']!,
+                      style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
+                    ),
+                    subtitle: Text(
+                      '${contact['phone']} • ${contact['relation']}',
+                      style: TextStyle(color: colors.textSecondary),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.phone, color: colors.statusSuccess),
+                      tooltip: 'Call ${contact['name']}',
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      onPressed: () {
+                        AnnouncementCoordinator.instance.announce(
+                          'Calling ${contact['name']}',
+                          priority: AnnouncementPriority.high,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Calling ${contact['name']} (${contact['phone']})...')),
+                        );
+                      },
+                    ),
                   ),
                 ),
               );

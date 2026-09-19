@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../tickets/ticket_controller.dart';
 import 'voice_assistant_settings_page.dart';
 
 /// Accessibility settings page matching BusBuddy dark UI design screenshot 1.
+/// Upgraded per Astra Phase 2 with semantic design tokens, 48dp touch targets,
+/// and live high-contrast theme toggling.
 class AccessibilitySettingsPage extends StatefulWidget {
   const AccessibilitySettingsPage({
     super.key,
@@ -31,44 +36,56 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
   bool get _screenReaderHints => _settings.screenReaderHints;
 
   void _showTextSizePicker() {
+    final colors = AppTheme.colors(context);
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select Text Size',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 16),
-              ...['Small', 'Medium', 'Large', 'Extra Large'].map((size) {
-                final isSelected = _textSize == size;
-                return ListTile(
-                  title: Text(
-                    size,
-                    style: TextStyle(
-                      color: isSelected ? const Color(0xFF38BDF8) : Colors.white,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+        return Material(
+          color: colors.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Text Size',
+                  style: TextStyle(color: colors.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 16),
+                ...['Small', 'Medium', 'Large', 'Extra Large'].map((size) {
+                  final isSelected = _textSize == size;
+                  return Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      title: Text(
+                        size,
+                        style: TextStyle(
+                          color: isSelected ? colors.actionPrimary : colors.textPrimary,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                        ),
+                      ),
+                      trailing: isSelected ? Icon(Icons.check, color: colors.actionPrimary) : null,
+                      onTap: () {
+                        setState(() {
+                          _settings.updateTextSize(size);
+                        });
+                        AnnouncementCoordinator.instance.announce(
+                          'Text size set to $size',
+                          priority: AnnouncementPriority.normal,
+                        );
+                        Navigator.pop(context);
+                      },
                     ),
-                  ),
-                  trailing: isSelected ? const Icon(Icons.check, color: Color(0xFF38BDF8)) : null,
-                  onTap: () {
-                    setState(() {
-                      _settings.updateTextSize(size);
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         );
       },
@@ -88,27 +105,33 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
         ),
         title: Column(
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+              children: [
+                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
+                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
               ],
             ),
-            const Text(
+            Text(
               'Accessibility',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -124,34 +147,37 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111C33),
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF3B82F6),
+                        decoration: BoxDecoration(
+                          color: colors.actionPrimary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.accessibility_new, color: Colors.white, size: 28),
+                        child: Icon(Icons.accessibility_new, color: colors.actionPrimaryText, size: 28),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Accessibility',
-                              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                          children: [
+                            Semantics(
+                              header: true,
+                              child: Text(
+                                'Accessibility',
+                                style: TextStyle(color: colors.textPrimary, fontSize: 20, fontWeight: FontWeight.w800),
+                              ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'Adjust the app to make it easier to use.',
-                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                              style: TextStyle(color: colors.textSecondary, fontSize: 13),
                             ),
                           ],
                         ),
@@ -169,12 +195,13 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_textSize, style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700, fontSize: 15)),
+                      Text(_textSize, style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right, color: Color(0xFF38BDF8), size: 20),
+                      Icon(Icons.chevron_right, color: colors.actionPrimary, size: 20),
                     ],
                   ),
                   onTap: _showTextSizePicker,
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
 
@@ -186,14 +213,19 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_highContrast, style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700, fontSize: 15)),
+                      Text(_highContrast, style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right, color: Color(0xFF38BDF8), size: 20),
+                      Icon(Icons.chevron_right, color: colors.actionPrimary, size: 20),
                     ],
                   ),
                   onTap: () {
                     setState(() => _settings.toggleHighContrast());
+                    AnnouncementCoordinator.instance.announce(
+                      'High contrast ${_settings.highContrast == 'On' ? 'enabled (WCAG AAA 7:1 ratio)' : 'disabled'}',
+                      priority: AnnouncementPriority.normal,
+                    );
                   },
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
 
@@ -202,7 +234,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   icon: Icons.volume_up,
                   title: 'Voice & TalkBack',
                   subtitle: 'App voice, TalkBack support',
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF64748B), size: 20),
+                  trailing: Icon(Icons.chevron_right, color: colors.textSecondary, size: 20),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -213,6 +245,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                       ),
                     );
                   },
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
 
@@ -224,9 +257,10 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   trailing: Switch(
                     value: _hapticFeedback,
                     activeThumbColor: Colors.white,
-                    activeTrackColor: const Color(0xFF22C55E),
+                    activeTrackColor: colors.statusSuccess,
                     onChanged: (val) => setState(() => _settings.updateHapticFeedback(val)),
                   ),
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
 
@@ -238,9 +272,10 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   trailing: Switch(
                     value: _simplifiedNav,
                     activeThumbColor: Colors.white,
-                    activeTrackColor: const Color(0xFF22C55E),
+                    activeTrackColor: colors.statusSuccess,
                     onChanged: (val) => setState(() => _settings.updateSimplifiedNav(val)),
                   ),
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
 
@@ -252,9 +287,10 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   trailing: Switch(
                     value: _screenReaderHints,
                     activeThumbColor: Colors.white,
-                    activeTrackColor: const Color(0xFF22C55E),
+                    activeTrackColor: colors.statusSuccess,
                     onChanged: (val) => setState(() => _settings.updateScreenReaderHints(val)),
                   ),
+                  colors: colors,
                 ),
                 const SizedBox(height: 14),
 
@@ -262,34 +298,34 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111C33),
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2563EB),
+                        decoration: BoxDecoration(
+                          color: colors.actionPrimary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.info, color: Colors.white, size: 16),
+                        child: Icon(Icons.info, color: colors.actionPrimaryText, size: 16),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
                               'Tip',
-                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                              style: TextStyle(color: colors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               "You can also use your phone's TalkBack settings. BusBuddy is designed to work well with TalkBack.",
-                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+                              style: TextStyle(color: colors.textSecondary, fontSize: 13, height: 1.4),
                             ),
                           ],
                         ),
@@ -308,50 +344,53 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
               child: Semantics(
                 button: true,
                 label: 'Ask BusBuddy. Need help with settings? Just ask.',
-                child: InkWell(
-                  onTap: _openAskBusBuddy,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    height: 60,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDC2626),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFDC2626).withValues(alpha: 0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _openAskBusBuddy,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      height: 60,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: colors.statusAlert,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.statusAlert.withValues(alpha: 0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
-                          child: const Icon(Icons.mic, color: Colors.white, size: 22),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Ask BusBuddy',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
                             ),
-                            Text(
-                              'Need help with settings? Just ask.',
-                              style: TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
+                            child: const Icon(Icons.mic, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ask BusBuddy',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                              ),
+                              Text(
+                                'Need help with settings? Just ask.',
+                                style: TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -368,42 +407,47 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
     required String title,
     required String subtitle,
     required Widget trailing,
+    required dynamic colors,
     VoidCallback? onTap,
   }) {
     return Semantics(
       button: onTap != null,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111C33),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF1E293B)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 24),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: colors.border),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: colors.textPrimary, size: 24),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(color: colors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              trailing,
-            ],
+                trailing,
+              ],
+            ),
           ),
         ),
       ),
