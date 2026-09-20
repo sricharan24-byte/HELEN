@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/a11y/enlarging_text_scaler.dart';
 import 'core/di/service_locator.dart';
 import 'core/settings/app_settings_controller.dart';
 import 'core/theme/app_theme.dart';
@@ -68,14 +69,15 @@ class MyApp extends StatelessWidget {
           theme: settings.isHighContrast ? AppTheme.highContrast : AppTheme.dark,
           builder: (context, child) {
             final media = MediaQuery.of(context);
-            final platformScale = media.textScaler.scale(1.0);
-            // Astra P0.3: Preserve platform accessibility TextScaler without an upper 2.0x ceiling.
-            // Layouts reflow responsively rather than clamping user accessibility settings.
-            final combinedScale = platformScale * settings.textScaleFactor;
-            final effectiveScale = combinedScale < 0.85 ? 0.85 : combinedScale;
+            // Astra BUS-P0-03: Strictly preserve platform non-linear TextScaler.
+            // Never linearize via scale(1.0) and never downscale below system settings.
+            final multiplier = settings.inAppEnlargementMultiplier;
+            final effectiveScaler = multiplier > 1.0
+                ? EnlargingTextScaler(media.textScaler, multiplier)
+                : media.textScaler;
             return MediaQuery(
               data: media.copyWith(
-                textScaler: TextScaler.linear(effectiveScale),
+                textScaler: effectiveScaler,
               ),
               child: Overlay(
                 initialEntries: [

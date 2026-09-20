@@ -121,10 +121,15 @@ class AppSettingsController extends ChangeNotifier {
   String geminiVoice = const String.fromEnvironment('GEMINI_VOICE', defaultValue: 'Aoede');
   List<HomeScreenItem> homeScreenItems = List.from(HomeScreenItem.defaultItems);
 
+  /// In-app text enlargement multiplier.
+  /// Strictly guaranteed never to return < 1.0, preserving platform TextScaler.
+  double get inAppEnlargementMultiplier => textScaleFactor;
+
   double get textScaleFactor {
     switch (textSize) {
       case 'Small':
-        return 0.85;
+        // Astra BUS-P0-03: Never downscale below platform accessibility font size.
+        return 1.0;
       case 'Medium':
         return 1.0;
       case 'Large':
@@ -138,7 +143,7 @@ class AppSettingsController extends ChangeNotifier {
       case 'Maximum':
         return 2.00;
       default:
-        return 1.15;
+        return 1.0;
     }
   }
 
