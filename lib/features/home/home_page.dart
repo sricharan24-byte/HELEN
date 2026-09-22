@@ -47,7 +47,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-
   @override
   void initState() {
     super.initState();
@@ -74,37 +73,47 @@ class _HomePageState extends State<HomePage> {
         final originId = shortcut.actionData['originId'] as String?;
         final destinationId = shortcut.actionData['destinationId'] as String?;
         if (originId != null && destinationId != null) {
-          final matches = widget.repository.allRoutes.where((r) =>
-            r.orderedStopIds.contains(originId) && r.orderedStopIds.contains(destinationId)
-          ).toList();
+          final matches = widget.repository.allRoutes
+              .where(
+                (r) =>
+                    r.orderedStopIds.contains(originId) &&
+                    r.orderedStopIds.contains(destinationId),
+              )
+              .toList();
           if (matches.isNotEmpty) {
             widget.controller.selectRoute(matches.first);
             widget.onRouteSelected(matches.first.id);
           }
         }
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => TicketBookingSuitePage(
-              ticketController: widget.ticketController,
-              journeyController: widget.controller,
-              initialStepIndex: 0,
-              showTopPrototypeTabs: false,
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => TicketBookingSuitePage(
+                ticketController: widget.ticketController,
+                journeyController: widget.controller,
+                initialStepIndex: 0,
+                showTopPrototypeTabs: false,
+              ),
             ),
           ),
-        ));
+        );
         break;
 
       case AdaptiveShortcutType.liveTracking:
         final busId = shortcut.actionData['busId'] as String? ?? '18B';
-        final routeId = shortcut.actionData['routeId'] as String? ?? 'vit-to-katpadi';
+        final routeId =
+            shortcut.actionData['routeId'] as String? ?? 'vit-to-katpadi';
         final allStops = widget.repository.findStops('');
         final origin = allStops.isNotEmpty
             ? allStops.first
-            : const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'Vellore');
-        final destination = allStops.length > 1
-            ? allStops.last
-            : origin;
-        final ticketToTrack = widget.ticketController.activeTicket ??
+            : const Stop(
+                id: 'vit-main-gate',
+                name: 'VIT Main Gate',
+                area: 'Vellore',
+              );
+        final destination = allStops.length > 1 ? allStops.last : origin;
+        final ticketToTrack =
+            widget.ticketController.activeTicket ??
             Ticket(
               id: 'BB-SHORTCUT-$busId',
               busId: busId,
@@ -114,7 +123,9 @@ class _HomePageState extends State<HomePage> {
               destination: destination,
               passengerName: 'Pavan',
               passengerType: PassengerType.general,
-              fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
+              fareQuote: FareEngine.calculateCorridorFare(
+                PassengerType.general,
+              ),
               paymentMethod: PaymentMethod.upi,
               issuedAt: DateTime.now(),
               validUntil: DateTime.now().add(const Duration(hours: 4)),
@@ -130,27 +141,31 @@ class _HomePageState extends State<HomePage> {
               ),
               isDemo: true,
             );
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => LiveLocationScreen(
-              ticket: ticketToTrack,
-              repository: widget.repository,
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => LiveLocationScreen(
+                ticket: ticketToTrack,
+                repository: widget.repository,
+              ),
             ),
           ),
-        ));
+        );
         break;
 
       case AdaptiveShortcutType.ticketBooking:
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => TicketBookingSuitePage(
-              ticketController: widget.ticketController,
-              journeyController: widget.controller,
-              initialStepIndex: 1,
-              showTopPrototypeTabs: false,
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => TicketBookingSuitePage(
+                ticketController: widget.ticketController,
+                journeyController: widget.controller,
+                initialStepIndex: 1,
+                showTopPrototypeTabs: false,
+              ),
             ),
           ),
-        ));
+        );
         break;
 
       case AdaptiveShortcutType.savedPlace:
@@ -158,31 +173,37 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case AdaptiveShortcutType.corridorAlerts:
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
-        ));
+        unawaited(
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const AlertsPage())),
+        );
         break;
 
       case AdaptiveShortcutType.safety:
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => SafetySharingPage(
-              activeTicket: widget.ticketController.activeTicket,
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SafetySharingPage(
+                activeTicket: widget.ticketController.activeTicket,
+              ),
             ),
           ),
-        ));
+        );
         break;
 
       case AdaptiveShortcutType.feature:
         if (shortcut.actionType == 'voice_assistant') {
-          unawaited(Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => GeminiLiveScreen(
-                ticketController: widget.ticketController,
-                repository: widget.repository,
+          unawaited(
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GeminiLiveScreen(
+                  ticketController: widget.ticketController,
+                  repository: widget.repository,
+                ),
               ),
             ),
-          ));
+          );
         } else {
           _openRouteSearch();
         }
@@ -191,57 +212,69 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openRouteSearch() {
-    unawaited(Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => TicketBookingSuitePage(
-          ticketController: widget.ticketController,
-          journeyController: widget.controller,
-          initialStepIndex: 0,
-          showTopPrototypeTabs: false,
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => TicketBookingSuitePage(
+            ticketController: widget.ticketController,
+            journeyController: widget.controller,
+            initialStepIndex: 0,
+            showTopPrototypeTabs: false,
+          ),
         ),
       ),
-    ));
+    );
   }
 
   void _openSavedPlacesModal() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Saved Places',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: const Color(0xFF1E293B),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Saved Places',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildSavedPlaceTile(Icons.home, 'Home', 'Gandhi Nagar, Vellore'),
-            _buildSavedPlaceTile(Icons.school, 'VIT Campus', 'VIT Main Gate'),
-            _buildSavedPlaceTile(Icons.train, 'Katpadi Junction', 'Katpadi Railway Station'),
-            _buildSavedPlaceTile(Icons.local_hospital, 'CMC Hospital', 'Vellore Town'),
-          ],
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildSavedPlaceTile(Icons.home, 'Home', 'Gandhi Nagar, Vellore'),
+              _buildSavedPlaceTile(Icons.school, 'VIT Campus', 'VIT Main Gate'),
+              _buildSavedPlaceTile(
+                Icons.train,
+                'Katpadi Junction',
+                'Katpadi Railway Station',
+              ),
+              _buildSavedPlaceTile(
+                Icons.local_hospital,
+                'CMC Hospital',
+                'Vellore Town',
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _buildSavedPlaceTile(IconData icon, String title, String subtitle) {
@@ -251,8 +284,17 @@ class _HomePageState extends State<HomePage> {
         foregroundColor: const Color(0xFF38BDF8),
         child: Icon(icon),
       ),
-      title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Color(0xFF94A3B8))),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Color(0xFF94A3B8)),
+      ),
       trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
       onTap: () {
         Navigator.of(context).pop();
@@ -273,7 +315,11 @@ class _HomePageState extends State<HomePage> {
 
     final customCards = <Widget>[];
     for (final item in visibleItems) {
-      final cardWidget = _buildCustomCardForItem(item, hasActiveTicket, activeTicket);
+      final cardWidget = _buildCustomCardForItem(
+        item,
+        hasActiveTicket,
+        activeTicket,
+      );
       if (cardWidget is! SizedBox) {
         customCards.add(cardWidget);
         customCards.add(const SizedBox(height: 14));
@@ -287,11 +333,15 @@ class _HomePageState extends State<HomePage> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 children: [
                   // Hidden purpose statement for screen reader context
                   Semantics(
-                    label: 'BusBuddy helps plan journeys from VIT Vellore to Katpadi Railway Station',
+                    label:
+                        'BusBuddy helps plan journeys from VIT Vellore to Katpadi Railway Station',
                     child: const SizedBox.shrink(),
                   ),
 
@@ -304,39 +354,39 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Semantics(
-                            headingLevel: 1,
-                            child: Wrap(
-                              spacing: 2,
-                              children: [
-                                Text(
-                                  'Bus',
-                                  style: textTheme.headlineSmall?.copyWith(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 26,
+                              headingLevel: 1,
+                              child: Wrap(
+                                spacing: 2,
+                                children: [
+                                  Text(
+                                    'Bus',
+                                    style: textTheme.headlineSmall?.copyWith(
+                                      color: colors.textPrimary,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 26,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  'Buddy',
-                                  style: textTheme.headlineSmall?.copyWith(
-                                    color: colors.actionPrimary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 26,
+                                  Text(
+                                    'Buddy',
+                                    style: textTheme.headlineSmall?.copyWith(
+                                      color: colors.actionSecondary,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 26,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Travel Together, Go Further',
-                            style: TextStyle(
-                              color: colors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                            const SizedBox(height: 2),
+                            Text(
+                              'Travel Together, Go Further',
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
                         ),
                       ),
                       Row(
@@ -347,12 +397,20 @@ class _HomePageState extends State<HomePage> {
                             label: 'Corridor Alerts',
                             excludeSemantics: true,
                             child: IconButton(
-                              icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                              icon: Icon(
+                                Icons.notifications_outlined,
+                                color: colors.textPrimary,
+                                size: 24,
+                              ),
                               tooltip: 'Corridor Alerts',
                               onPressed: () {
-                                unawaited(Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
-                                ));
+                                unawaited(
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const AlertsPage(),
+                                    ),
+                                  ),
+                                );
                               },
                             ),
                           ),
@@ -361,10 +419,14 @@ class _HomePageState extends State<HomePage> {
                             button: true,
                             label: 'User Profile',
                             excludeSemantics: true,
-                            child: const CircleAvatar(
+                            child: CircleAvatar(
                               radius: 22,
-                              backgroundColor: Color(0xFF1E293B),
-                              child: Icon(Icons.person, color: Colors.white, size: 24),
+                              backgroundColor: colors.surface,
+                              child: Icon(
+                                Icons.person,
+                                color: colors.textPrimary,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ],
@@ -376,28 +438,35 @@ class _HomePageState extends State<HomePage> {
                   // ── Greeting Banner ──────────────────────────────────────
                   Row(
                     children: [
-                      Text(hasActiveTicket ? '☀️ ' : '👋 ', style: const TextStyle(fontSize: 22)),
+                      Text(
+                        hasActiveTicket ? '☀️ ' : '👋 ',
+                        style: const TextStyle(fontSize: 22),
+                      ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              hasActiveTicket ? 'Good morning, Pavan!' : 'Good morning!',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
+                              hasActiveTicket
+                                  ? 'Good morning, Pavan!'
+                                  : 'Good morning!',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            hasActiveTicket ? "Here's your journey today." : 'What would you like to do?',
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 13,
+                            const SizedBox(height: 2),
+                            Text(
+                              hasActiveTicket
+                                  ? "Here's your journey today."
+                                  : 'What would you like to do?',
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
                         ),
                       ),
                     ],
@@ -409,201 +478,280 @@ class _HomePageState extends State<HomePage> {
                     onExecuteShortcut: _handleAdaptiveShortcut,
                   ),
 
-                  // ── Active Ticket Hero Card (Image 2) ───────────────────
+                  // ── Active Ticket Hero Card ─────────────────────────────
                   if (hasActiveTicket) ...[
                     Semantics(
                       container: true,
-                      label: 'Active Journey: Bus 18B to Katpadi. On Track. 3 stops remaining. Estimated arrival 6 minutes.',
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7), // Light Mint Green
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      label:
+                          'Active Journey: Bus 18B to Katpadi. On Track. 3 stops remaining. Estimated arrival 6 minutes.',
+                      child: Builder(
+                        builder: (context) {
+                          final heroBg = colors.isHighContrast
+                              ? colors.surface
+                              : colors.statusSuccess.withValues(alpha: 0.14);
+                          final heroBorder = colors.isHighContrast
+                              ? colors.border
+                              : colors.statusSuccess.withValues(alpha: 0.55);
+                          final heroTitle = colors.isHighContrast
+                              ? colors.textPrimary
+                              : const Color(0xFF14532D);
+                          final heroBody = colors.isHighContrast
+                              ? colors.textSecondary
+                              : const Color(0xFF15803D);
+                          final chipBg = colors.isHighContrast
+                              ? colors.statusSuccess
+                              : const Color(0xFF15803D);
+                          final chipFg = colors.isHighContrast
+                              ? colors.onActionPrimary
+                              : Colors.white;
+                          final iconBg = colors.isHighContrast
+                              ? colors.surfaceSubtle
+                              : const Color(0xFFBBF7D0);
+                          final divider = colors.isHighContrast
+                              ? colors.border
+                              : const Color(0xFF86EFAC);
+
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: heroBg,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: heroBorder,
+                                width: colors.isHighContrast ? 2 : 1.5,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFBBF7D0),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.directions_bus,
-                                        color: Color(0xFF15803D),
-                                        size: 24,
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: iconBg,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              Icons.directions_bus,
+                                              color: colors.isHighContrast
+                                                  ? colors.statusSuccess
+                                                  : const Color(0xFF15803D),
+                                              size: 24,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Flexible(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'My Journey',
+                                                  style: TextStyle(
+                                                    color: heroTitle,
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  '${activeTicket.busId} → ${activeTicket.destination.name}',
+                                                  style: TextStyle(
+                                                    color: colors.isHighContrast
+                                                        ? colors.statusSuccess
+                                                        : const Color(
+                                                            0xFF15803D,
+                                                          ),
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 14),
                                     Flexible(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'My Journey',
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: chipBg,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'On Track',
                                           style: TextStyle(
-                                            color: Color(0xFF14532D),
-                                            fontSize: 18,
+                                            color: chipFg,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${activeTicket.busId} → ${activeTicket.destination.name}',
-                                          style: const TextStyle(
-                                            color: Color(0xFF15803D),
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                          ),
-                                        ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Flexible(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF15803D),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: const Text(
-                                      'On Track',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            const Divider(color: Color(0xFF86EFAC), height: 1),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.location_on, color: Color(0xFF15803D), size: 20),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: const [
-                                            Text(
-                                              '3 stops',
-                                            style: TextStyle(
-                                              color: Color(0xFF14532D),
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                          Text(
-                                            'remaining',
-                                            style: TextStyle(
-                                              color: Color(0xFF15803D),
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(height: 30, width: 1, color: const Color(0xFF86EFAC)),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.access_time_filled, color: Color(0xFF15803D), size: 20),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: const [
-                                            Text(
-                                              '6 min',
-                                              style: TextStyle(
-                                                color: Color(0xFF14532D),
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                            Text(
-                                              'estimated arrival',
-                                              style: TextStyle(
-                                                color: Color(0xFF15803D),
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: FilledButton(
-                                onPressed: () {
-                                  final routes = widget.repository.allRoutes;
-                                  if (routes.isNotEmpty) {
-                                    widget.controller.selectRoute(routes.first);
-                                  }
-                                  unawaited(Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => TicketBookingSuitePage(
-                                        ticketController: widget.ticketController,
-                                        journeyController: widget.controller,
-                                        initialStepIndex: 2,
-                                      ),
-                                    ),
-                                  ));
-                                },
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF15803D),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Flexible(
-                                      child: Text(
-                                        'View Journey Details',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Icon(Icons.chevron_right, color: Colors.white, size: 20),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                Divider(color: divider, height: 1),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.location_on,
+                                            color: heroBody,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '3 stops',
+                                                  style: TextStyle(
+                                                    color: heroTitle,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'remaining',
+                                                  style: TextStyle(
+                                                    color: heroBody,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      height: 30,
+                                      width: 1,
+                                      color: divider,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.access_time_filled,
+                                            color: heroBody,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '6 min',
+                                                  style: TextStyle(
+                                                    color: heroTitle,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'estimated arrival',
+                                                  style: TextStyle(
+                                                    color: heroBody,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: FilledButton(
+                                    onPressed: () {
+                                      final routes =
+                                          widget.repository.allRoutes;
+                                      if (routes.isNotEmpty) {
+                                        widget.controller.selectRoute(
+                                          routes.first,
+                                        );
+                                      }
+                                      unawaited(
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                TicketBookingSuitePage(
+                                                  ticketController:
+                                                      widget.ticketController,
+                                                  journeyController:
+                                                      widget.controller,
+                                                  initialStepIndex: 2,
+                                                ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: colors.isHighContrast
+                                          ? colors.actionPrimary
+                                          : const Color(0xFF15803D),
+                                      foregroundColor: colors.isHighContrast
+                                          ? colors.onActionPrimary
+                                          : Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            'View Journey Details',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 6),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -624,15 +772,19 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.eco_outlined, color: Color(0xFF64748B), size: 20),
+                          Icon(
+                            Icons.eco_outlined,
+                            color: colors.textMuted,
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
                                 'More Accessible Cities',
                                 style: TextStyle(
-                                  color: Color(0xFF94A3B8),
+                                  color: colors.textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -640,7 +792,7 @@ class _HomePageState extends State<HomePage> {
                               Text(
                                 'for a Brighter Tomorrow',
                                 style: TextStyle(
-                                  color: Color(0xFF64748B),
+                                  color: colors.textMuted,
                                   fontSize: 11,
                                 ),
                               ),
@@ -648,9 +800,9 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ],
                       ),
-                      const Icon(
+                      Icon(
                         Icons.directions_bus_filled_outlined,
-                        color: Color(0xFF334155),
+                        color: colors.border,
                         size: 32,
                       ),
                     ],
@@ -666,44 +818,69 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyLayoutCard() {
+    final colors = AppTheme.colors(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF111C33),
+        color: colors.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        border: Border.all(
+          color: colors.border,
+          width: colors.isHighContrast ? 2 : 1,
+        ),
       ),
       child: Column(
         children: [
-          const Icon(Icons.dashboard_customize_outlined, color: Color(0xFF94A3B8), size: 40),
+          Icon(
+            Icons.dashboard_customize_outlined,
+            color: colors.textSecondary,
+            size: 40,
+          ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'All Home Cards Hidden',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'You have hidden all feature cards on your home screen. Tap below to restore default cards.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            style: TextStyle(color: colors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: AppSettingsController.instance.resetHomeScreenLayout,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0284C7),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              backgroundColor: colors.actionPrimary,
+              foregroundColor: colors.onActionPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            icon: const Icon(Icons.restore, color: Colors.white, size: 20),
-            label: const Text('Restore Default Cards', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            icon: Icon(Icons.restore, color: colors.onActionPrimary, size: 20),
+            label: Text(
+              'Restore Default Cards',
+              style: TextStyle(
+                color: colors.onActionPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCustomCardForItem(HomeScreenItem item, bool hasActiveTicket, Ticket? activeTicket) {
+  Widget _buildCustomCardForItem(
+    HomeScreenItem item,
+    bool hasActiveTicket,
+    Ticket? activeTicket,
+  ) {
     switch (item.id) {
       case HomeScreenItem.idRouteSearch:
         return _buildTaskActionCard(
@@ -727,15 +904,17 @@ class _HomePageState extends State<HomePage> {
           subtitle: 'No active journey',
           semanticLabel: '${item.title}. No active journey.',
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => TicketBookingSuitePage(
-                  ticketController: widget.ticketController,
-                  journeyController: widget.controller,
-                  initialStepIndex: 0,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TicketBookingSuitePage(
+                    ticketController: widget.ticketController,
+                    journeyController: widget.controller,
+                    initialStepIndex: 0,
+                  ),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -747,13 +926,14 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => MyTicketsPage(
-                  ticketController: widget.ticketController,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      MyTicketsPage(ticketController: widget.ticketController),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -776,14 +956,16 @@ class _HomePageState extends State<HomePage> {
           semanticLabel: '${item.title}. ${item.subtitle}.',
           trailingIcon: Icons.graphic_eq,
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => GeminiLiveScreen(
-                  ticketController: widget.ticketController,
-                  repository: widget.repository,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => GeminiLiveScreen(
+                    ticketController: widget.ticketController,
+                    repository: widget.repository,
+                  ),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -800,11 +982,14 @@ class _HomePageState extends State<HomePage> {
             final allStops = widget.repository.findStops('');
             final origin = allStops.isNotEmpty
                 ? allStops.first
-                : const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'Vellore');
-            final destination = allStops.length > 1
-                ? allStops.last
-                : origin;
-            final ticketToTrack = activeTicket ??
+                : const Stop(
+                    id: 'vit-main-gate',
+                    name: 'VIT Main Gate',
+                    area: 'Vellore',
+                  );
+            final destination = allStops.length > 1 ? allStops.last : origin;
+            final ticketToTrack =
+                activeTicket ??
                 Ticket(
                   id: 'BB-PREVIEW-CORRIDOR',
                   busId: '18B',
@@ -814,7 +999,9 @@ class _HomePageState extends State<HomePage> {
                   destination: destination,
                   passengerName: 'Pavan',
                   passengerType: PassengerType.general,
-                  fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
+                  fareQuote: FareEngine.calculateCorridorFare(
+                    PassengerType.general,
+                  ),
                   paymentMethod: PaymentMethod.upi,
                   issuedAt: DateTime.now(),
                   validUntil: DateTime.now().add(const Duration(hours: 4)),
@@ -830,14 +1017,16 @@ class _HomePageState extends State<HomePage> {
                   ),
                   isDemo: true,
                 );
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => LiveLocationScreen(
-                  ticket: ticketToTrack,
-                  repository: widget.repository,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => LiveLocationScreen(
+                    ticket: ticketToTrack,
+                    repository: widget.repository,
+                  ),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -849,11 +1038,11 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AlertsPage(),
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
               ),
-            ));
+            );
           },
         );
 
@@ -865,13 +1054,13 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => SafetySharingPage(
-                  activeTicket: activeTicket,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SafetySharingPage(activeTicket: activeTicket),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -884,14 +1073,16 @@ class _HomePageState extends State<HomePage> {
           semanticLabel: '${item.title}. ${item.subtitle}.',
           borderColor: const Color(0xFF334155),
           onTap: () {
-            unawaited(Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => SettingsPage(
-                  repository: widget.repository,
-                  ticketController: widget.ticketController,
+            unawaited(
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SettingsPage(
+                    repository: widget.repository,
+                    ticketController: widget.ticketController,
+                  ),
                 ),
               ),
-            ));
+            );
           },
         );
 
@@ -920,52 +1111,60 @@ class _HomePageState extends State<HomePage> {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(22),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              border: borderColor != null ? Border.all(color: borderColor) : null,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 72),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: borderColor != null
+                    ? Border.all(color: borderColor)
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    trailingIcon ?? Icons.chevron_right,
                     color: Colors.white,
-                    shape: BoxShape.circle,
+                    size: 24,
                   ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  trailingIcon ?? Icons.chevron_right,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -59,7 +59,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           backgroundColor: c.actionPrimary,
           foregroundColor: c.onActionPrimary,
           textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
@@ -71,7 +74,10 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           foregroundColor: c.textPrimary,
           side: BorderSide(color: c.border, width: 2),
           shape: RoundedRectangleBorder(
@@ -94,7 +100,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: BorderSide(color: c.borderFocus, width: 3),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       cardTheme: CardThemeData(
         color: c.surface,
@@ -104,6 +113,53 @@ class AppTheme {
           side: BorderSide(color: c.border, width: 2),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
+          foregroundColor: c.textPrimary,
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: c.textSecondary,
+        textColor: c.textPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: c.surfaceSubtle,
+        selectedColor: c.actionPrimary,
+        labelStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide(color: c.border, width: c.isHighContrast ? 2 : 1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+        ),
+        showCheckmark: false,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: c.isHighContrast ? c.surface : c.surfaceSubtle,
+        contentTextStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          side: BorderSide(color: c.border, width: c.isHighContrast ? 2 : 1),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: c.border,
+        thickness: c.isHighContrast ? 2 : 1,
+        space: 1,
       ),
     );
   }
@@ -142,7 +198,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           backgroundColor: c.actionPrimary,
           foregroundColor: c.onActionPrimary,
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
@@ -153,7 +212,10 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           foregroundColor: c.textPrimary,
           side: BorderSide(color: c.border, width: 1.5),
           shape: RoundedRectangleBorder(
@@ -176,7 +238,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: BorderSide(color: c.borderFocus, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       cardTheme: CardThemeData(
         color: c.surface,
@@ -187,6 +252,49 @@ class AppTheme {
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
+          foregroundColor: c.textPrimary,
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: c.textSecondary,
+        textColor: c.textPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: c.surfaceSubtle,
+        selectedColor: c.actionPrimary,
+        labelStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide(color: c.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+        ),
+        showCheckmark: false,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: c.surfaceSubtle,
+        contentTextStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          side: BorderSide(color: c.border),
+        ),
+      ),
+      dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 1),
     );
   }
 
@@ -224,7 +332,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           backgroundColor: c.actionPrimary,
           foregroundColor: c.onActionPrimary,
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
@@ -235,7 +346,10 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
           foregroundColor: c.textPrimary,
           side: BorderSide(color: c.border, width: 1.5),
           shape: RoundedRectangleBorder(
@@ -258,7 +372,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: BorderSide(color: c.borderFocus, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       cardTheme: CardThemeData(
         color: c.surface,
@@ -269,6 +386,49 @@ class AppTheme {
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(
+            AppSpacing.minTouchTarget,
+            AppSpacing.minTouchTarget,
+          ),
+          foregroundColor: c.textPrimary,
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: c.textSecondary,
+        textColor: c.textPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: c.surfaceSubtle,
+        selectedColor: c.actionPrimary,
+        labelStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide(color: c.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+        ),
+        showCheckmark: false,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: c.surfaceSubtle,
+        contentTextStyle: TextStyle(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          side: BorderSide(color: c.border),
+        ),
+      ),
+      dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 1),
     );
   }
 }

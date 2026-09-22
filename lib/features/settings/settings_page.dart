@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../safety/safety_sharing_page.dart';
 import '../tickets/ticket_controller.dart';
@@ -8,36 +10,53 @@ import 'accessibility_settings_page.dart';
 import 'personalization_settings_page.dart';
 import 'voice_assistant_settings_page.dart';
 
-/// Settings & Accessibility hub matching dark BusBuddy UI palette.
+/// Settings hub — theme-aware cards for accessibility, personalization,
+/// voice, and emergency configuration.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({
-    super.key,
-    this.repository,
-    this.ticketController,
-  });
+  const SettingsPage({super.key, this.repository, this.ticketController});
 
   final TransportRepository? repository;
   final TicketController? ticketController;
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         title: Column(
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+              children: [
+                Text(
+                  'Bus',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
+                Text(
+                  'Buddy',
+                  style: TextStyle(
+                    color: colors.actionSecondary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
               ],
             ),
-            const Text(
+            Text(
               'Settings & Preferences',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -45,11 +64,10 @@ class SettingsPage extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            // ── Section 1: Accessibility ────────────────────────────────
-            _buildSectionHeader('ACCESSIBILITY & TALKBACK'),
-            const SizedBox(height: 8),
+            _buildSectionHeader(context, 'ACCESSIBILITY & TALKBACK'),
+            const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
               iconColor: const Color(0xFF3B82F6),
@@ -58,21 +76,22 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Text size, high contrast, talkback, & haptics',
               trailingText: 'Large · On',
               onTap: () {
-                unawaited(Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AccessibilitySettingsPage(
-                      repository: repository,
-                      ticketController: ticketController,
+                unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AccessibilitySettingsPage(
+                        repository: repository,
+                        ticketController: ticketController,
+                      ),
                     ),
                   ),
-                ));
+                );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
 
-            // ── Section 2: Personalization ──────────────────────────────
-            _buildSectionHeader('PERSONALIZATION & LAYOUT'),
-            const SizedBox(height: 8),
+            _buildSectionHeader(context, 'PERSONALIZATION & LAYOUT'),
+            const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
               iconColor: const Color(0xFF16A34A),
@@ -81,21 +100,22 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Customize home screen, adaptive UI, & layout',
               trailingText: 'Adaptive On',
               onTap: () {
-                unawaited(Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => PersonalizationSettingsPage(
-                      repository: repository,
-                      ticketController: ticketController,
+                unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => PersonalizationSettingsPage(
+                        repository: repository,
+                        ticketController: ticketController,
+                      ),
                     ),
                   ),
-                ));
+                );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
 
-            // ── Section 3: Voice Assistant ──────────────────────────────
-            _buildSectionHeader('VOICE ASSISTANT & AI'),
-            const SizedBox(height: 8),
+            _buildSectionHeader(context, 'VOICE ASSISTANT & AI'),
+            const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
               iconColor: const Color(0xFF7C3AED),
@@ -104,21 +124,22 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Preferred language, voice speed, & Gemini AI',
               trailingText: 'English',
               onTap: () {
-                unawaited(Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => VoiceAssistantSettingsPage(
-                      repository: repository,
-                      ticketController: ticketController,
+                unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => VoiceAssistantSettingsPage(
+                        repository: repository,
+                        ticketController: ticketController,
+                      ),
                     ),
                   ),
-                ));
+                );
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
 
-            // ── Section 4: Safety & Emergency ───────────────────────────
-            _buildSectionHeader('EMERGENCY & TRUSTED CONTACTS'),
-            const SizedBox(height: 8),
+            _buildSectionHeader(context, 'EMERGENCY & TRUSTED CONTACTS'),
+            const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
               iconColor: const Color(0xFFDC2626),
@@ -127,27 +148,45 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Configure 1-tap location alerts & sharing links',
               trailingText: 'Active',
               onTap: () {
-                unawaited(Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const SafetySharingPage(),
+                unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SafetySharingPage(),
+                    ),
                   ),
-                ));
+                );
               },
             ),
+            const SizedBox(height: AppSpacing.xl),
+            Text(
+              'VIT Vellore → Katpadi Railway Station corridor',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        color: Color(0xFF94A3B8),
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.0,
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final colors = AppTheme.colors(context);
+    return Semantics(
+      header: true,
+      label: title,
+      child: Text(
+        title,
+        style: TextStyle(
+          color: colors.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }
@@ -161,61 +200,87 @@ class SettingsPage extends StatelessWidget {
     required String trailingText,
     required VoidCallback onTap,
   }) {
+    final colors = AppTheme.colors(context);
+
     return Semantics(
       button: true,
       label: '$title. $subtitle.',
       excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111C33),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF1E293B)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: Colors.white, size: 24),
+      child: Material(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          child: Container(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(
+                color: colors.border,
+                width: colors.isHighContrast ? 2 : 1,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: iconColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      title,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      trailingText,
+                      style: TextStyle(
+                        color: colors.actionSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right,
+                      color: colors.actionSecondary,
+                      size: 20,
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    trailingText,
-                    style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, color: Color(0xFF38BDF8), size: 20),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

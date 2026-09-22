@@ -88,7 +88,7 @@ class HomeScreenItem {
       case idSafety:
         return const Color(0xFFE11D48); // Rose
       case idSettings:
-        return const Color(0xFF1E293B); // Dark Slate
+        return const Color(0xFF475569); // Slate — visible on dark midnight bg
       default:
         return const Color(0xFF334155);
     }
