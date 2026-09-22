@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 22, 2026 (UI polish committed; BUS-P2-01 permission-flow tests, BUS-P2-03 CI + docs gates, BUS-P2-02 release-smoke/startup harnesses + web release build; `flutter analyze: No issues found!`, full suite green)
+**Last Updated**: September 22, 2026 (CI GREEN — run 35729139948: analyze, 354/354 tests, docs gate, APK+AAB+web evidence; only device harnesses remain open)
 
 ---
 
@@ -794,20 +794,19 @@ The application provides intuitive journey planning, digital ticket booking with
 - `flutter test`: **`00:42 +341: All tests passed!`** (log `/tmp/bb_test_final.log`)
 - `flutter build apk --release`: **success**, APK at `build/app/outputs/flutter-apk/app-release.apk` (53M on disk; `lib/arm64-v8a/libapp.so` 6.8 MB AOT, `libflutter.so` 11.6 MB).
 
-### ⚠️ Still open (require device/emulator or CI run)
+### ⚠️ Still open (require device/emulator)
 
 1. **BUS-P2-02 device remainder**: run `tool/release_smoke.sh` and `tool/startup_memory_benchmark.sh` against a physical device/emulator (no adb target in this environment) for on-device cold/warm/PSS numbers, reflection/plugin feature smoke, and TalkBack semantics no-regression evidence.
 2. **BUS-P2-01 instrumented remainder**: deny / permanent-deny / revoke / approximate-location UI tests — **N/A while zero runtime permissions** (in-repo contract locked in `test/platform/permission_flow_test.dart`; re-open if a permission is re-added).
 3. **Macrobenchmark note**: cold/warm + 10-cycle memory collection is implemented in `tool/startup_memory_benchmark.sh` (Flutter `am start -W` harness). Full androidx Macrobenchmark + Baseline Profile module remains optional once a device farm/CI Android runner is available.
 
-### ✅ Completed this session (2026-09-22 UI + P2 closure batch)
+### ✅ CI GREEN — 2026-09-22 (BUS-P2-03 closed)
 
-- **UI polish** committed as `0164afc` (`feat(ui): theme-aware home and settings polish…`) — analyze clean, suite green.
-- **BUS-P2-03**: `.github/workflows/ci.yml` (fatal analyze, tests with derived count, docs gate, minified APK + web release, evidence artifact with commit SHA); `tool/ci/verify_docs.sh`; `test/platform/docs_verification_test.dart`.
-- **BUS-P2-01**: `test/platform/permission_flow_test.dart` (manifest/flavor lock, no request APIs/plugins, re-add rationale, mic + map feature fallbacks).
-- **BUS-P2-02 harnesses**: `tool/release_smoke.sh`, `tool/startup_memory_benchmark.sh` (budgets via env); ADR-003 updated.
-- **Web release**: `flutter build web --release` for Chrome voice path.
+- Pushed `5f757af` (CI pipeline + P2 tests/harnesses); first CI run failed only on `flutter build apk --release --analyze-size` (multi-ABI; `--analyze-size` needs a single ABI).
+- Fixed in `2fc4481`: arm64-only `--analyze-size` build for the size log, then the shippable multi-ABI release APK, plus a minified release AAB step.
+- **CI run [35729139948](https://github.com/sricharan24-byte/HELEN/actions/runs/35729139948) SUCCESS**: `flutter analyze --fatal-infos --fatal-warnings` clean, **354/354 tests**, docs gate pass, minified APK + AAB + web release built, immutable evidence artifact uploaded with commit SHA.
+- Suite count moved 341 → 354 (13 new P2 docs/permission-flow tests); README/AGENTS/research-doc counts updated to 54 files / 354 tests.
 
 ### 🔜 Next recommended step
 
-- Push so GitHub Actions runs CI and publishes the evidence artifact; attach a device and run `tool/release_smoke.sh` + `tool/startup_memory_benchmark.sh` for the remaining BUS-P2-02 device numbers.
+- Attach a device and run `tool/release_smoke.sh` + `tool/startup_memory_benchmark.sh` for the remaining BUS-P2-02 device numbers.

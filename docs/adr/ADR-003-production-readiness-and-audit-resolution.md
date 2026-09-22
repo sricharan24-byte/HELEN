@@ -133,9 +133,11 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 - Manifest remains INTERNET-only. Extended `test/platform/android_configuration_test.dart` to lock the permission set, assert absence of location/mic permissions, and require the BUS-P2-01 re-add rationale comment.
 - Runtime permission-flow tests (deny / permanent deny / revoke / approximate) remain open only if a permission is re-introduced.
 
-## 5b. `BUS-P2-03`: CI as source of truth (implemented 2026-09-22)
+## 5b. `BUS-P2-03`: CI as source of truth (GREEN 2026-09-22)
 
-- **Decision**: `.github/workflows/ci.yml` is authoritative for `flutter analyze --fatal-infos --fatal-warnings`, full `flutter test` (count derived from the run, not a hand-edited badge), `tool/ci/verify_docs.sh`, minified release APK + web release builds, and an immutable `evidence/` artifact stamped with `commit_sha`, test count, APK sha256/size, and run id.
+- **Decision**: `.github/workflows/ci.yml` is authoritative for `flutter analyze --fatal-infos --fatal-warnings`, full `flutter test` (count derived from the run, not a hand-edited badge), `tool/ci/verify_docs.sh`, minified release APK + AAB + web release builds, and an immutable `evidence/` artifact stamped with `commit_sha`, test count, APK/AAB sha256/size, and run id.
+- **CI fix**: first run failed only on `flutter build apk --release --analyze-size` (multi-ABI; the flag needs a single ABI). Fixed in `2fc4481`: arm64-only analysis build for the size log, then the shippable multi-ABI APK, plus a release AAB step.
+- **Evidence**: CI run [35729139948](https://github.com/sricharan24-byte/HELEN/actions/runs/35729139948) — **SUCCESS**: analyze clean, **354/354 tests**, docs gate pass, APK + AAB + web artifacts uploaded.
 - **Docs gate**: `test/platform/docs_verification_test.dart` fails the suite if ADR-001/002/003, CI workflow, smoke/benchmark scripts, or P2 config claims are missing or drift from source.
 - **Claim policy**: README/ADR test counts and release claims must match CI evidence; manual badge edits are non-authoritative.
 

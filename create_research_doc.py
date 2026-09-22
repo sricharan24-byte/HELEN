@@ -445,7 +445,7 @@ add_table(["Task ID", "Category", "Engineered Resolution & Test File"], [
 
 doc.add_heading("Automated verification & test coverage", level=2)
 add_bullets([
-    "52 test files covering domain entities, services, controllers, and accessibility contracts with 100% pass rate.",
+    "54 test files covering domain entities, services, controllers, and accessibility contracts with 100% pass rate.",
     "FareEngine integer paise arithmetic and boundary tests: 100% pass rate.",
     "AnnouncementCoordinator priority queue ordering and Gemini Live audio ducking synchronization.",
     "Accessibility widget test suite (touch targets >= 48dp, Heading Level 2 semantics, and WCAG AAA high-contrast tokens).",
