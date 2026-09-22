@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local CI/evidence artifacts (uploaded by GitHub Actions, not committed)
+evidence/

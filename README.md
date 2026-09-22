@@ -5,7 +5,8 @@
 [![Flutter](https://img.shields.io/badge/Framework-Flutter%203.x-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Language-Dart-0175C2?logo=dart)](https://dart.dev)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OpenStreetMap%20%2B%20OSRM-7EBC6F?logo=openstreetmap)](https://www.openstreetmap.org)
-[![Tests](https://img.shields.io/badge/Tests-341%2F341%20Passed%20(100%25)-16A34A)](#-automated-tests)
+[![CI](https://github.com/sricharan24-byte/HELEN/actions/workflows/ci.yml/badge.svg)](https://github.com/sricharan24-byte/HELEN/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/Tests-see%20CI%20evidence-16A34A)](https://github.com/sricharan24-byte/HELEN/actions/workflows/ci.yml)
 [![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%202.2%20AAA-brightgreen)](https://www.w3.org/WAI/standards-guidelines/wcag/)
 
 ---
@@ -174,8 +175,13 @@ BusBuddy/
 ├── docs/
 │   ├── adr/                                  # ADR-001 (Phase 1), ADR-002 (Phase 2), ADR-003 (Production Readiness)
 │   └── audit/                                # GPT-6 Astra & Claude Opus 5 audit specifications and feedback
+├── .github/workflows/ci.yml                  # BUS-P2-03 CI: analyze, tests, docs, release builds, evidence
+├── tool/
+│   ├── ci/verify_docs.sh                     # BUS-P2-03 documentation & claim verification
+│   ├── release_smoke.sh                      # BUS-P2-02 minified release + optional device smoke
+│   └── startup_memory_benchmark.sh           # BUS-P2-02 cold/warm startup + PSS after nav cycles
 ├── create_research_doc.py                    # Research paper & specification generator (python-docx)
-├── progress.md                               # Comprehensive engineering progress log (Chunks 1–38)
+├── progress.md                               # Comprehensive engineering progress log
 └── README.md                                 # Technical documentation & repository guide
 ```
 
@@ -188,7 +194,7 @@ Run the complete Flutter automated test suite:
 flutter test
 ```
 
-> **Test Suite Quality**: 52 test files / **341 tests** (verified `flutter test` 2026-09-22) covering pure-Dart domain contracts, integer paise precision math, OSRM failure resilience, monotonic telemetry reducers, Gemini Live WebSocket handshake & exponential backoff, announcement queue preemption, floating overlay `BlockSemantics`, WCAG 2.2 AAA contrast verification, TTS fallback arbitration, Android permission minimization (BUS-P2-01), release shrink config (BUS-P2-02), and process death state restoration.
+> **Test Suite Quality**: **CI is the source of truth (BUS-P2-03)** — `.github/workflows/ci.yml` runs `flutter analyze --fatal-infos --fatal-warnings`, the full `flutter test` suite, `tool/ci/verify_docs.sh`, minified release APK + web builds, and uploads an evidence artifact stamped with the audited commit SHA and derived test count. Local `flutter test` remains green for domain contracts, integer paise precision, OSRM failure resilience, monotonic telemetry reducers, Gemini Live WebSocket handshake & exponential backoff, announcement queue preemption, floating overlay `BlockSemantics`, WCAG contrast verification, TTS fallback arbitration, Android permission minimization + runtime permission-flow contract (BUS-P2-01), release shrink config (BUS-P2-02), documentation/ADR claim checks (BUS-P2-03), and process death state restoration.
 
 ---
 

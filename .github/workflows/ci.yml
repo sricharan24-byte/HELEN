@@ -1,0 +1,116 @@
+# BUS-P2-03: CI is the source of truth for analysis, tests, ADR paths,
+# release configuration, and evidence artifacts.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Analyze, test, docs, release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Static analysis (fatal infos/warnings)
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - name: Unit & widget tests
+        id: tests
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          flutter test --reporter expanded | tee evidence/flutter-test.log
+          # Derive pass count from the final summary line: "+N: All tests passed!"
+          count="$(grep -Eo 'All tests passed!|Some tests failed\.' evidence/flutter-test.log | tail -1 || true)"
+          if grep -q 'All tests passed!' evidence/flutter-test.log; then
+            total="$(grep -Eo '\+[0-9]+' evidence/flutter-test.log | tail -1 | tr -d '+')"
+            echo "test_count=${total}" >> "$GITHUB_OUTPUT"
+            echo "Tests passed: ${total}"
+          else
+            echo "Test suite failed" >&2
+            exit 1
+          fi
+
+      - name: Documentation & claim verification (BUS-P2-03)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          bash tool/ci/verify_docs.sh | tee evidence/docs-verify.log
+
+      - name: Record audited commit SHA
+        run: |
+          mkdir -p evidence
+          {
+            echo "commit_sha=$(git rev-parse HEAD)"
+            echo "commit_sha_short=$(git rev-parse --short HEAD)"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "test_count=${{ steps.tests.outputs.test_count }}"
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "generated_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } | tee evidence/build-info.properties
+
+      - name: Build minified release APK (BUS-P2-02)
+        run: |
+          set -euo pipefail
+          flutter build apk --release --analyze-size 2>&1 | tee evidence/apk-analyze-size.log
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$APK"
+          cp "$APK" evidence/app-release.apk
+          sha256sum "$APK" | tee evidence/app-release.apk.sha256
+          stat -c 'apk_bytes=%s' "$APK" | tee -a evidence/build-info.properties
+
+      - name: Build release web (Chrome voice path)
+        run: |
+          set -euo pipefail
+          flutter build web --release 2>&1 | tee evidence/web-build.log
+          test -f build/web/index.html
+          du -sb build/web | awk '{print "web_bytes="$1}' | tee -a evidence/build-info.properties
+
+      - name: Upload immutable evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: busbuddy-ci-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Step summary
+        run: |
+          {
+            echo "## BusBuddy CI evidence"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Tests | ${{ steps.tests.outputs.test_count }} passed |"
+            echo "| Analysis | fatal infos/warnings clean |"
+            echo "| Docs | \`tool/ci/verify_docs.sh\` pass |"
+            echo "| Artifact | \`busbuddy-ci-evidence-${{ github.run_id }}-${{ github.run_attempt }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

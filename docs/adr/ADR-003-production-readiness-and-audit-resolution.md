@@ -110,14 +110,15 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 
 - **Decision**: `android/app/src/main/AndroidManifest.xml` declares only `INTERNET`. `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, and `RECORD_AUDIO` were removed because no native capability consumes them (no location/audio plugins in the dependency closure; location is fixture-backed, voice is web speech on Chrome).
 - **Rationale note**: re-introducing a permission requires a just-in-time runtime request, a contextual rationale before the system prompt, and an accessible denial fallback (Astra Gate 12).
-- **Open**: flavor-scoped manifest-merge tests and runtime permission-flow tests (deny / deny-and-don't-ask / revoke-while-running / approximate location).
+- **Open**: ~~flavor-scoped manifest-merge tests and runtime permission-flow tests~~ — **closed 2026-09-22**: `test/platform/permission_flow_test.dart` locks INTERNET-only main + flavor manifests, asserts no request APIs/plugins, documents re-add rationale (JIT + rationale + denial fallback), and verifies browser-mic / offline-map feature fallbacks. Instrumented deny/revoke flows remain N/A until a runtime permission is reintroduced.
 
 ### 5.3 `BUS-P2-02`: release shrinking (build verified 2026-09-22)
 
 - **Decision**: `android/app/build.gradle.kts` release type enables R8 code shrinking (`isMinifyEnabled`) and resource shrinking (`isShrinkResources`) with `proguard-android-optimize.txt` plus a new evidence-based `android/app/proguard-rules.pro` (Flutter embedding/plugin glue, app `MainActivity`, `shared_preferences_android` entry points only).
 - **R8 Play Core link fix (2026-09-22)**: first minified build failed on optional Flutter embedding references to `com.google.android.play.core.*` split/deferred-component APIs (not on our classpath). Added AGP `missing_rules.txt` `-dontwarn` entries with rationale — these APIs are never executed (no Play Core dependency, no dynamic feature modules).
 - **Verified**: `flutter build apk --release` succeeds → `build/app/outputs/flutter-apk/app-release.apk` (55.6 MB / 53M on disk).
-- **Open (exit criteria)**: release smoke across every reflection/plugin-dependent feature on device, binary-size delta vs non-minified baseline, cold/warm startup and memory budgets, semantics no-regression evidence.
+- **Exit criteria harness**: `tool/release_smoke.sh` (minified APK rebuild, size/sha256, optional device install + launch + reflection restart smoke) and `tool/startup_memory_benchmark.sh` (cold/warm `am start -W` TotalTime budgets, PSS after 10 navigation cycles, logcat fatal scan). CI runs `flutter build apk --release` + `flutter build web --release` and uploads an immutable evidence artifact with commit SHA (BUS-P2-03).
+- **Open (device remainder)**: run the two shell harnesses against a physical device/emulator (none attached in this environment) for on-device cold/warm/memory numbers and TalkBack semantics no-regression evidence.
 
 ### 5.4 `BUS-P2-04`: strict static analysis (DONE — GREEN)
 
@@ -132,10 +133,16 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 - Manifest remains INTERNET-only. Extended `test/platform/android_configuration_test.dart` to lock the permission set, assert absence of location/mic permissions, and require the BUS-P2-01 re-add rationale comment.
 - Runtime permission-flow tests (deny / permanent deny / revoke / approximate) remain open only if a permission is re-introduced.
 
+## 5b. `BUS-P2-03`: CI as source of truth (implemented 2026-09-22)
+
+- **Decision**: `.github/workflows/ci.yml` is authoritative for `flutter analyze --fatal-infos --fatal-warnings`, full `flutter test` (count derived from the run, not a hand-edited badge), `tool/ci/verify_docs.sh`, minified release APK + web release builds, and an immutable `evidence/` artifact stamped with `commit_sha`, test count, APK sha256/size, and run id.
+- **Docs gate**: `test/platform/docs_verification_test.dart` fails the suite if ADR-001/002/003, CI workflow, smoke/benchmark scripts, or P2 config claims are missing or drift from source.
+- **Claim policy**: README/ADR test counts and release claims must match CI evidence; manual badge edits are non-authoritative.
+
 ## 4. Verification & Status Summary
 
 - **Total Dart Files Validated**: 131 files across `lib/` and `test/`.
 - **Bracket / Syntax Integrity**: 0 syntax errors, 0 bracket imbalances.
 - **Import Resolution**: 0 unresolved internal or package imports.
 - **Deliverable Artifact**: Updated `BusBuddy_Implementation_Research_and_UI_Design.docx`.
-- **2026-09-22 gate**: `flutter analyze` clean; full suite **341/341**; minified release APK builds.
+- **2026-09-22 gate**: `flutter analyze` clean; full suite **341/341**; minified release APK builds; UI polish `0164afc`; BUS-P2-01/02/03 tooling + tests landed (device harnesses ready when adb target available).
