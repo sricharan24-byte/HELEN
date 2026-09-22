@@ -3,6 +3,9 @@
 sealed class Result<T, E> {
   const Result();
 
+  const factory Result.success(T value) = Success<T, E>;
+  const factory Result.failure(E error) = FailureResult<T, E>;
+
   bool get isSuccess => this is Success<T, E>;
   bool get isFailure => this is FailureResult<T, E>;
 
@@ -15,6 +18,8 @@ sealed class Result<T, E> {
         Success() => null,
         FailureResult(:final error) => error,
       };
+
+  E? get failureOrNull => errorOrNull;
 
   R when<R>({
     required R Function(T value) success,

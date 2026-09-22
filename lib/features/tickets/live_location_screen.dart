@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart' hide Route;
 
 import '../../data/models/ticket_model.dart';
@@ -285,7 +286,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     final shareMessage =
         '🚨 BusBuddy Safety Alert: I am riding bus ${ticket.busId} from ${ticket.origin.name} to ${ticket.destination.name}.\nTrack my live trip: https://busbuddy.app/track/${ticket.id}';
 
-    showDialog(
+    unawaited(showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -337,6 +338,6 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

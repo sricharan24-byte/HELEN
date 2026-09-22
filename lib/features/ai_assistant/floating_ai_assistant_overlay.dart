@@ -1,10 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
-import '../../core/a11y/announcement_coordinator.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/tokens/app_spacing.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
@@ -39,6 +37,9 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
   final TextEditingController _textInputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  final FocusNode _bubbleFocusNode = FocusNode(debugLabel: 'FloatingAssistantBubble');
+  final FocusScopeNode _windowFocusScopeNode = FocusScopeNode(debugLabel: 'AssistantWindowScope');
+
   double _dragDistance = 0.0;
 
   @override
@@ -56,12 +57,37 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
       duration: const Duration(milliseconds: 1600),
     );
     if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
-      _pulseAnimation.repeat(reverse: true);
+      unawaited(_pulseAnimation.repeat(reverse: true));
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disableAnimations = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disableAnimations) {
+      if (_pulseAnimation.isAnimating) {
+        _pulseAnimation.stop();
+        _pulseAnimation.value = 0.0;
+      }
+    } else if (!_pulseAnimation.isAnimating && !WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+      unawaited(_pulseAnimation.repeat(reverse: true));
+    }
+  }
+
+  void _closeWindowAndRestoreFocus() {
+    _controller.closeWindow();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _bubbleFocusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _bubbleFocusNode.dispose();
+    _windowFocusScopeNode.dispose();
     _pulseAnimation.dispose();
     _textInputController.dispose();
     _scrollController.dispose();
@@ -75,11 +101,11 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
       _lastRenderedMessageCount = currentCount;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(
+          unawaited(_scrollController.animateTo(
             _scrollController.position.maxScrollExtent,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
-          );
+          ));
         }
       });
     }
@@ -108,6 +134,14 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
           _controller.clampToScreen(size, padding);
         }
 
+        if (_controller.isWindowOpen) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_windowFocusScopeNode.hasFocus) {
+              _windowFocusScopeNode.requestFocus();
+            }
+          });
+        }
+
         return Stack(
           children: [
             // ── The Floating Window (when open) ──────────────────────────────
@@ -117,7 +151,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                 child: BlockSemantics(
                   blocking: true,
                   child: GestureDetector(
-                    onTap: _controller.closeWindow,
+                    onTap: _closeWindowAndRestoreFocus,
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       color: Colors.black.withValues(alpha: 0.45),
@@ -146,7 +180,9 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
     return Positioned(
       left: _controller.position.dx,
       top: _controller.position.dy,
-      child: GestureDetector(
+      child: Focus(
+        focusNode: _bubbleFocusNode,
+        child: GestureDetector(
         onPanStart: (details) {
           _dragDistance = 0.0;
         },
@@ -271,6 +307,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                 ),
               );
             },
+            ),
           ),
         ),
       ),
@@ -289,9 +326,14 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
       bottom: bottom,
       width: windowWidth,
       height: windowHeight,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
+      child: FocusScope(
+        node: _windowFocusScopeNode,
+        child: Semantics(
+          scopesRoute: true,
+          explicitChildNodes: true,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
             borderRadius: BorderRadius.circular(24),
@@ -325,6 +367,9 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                   child: _buildChatFeed(),
                 ),
 
+                if (_controller.isPermissionBlocked)
+                  _buildPermissionRecoveryBanner(),
+
                 // 3. Mic & Voice Mute Control Center
                 _buildVoiceControlBar(),
 
@@ -338,8 +383,10 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   // ── Mini Window Header ─────────────────────────────────────────────────────
   Widget _buildWindowHeader() {
@@ -472,7 +519,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
             button: true,
             child: IconButton(
               icon: const Icon(Icons.close, color: Colors.white70, size: 20),
-              onPressed: _controller.closeWindow,
+              onPressed: _closeWindowAndRestoreFocus,
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               padding: const EdgeInsets.all(12),
             ),
@@ -549,25 +596,63 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
                   // Action Button (if generated by the AI response)
                   if (msg.actionType != null && msg.actionLabel != null) ...[
                     const SizedBox(height: 8),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF007AFF),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      onPressed: () {
-                        _controller.executeAction(context, msg.actionType!, widget.navigatorKey);
-                      },
-                      icon: const Icon(Icons.touch_app, size: 14),
-                      label: Text(
-                        msg.actionLabel!,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF007AFF),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          _controller.executeAction(context, msg.actionType!, widget.navigatorKey);
+                        },
+                        icon: const Icon(Icons.touch_app, size: 16),
+                        label: Text(
+                          msg.actionLabel!,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ],
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionRecoveryBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.mic_off, color: Color(0xFFF87171), size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Microphone access blocked. Allow in browser, then retry.',
+              style: TextStyle(color: Colors.white, fontSize: 11.5),
+            ),
+          ),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+            child: TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF38BDF8),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed: () => _controller.startListening(playChimeTone: true),
+              child: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
             ),
           ),
         ],
@@ -593,72 +678,86 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Glowing Center Mic Orb
-          GestureDetector(
-            onTap: _controller.toggleListeningOrMute,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, _) {
-                final scale = (isListening || isSpeaking)
-                    ? 1.0 + (_pulseAnimation.value * 0.12)
-                    : 1.0;
+          Semantics(
+            button: true,
+            label: isListening
+                ? 'Listening. Tap to stop'
+                : isSpeaking
+                    ? 'Speaking. Tap to interrupt'
+                    : isMuted
+                        ? 'Microphone muted. Tap to unmute'
+                        : 'Tap to speak',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+              child: GestureDetector(
+                onTap: _controller.toggleListeningOrMute,
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, _) {
+                    final scale = (isListening || isSpeaking)
+                        ? 1.0 + (_pulseAnimation.value * 0.12)
+                        : 1.0;
 
-                final glowColor = isListening
-                    ? const Color(0xFF10B981)
-                    : isSpeaking
-                        ? const Color(0xFF38BDF8)
-                        : isMuted
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFF007AFF);
+                    final glowColor = isListening
+                        ? const Color(0xFF10B981)
+                        : isSpeaking
+                            ? const Color(0xFF38BDF8)
+                            : isMuted
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF007AFF);
 
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: glowColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: glowColor, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: glowColor.withValues(alpha: 0.3),
-                          blurRadius: 12,
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: glowColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: glowColor, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: glowColor.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isListening
-                              ? Icons.mic
-                              : isSpeaking
-                                  ? Icons.graphic_eq
-                                  : isMuted
-                                      ? Icons.mic_off
-                                      : Icons.mic_none,
-                          color: glowColor,
-                          size: 20,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isListening
+                                  ? Icons.mic
+                                  : isSpeaking
+                                      ? Icons.graphic_eq
+                                      : isMuted
+                                          ? Icons.mic_off
+                                          : Icons.mic_none,
+                              color: glowColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isListening
+                                  ? 'Listening...'
+                                  : isSpeaking
+                                      ? 'Speaking...'
+                                      : isMuted
+                                          ? 'Muted'
+                                          : 'Tap to Speak',
+                              style: TextStyle(
+                                color: glowColor,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isListening
-                              ? 'Listening...'
-                              : isSpeaking
-                                  ? 'Speaking...'
-                                  : isMuted
-                                      ? 'Muted'
-                                      : 'Tap to Speak',
-                          style: TextStyle(
-                            color: glowColor,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ],
@@ -676,23 +775,24 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
     ];
 
     return Container(
-      height: 38,
+      height: 48,
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         itemCount: prompts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final p = prompts[index];
           return ActionChip(
+            materialTapTargetSize: MaterialTapTargetSize.padded,
             backgroundColor: const Color(0xFF1E293B),
             side: const BorderSide(color: Color(0xFF334155)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             label: Text(
               p,
-              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 11.5),
+              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
             ),
             onPressed: () {
               _controller.sendQuery(p);
@@ -742,20 +842,23 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
             ),
           ),
           const SizedBox(width: 8),
-          IconButton.filled(
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFF007AFF),
-              padding: const EdgeInsets.all(10),
-              minimumSize: const Size(40, 40),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: IconButton.filled(
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF007AFF),
+                padding: const EdgeInsets.all(12),
+                minimumSize: const Size(48, 48),
+              ),
+              icon: const Icon(Icons.send, color: Colors.white, size: 18),
+              onPressed: () {
+                final text = _textInputController.text;
+                if (text.trim().isNotEmpty) {
+                  _controller.sendQuery(text);
+                  _textInputController.clear();
+                }
+              },
             ),
-            icon: const Icon(Icons.send, color: Colors.white, size: 16),
-            onPressed: () {
-              final text = _textInputController.text;
-              if (text.trim().isNotEmpty) {
-                _controller.sendQuery(text);
-                _textInputController.clear();
-              }
-            },
           ),
         ],
       ),

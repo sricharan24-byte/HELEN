@@ -4,14 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
 import 'package:busbuddy/data/models/ticket_model.dart';
 import 'package:busbuddy/data/models/transport_models.dart';
-import 'package:busbuddy/data/repositories/emergency_contact_repository.dart';
 import 'package:busbuddy/features/safety/safety_sharing_page.dart';
 
 void main() {
   group('Astra Gate 12: Safety & Emergency Accessibility Tests', () {
-    setUp(() {
-      AnnouncementCoordinator.instance.resetForTesting();
-    });
+    setUp(AnnouncementCoordinator.instance.resetForTesting);
 
     testWidgets('renders Gate 12 non-voice emergency SOS and triggers urgent announcement', (tester) async {
       String? lastAnnouncement;
@@ -63,7 +60,11 @@ void main() {
         busId: 'Bus 23',
         passengerName: 'Pavan',
         passengerType: PassengerType.general,
-        fareAmount: 15.0,
+        fareQuote: FareQuote.fromPaise(
+          basePaise: 1500,
+          passengerType: PassengerType.general,
+          discountPercentage: 0,
+        ),
         paymentMethod: PaymentMethod.upi,
         issuedAt: DateTime.now(),
         validUntil: DateTime.now().add(const Duration(hours: 2)),
@@ -91,7 +92,12 @@ void main() {
       // Verify emergency contacts phone buttons have >= 48x48dp bounds
       final phoneButtons = find.byIcon(Icons.phone);
       expect(phoneButtons, findsWidgets);
-      final firstPhoneSize = tester.getSize(phoneButtons.first);
+      final phoneIconButton = find.ancestor(
+        of: phoneButtons.first,
+        matching: find.byType(IconButton),
+      );
+      expect(phoneIconButton, findsOneWidget);
+      final firstPhoneSize = tester.getSize(phoneIconButton);
       expect(firstPhoneSize.width, greaterThanOrEqualTo(48.0));
       expect(firstPhoneSize.height, greaterThanOrEqualTo(48.0));
     });

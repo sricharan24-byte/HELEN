@@ -5,20 +5,15 @@ import 'package:busbuddy/core/theme/app_theme.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
-import 'package:busbuddy/features/journey/journey_page.dart';
 import 'package:busbuddy/features/route_details/route_details_page.dart';
 import 'package:busbuddy/features/route_search/route_search_page.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    AnnouncementCoordinator.instance.reset();
-  });
+  setUp(AnnouncementCoordinator.instance.reset);
 
-  tearDown(() {
-    AnnouncementCoordinator.instance.reset();
-  });
+  tearDown(AnnouncementCoordinator.instance.reset);
 
   group('Vertical Slice Journey Flow (Astra Step 2.3)', () {
     testWidgets('Search -> Route Details -> Active Journey vertical flow works end-to-end', (tester) async {

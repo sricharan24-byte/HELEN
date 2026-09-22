@@ -1,3 +1,6 @@
+import '../../core/failure.dart';
+import '../../core/result.dart';
+import '../../transit/entities/transit_route.dart';
 import 'fare.dart';
 import 'ticket.dart';
 
@@ -7,7 +10,7 @@ import 'ticket.dart';
 ///
 /// Authoritative Precedence & Tier Table:
 /// 1. Zero Hops (origin == destination):
-///    - Throws [ArgumentError] / Invalid sequence. Same-stop ticketing is invalid.
+///    - Throws [ArgumentError] / Returns [ValidationFailure]. Same-stop ticketing is invalid.
 /// 2. Standard Corridor (VIT Main Gate ↔ Katpadi Station):
 ///    - Traverses 4 hops (5 stops): Base fare 2000 paise (₹20.0).
 ///    - Rule ID: `RULE_CORRIDOR_V1`
@@ -34,16 +37,15 @@ class FareEngine {
   /// Concession discount percentage (40%).
   static const int concessionDiscountPercentage = 40;
 
-  /// Calculates the fare given a base fare amount in double rupees and passenger type.
-  /// Converts to integer paise internally for exact arithmetic without binary floating-point drift.
-  static Fare calculateFromBase({
-    required double baseFare,
+  /// Pure integer paise calculation from base paise.
+  static FareQuote calculateFromBasePaise({
+    required int basePaise,
     required PassengerType passengerType,
     int hopCount = 0,
     String ruleId = 'RULE_CUSTOM_BASE',
     String explanation = '',
   }) {
-    final basePaise = (baseFare * 100).round();
+    final cleanBase = basePaise < 0 ? 0 : basePaise;
     final discountPercent = switch (passengerType) {
       PassengerType.general => 0,
       PassengerType.student || PassengerType.senior => concessionDiscountPercentage,
@@ -52,27 +54,47 @@ class FareEngine {
     final effectiveExplanation = explanation.isNotEmpty
         ? explanation
         : discountPercent > 0
-            ? '${passengerType.name.toUpperCase()} concession ($discountPercent% discount) applied to base ₹${(basePaise / 100).toStringAsFixed(0)}.'
+            ? '${passengerType.name.toUpperCase()} concession ($discountPercent% discount) applied to base ₹${cleanBase ~/ 100}.'
             : 'Standard general adult fare.';
 
-    return Fare.fromPaise(
-      basePaise: basePaise,
+    return FareQuote.fromPaise(
+      basePaise: cleanBase,
       passengerType: passengerType,
       discountPercentage: discountPercent,
       hopCount: hopCount,
-      ruleId: ruleId,
+      ruleVersion: ruleId,
       explanation: effectiveExplanation,
     );
   }
 
+  /// Calculates the fare given a base fare amount in double rupees and passenger type.
+  /// Converts to integer paise internally for exact arithmetic without binary floating-point drift.
+  static FareQuote calculateFromBase({
+    required double baseFare,
+    required PassengerType passengerType,
+    int hopCount = 0,
+    String ruleId = 'RULE_CUSTOM_BASE',
+    String explanation = '',
+  }) {
+    return calculateFromBasePaise(
+      basePaise: (baseFare * 100).round(),
+      passengerType: passengerType,
+      hopCount: hopCount,
+      ruleId: ruleId,
+      explanation: explanation,
+    );
+  }
+
   /// Calculates the standard VIT ↔ Katpadi corridor fare (4 hops, 5 stops).
-  static Fare calculateCorridorFare(PassengerType passengerType) {
-    return calculateFromBase(
-      baseFare: standardCorridorBasePaise / 100.0,
+  /// Uses the dedicated corridor rule identity `RULE_CORRIDOR_V1` while
+  /// remaining numerically identical to the 4-hop medium tier (2000 paise).
+  static FareQuote calculateCorridorFare(PassengerType passengerType) {
+    return calculateFromBasePaise(
+      basePaise: standardCorridorBasePaise,
       passengerType: passengerType,
       hopCount: 4,
       ruleId: 'RULE_CORRIDOR_V1',
-      explanation: 'VIT ↔ Katpadi Standard Corridor (4 hops, ₹20 base fare).',
+      explanation: 'Standard VIT ↔ Katpadi corridor fare (4 hops, 5 stops).',
     );
   }
 
@@ -80,7 +102,7 @@ class FareEngine {
   ///
   /// Rejects non-positive hops (hopCount <= 0) by throwing [ArgumentError]
   /// to satisfy Astra P0.1 boundary requirements.
-  static Fare calculateByStopCount({
+  static FareQuote calculateByStopCount({
     required int stopCount,
     required PassengerType passengerType,
   }) {
@@ -92,18 +114,18 @@ class FareEngine {
     final String ruleId;
 
     if (stopCount <= 3) {
-      basePaise = 1500; // ₹15.0
+      basePaise = 1500; // ₹15.0 (1500 paise)
       ruleId = 'RULE_HOP_SHORT_V1';
     } else if (stopCount <= 5) {
-      basePaise = 2000; // ₹20.0
+      basePaise = 2000; // ₹20.0 (2000 paise)
       ruleId = 'RULE_HOP_MEDIUM_V1';
     } else {
-      basePaise = 2500; // ₹25.0
+      basePaise = 2500; // ₹25.0 (2500 paise)
       ruleId = 'RULE_HOP_EXTENDED_V1';
     }
 
-    return calculateFromBase(
-      baseFare: basePaise / 100.0,
+    return calculateFromBasePaise(
+      basePaise: basePaise,
       passengerType: passengerType,
       hopCount: stopCount,
       ruleId: ruleId,
@@ -112,7 +134,7 @@ class FareEngine {
   }
 
   /// Calculates the fare between two stop indices along a route.
-  static Fare calculateRouteFare({
+  static FareQuote calculateRouteFare({
     required int originIndex,
     required int destinationIndex,
     required PassengerType passengerType,
@@ -127,4 +149,70 @@ class FareEngine {
       passengerType: passengerType,
     );
   }
+
+  /// Quotes fare returning [Result<FareQuote, ValidationFailure>].
+  ///
+  /// Strictly validates:
+  /// 1. Origin != Destination (returns ValidationFailure on 0 hops).
+  /// 2. Stops exist and are ordered on the provided route (returns ValidationFailure on unordered stops).
+  /// 3. Supports circular loops and repeated stop occurrences via domain segment resolution per BUS-P1-02.
+  static Result<FareQuote, ValidationFailure> quoteFareResult({
+    required List<String> orderedStopIds,
+    required String originStopId,
+    required String destinationStopId,
+    required PassengerType passengerType,
+    String routeName = 'Corridor Route',
+    int? originSequence,
+    int? destinationSequence,
+  }) {
+    final route = TransitRoute(
+      id: 'quote-route',
+      displayName: routeName,
+      direction: 'Inbound',
+      orderedStopIds: orderedStopIds,
+    );
+
+    return quoteRouteFareResult(
+      route: route,
+      originStopId: originStopId,
+      destinationStopId: destinationStopId,
+      passengerType: passengerType,
+      originSequence: originSequence,
+      destinationSequence: destinationSequence,
+    );
+  }
+
+  /// Quotes fare directly for a TransitRoute domain entity.
+  static Result<FareQuote, ValidationFailure> quoteRouteFareResult({
+    required TransitRoute route,
+    required String originStopId,
+    required String destinationStopId,
+    required PassengerType passengerType,
+    int? originSequence,
+    int? destinationSequence,
+  }) {
+    final segmentResult = route.resolveSegment(
+      originStopId: originStopId,
+      destinationStopId: destinationStopId,
+      originSequence: originSequence,
+      destinationSequence: destinationSequence,
+    );
+
+    if (segmentResult.isFailure) {
+      final failure = segmentResult.failureOrNull!;
+      return FailureResult(ValidationFailure(failure.message));
+    }
+
+    final segment = segmentResult.valueOrNull!;
+    try {
+      final quote = calculateByStopCount(
+        stopCount: segment.hopCount,
+        passengerType: passengerType,
+      );
+      return Success(quote);
+    } catch (e) {
+      return FailureResult(ValidationFailure(e.toString()));
+    }
+  }
 }
+

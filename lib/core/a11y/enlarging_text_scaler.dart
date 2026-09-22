@@ -13,6 +13,14 @@ class EnlargingTextScaler implements TextScaler {
   final double enlargementMultiplier;
 
   @override
+  // BUS-P2-04: textScaleFactor getter is deprecated on TextScaler, but this
+  // decorator's contract IS the linear-equivalent factor (used by callers to
+  // report the effective scale); the nonlinear `scale()` path above is kept
+  // authoritative for layout. Suppressed with rationale per audit BUS-P2-04.
+  // ignore: deprecated_member_use
+  double get textScaleFactor => parent.textScaleFactor * enlargementMultiplier;
+
+  @override
   double scale(double fontSize) {
     final parentScaled = parent.scale(fontSize);
     // Guarantee that platform font size is never reduced.

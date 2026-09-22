@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../data/models/home_screen_item.dart';
 
@@ -208,7 +208,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: items.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       _settings.reorderHomeScreenItem(oldIndex, newIndex);
                       AnnouncementCoordinator.instance.announce(
                         'Card reordered',
@@ -303,7 +303,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
     required HomeScreenItem item,
     required int index,
     required int totalCount,
-    required dynamic colors,
+    required AppSemanticColors colors,
   }) {
     final isFirst = index == 0;
     final isLast = index == totalCount - 1;

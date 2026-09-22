@@ -59,3 +59,31 @@ class ServiceUnavailableFailure extends Failure {
     super.cause,
   });
 }
+
+/// State machine transition failure (e.g. invalid status transition or terminal state mutation).
+class StateTransitionFailure extends Failure {
+  const StateTransitionFailure(
+    super.message, {
+    super.code,
+    super.cause,
+  });
+}
+
+/// Segment resolution failure for route stop sequence navigation (e.g. invalid sequence, reverse travel, repeated-stop ambiguity).
+class SegmentResolutionFailure extends Failure {
+  const SegmentResolutionFailure(
+    super.message, {
+    this.originStopId,
+    this.destinationStopId,
+    this.isReverseTravel = false,
+    this.candidateCount = 0,
+    super.code,
+    super.cause,
+  });
+
+  final String? originStopId;
+  final String? destinationStopId;
+  final bool isReverseTravel;
+  final int candidateCount;
+}
+

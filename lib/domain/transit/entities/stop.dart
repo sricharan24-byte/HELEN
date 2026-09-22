@@ -17,6 +17,22 @@ class Stop {
 
   bool get hasCoordinates => latitude != null && longitude != null;
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'area': area,
+    if (latitude != null) 'latitude': latitude,
+    if (longitude != null) 'longitude': longitude,
+  };
+
+  factory Stop.fromJson(Map<String, dynamic> json) => Stop(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    area: json['area'] as String? ?? '',
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
+  );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

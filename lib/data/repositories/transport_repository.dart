@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import '../../core/di/async_disposable.dart';
+import '../../domain/transit/entities/telemetry_state.dart';
 import '../datasources/live_bus_movement_engine.dart';
 import '../datasources/local_transport_data_source.dart';
 import '../models/transport_models.dart';
@@ -21,10 +25,13 @@ abstract class TransportRepository {
 
   /// Stream live GPS bus location updates for a specific bus & route.
   Stream<BusLocation> streamBusLocation(String busId, String routeId);
+
+  /// Stream ordered, freshness-aware telemetry snapshots per Astra BUS-P1-01.
+  Stream<TelemetrySnapshot> streamTelemetry(String busId, String routeId);
 }
 
 /// Concrete [TransportRepository] backed by [LocalTransportDataSource].
-class LocalTransportRepository implements TransportRepository {
+class LocalTransportRepository implements TransportRepository, AsyncDisposable {
   LocalTransportRepository({required this._dataSource});
 
   final LocalTransportDataSource _dataSource;
@@ -43,9 +50,7 @@ class LocalTransportRepository implements TransportRepository {
   }) {
     final results = <Route>[];
     for (final route in _dataSource.allRoutes) {
-      final originIdx = route.orderedStopIds.indexOf(originId);
-      final destIdx = route.orderedStopIds.indexOf(destinationId);
-      if (originIdx != -1 && destIdx != -1 && originIdx < destIdx) {
+      if (route.stopsBetween(originId, destinationId).isNotEmpty) {
         results.add(route);
       }
     }
@@ -83,10 +88,77 @@ class LocalTransportRepository implements TransportRepository {
     return _activeEngines[key]!.locationStream;
   }
 
+  @override
+  Stream<TelemetrySnapshot> streamTelemetry(String busId, String routeId) {
+    // Sink lifetime is tied to the returned stream's subscription: resources
+    // are torn down in onCancel below (BUS-P0.2 disposal contract).
+    // ignore: close_sinks
+    late StreamController<TelemetrySnapshot> controller;
+    StreamSubscription<BusLocation>? locationSub;
+    Timer? freshnessTimer;
+    var state = TelemetrySnapshot.initial();
+
+    void checkFreshness() {
+      final updated = TelemetryReducer.checkFreshness(
+        current: state,
+        nowUtc: DateTime.now().toUtc(),
+      );
+      if (updated.freshness != state.freshness) {
+        state = updated;
+        if (!controller.isClosed) {
+          controller.add(state);
+        }
+      }
+    }
+
+    controller = StreamController<TelemetrySnapshot>.broadcast(
+      onListen: () {
+        controller.add(state);
+        locationSub = streamBusLocation(busId, routeId).listen(
+          (loc) {
+            final next = TelemetryReducer.reduceLocation(
+              current: state,
+              incoming: loc,
+              expectedBusId: busId,
+              expectedRouteId: routeId,
+            );
+            if (next != state) {
+              state = next;
+              if (!controller.isClosed) {
+                controller.add(state);
+              }
+            }
+          },
+          onError: (Object err) {
+            state = state.copyWith(
+              freshness: TelemetryFreshness.error,
+              errorMessage: err.toString(),
+            );
+            if (!controller.isClosed) {
+              controller.add(state);
+            }
+          },
+        );
+
+        freshnessTimer = Timer.periodic(
+          const Duration(seconds: 2),
+          (_) => checkFreshness(),
+        );
+      },
+      onCancel: () {
+        unawaited(locationSub?.cancel());
+        freshnessTimer?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
   /// Closes and cleans up all active movement simulation engines per Astra P0.2.
+  @override
   Future<void> dispose() async {
     for (final engine in _activeEngines.values) {
-      engine.dispose();
+      await engine.dispose();
     }
     _activeEngines.clear();
   }

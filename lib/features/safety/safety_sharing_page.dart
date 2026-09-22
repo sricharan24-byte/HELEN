@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
@@ -47,7 +48,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
   void _addContact() {
     final colors = AppTheme.colors(context);
 
-    showDialog(
+    unawaited(showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: colors.surface,
@@ -133,13 +134,13 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   void _triggerSosAlert() {
     final colors = AppTheme.colors(context);
 
-    showDialog(
+    unawaited(showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: colors.surface,
@@ -226,7 +227,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   @override
@@ -250,7 +251,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
           children: [
             // SOS Banner Card
             Container(
-              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              padding: AppSpacing.cardPadding,
               decoration: BoxDecoration(
                 color: colors.statusAlertBg,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -296,9 +297,11 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             const SizedBox(height: 16),
 
             // SOS Broadcast Button
-            SizedBox(
-              width: double.infinity,
-              height: AppSpacing.minTouchTarget + 4,
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: double.infinity,
+                minHeight: AppSpacing.minTouchTarget + 4,
+              ),
               child: FilledButton.icon(
                 onPressed: _triggerSosAlert,
                 icon: const Icon(Icons.sos, size: 24),
@@ -312,6 +315,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.statusAlert,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
@@ -360,9 +364,11 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                       style: TextStyle(color: colors.textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: AppSpacing.minTouchTarget,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: double.infinity,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
                       child: OutlinedButton.icon(
                         onPressed: () {
                           AnnouncementCoordinator.instance.announce(
@@ -379,7 +385,8 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                           style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w700),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: colors.actionPrimary),
+                          side: BorderSide(color: colors.actionPrimary, width: 1.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
@@ -394,13 +401,15 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'TRUSTED EMERGENCY CONTACTS',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: colors.textSecondary,
-                    fontSize: 11,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'TRUSTED EMERGENCY CONTACTS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
                 TextButton.icon(

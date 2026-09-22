@@ -9,6 +9,14 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  # BUS-P2-04: strengthen static analysis. Strict type checks catch
+  # build-time side effects and async/callback drift early.
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
@@ -21,8 +29,18 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # BUS-P2-04: async/callback hygiene.
+    - unawaited_futures            # discarded futures must be explicit
+    - discarded_futures            # ... including inside sync functions
+    - use_build_context_synchronously  # no context use across async gaps
+    - cancel_subscriptions         # StreamSubscriptions must be cancelled
+    - close_sinks                  # StreamSink/IOSink must be closed
+    - avoid_slow_async_io          # prefer sync FS APIs over async wrappers
+    - unnecessary_lambdas          # prefer tear-offs
+    - prefer_final_locals          # locals never reassigned are final
+    - prefer_single_quotes         # consistent quoting
+    - always_declare_return_types  # explicit return types everywhere
+    - require_trailing_commas      # stable diffs, clean formatter output
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

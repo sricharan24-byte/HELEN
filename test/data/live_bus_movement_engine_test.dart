@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/data/datasources/live_bus_movement_engine.dart';
@@ -26,7 +27,7 @@ void main() {
       expect(location.etaMinutes, greaterThan(0));
       expect(location.nextStopName.isNotEmpty, isTrue);
 
-      engine.dispose();
+      unawaited(engine.dispose());
     });
 
     test('handles empty stops or empty stop anchors gracefully without crashing', () async {
@@ -45,7 +46,7 @@ void main() {
       );
 
       expect(engine.locationStream, isNotNull);
-      engine.dispose();
+      unawaited(engine.dispose());
     });
   });
 }

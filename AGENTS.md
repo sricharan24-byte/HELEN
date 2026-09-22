@@ -11,7 +11,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 ## Build / Test / Development Commands
 - `flutter pub get` — resolve dependencies
 - `flutter analyze` — static analysis (0 errors)
-- `flutter test` — run all widget/unit tests (236 test suite)
+- `flutter test` — run all widget/unit tests (341 tests, 100% green)
 - `flutter run -d chrome` — run on Chrome web (required for Gemini Live voice features)
 - `flutter run -d linux` — run on Linux desktop
 - `python create_research_doc.py` — generates `BusBuddy_Implementation_Research_and_UI_Design.docx` using `python-docx`
@@ -48,6 +48,10 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 - **Resource Lifecycle Disposals**: `LiveLocationScreen`, `TicketController`, and speech sessions cancel active `StreamSubscription` and `Timer` instances in `dispose()` to eliminate memory leaks and background CPU cycles.
 - Web speech features use conditional imports (`dart:html`, `dart:js`, `dart:js_util`) — only compile on web target.
 - **Floating BusBuddy AI Bubble & Multitasking Window**: The floating mascot bubble floats persistently over all app screens via `MaterialApp.builder`. Users can drag it anywhere on screen. Tapping opens a compact chat and voice window with real-time mic mute/unmute control, direct transit action navigation buttons, and quick prompt chips. Automatically hides when full-screen `GeminiLiveScreen` is active.
+- **Integer Paise Monetary Invariant**: All currency calculations are strictly represented in integer paise (`1 INR = 100 paise`) in `FareEngine` and `FareQuote`. Zero floating-point arithmetic is permitted for financial logic.
+- **Composition Root**: `AppServiceLocator` (`lib/core/di/service_locator.dart`) is the sole dependency injection root. Subscriptions and resources implement `AsyncDisposable`.
+- **Lexical Scope & Models**: Pure-Dart entities reside in `lib/domain/`. `lib/data/models/transport_models.dart` imports and exports `Stop` (`import '../../domain/transit/entities/stop.dart'`).
+- **Architecture Decision Records**: Formal ADRs are recorded under `docs/adr/`: `ADR-001` (Domain & A11y Contracts), `ADR-002` (Accessibility & Safety Architecture), `ADR-003` (Production Readiness & Audit Resolution).
 - OpenStreetMap tiles + OSRM routing require network; tests log 400s for tile requests.
 - `create_research_doc.py` requires `python-docx` (executable with Python 3.12 or via virtual environment such as `/home/pavan/TrustRAG/.venv/bin/python create_research_doc.py`).
 

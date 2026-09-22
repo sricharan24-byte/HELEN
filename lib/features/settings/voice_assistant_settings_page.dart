@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../ai_assistant/ai_assistant_dialog.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../tickets/ticket_controller.dart';
@@ -47,7 +47,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
   bool get _voiceConfirmations => _settings.voiceConfirmations;
 
   void _showLanguagePicker() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
@@ -86,11 +86,11 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
           ),
         );
       },
-    );
+    ));
   }
 
   void _showVoiceSpeedPicker() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
@@ -135,7 +135,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
           ),
         );
       },
-    );
+    ));
   }
 
   void _showVoicePicker() {
@@ -147,7 +147,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
       {'id': 'Fenrir', 'name': 'Fenrir', 'desc': 'Passionate, deep & expressive'},
     ];
 
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
@@ -198,7 +198,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
           ),
         );
       },
-    );
+    ));
   }
 
   void _showApiKeyDialog() {
@@ -226,10 +226,11 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
       selectedVoice = 'Aoede';
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF111C33),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: Row(
@@ -370,18 +371,19 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
           ],
         ),
       ),
-    ).then((_) => textCtrl.dispose());
+    ).then((_) => textCtrl.dispose()),
+    );
   }
 
   void _openAskBusBuddy() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           repository: widget.repository,
           ticketController: widget.ticketController,
         ),
       ),
-    );
+    ));
   }
 
   @override
@@ -502,7 +504,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
                     value: _wakePhrase,
                     activeThumbColor: Colors.white,
                     activeTrackColor: const Color(0xFF22C55E),
-                    onChanged: (val) => _settings.updateWakePhrase(val),
+                    onChanged: _settings.updateWakePhrase,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -516,7 +518,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
                     value: _voiceConfirmations,
                     activeThumbColor: Colors.white,
                     activeTrackColor: const Color(0xFF22C55E),
-                    onChanged: (val) => _settings.updateVoiceConfirmations(val),
+                    onChanged: _settings.updateVoiceConfirmations,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -530,7 +532,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
                     value: _settings.floatingAssistantEnabled,
                     activeThumbColor: Colors.white,
                     activeTrackColor: const Color(0xFF22C55E),
-                    onChanged: (val) => _settings.updateFloatingAssistantEnabled(val),
+                    onChanged: _settings.updateFloatingAssistantEnabled,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -599,14 +601,14 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                     onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
+                      unawaited(Navigator.of(context).push(
+                        MaterialPageRoute<void>(
                           builder: (_) => GeminiLiveScreen(
                             ticketController: widget.ticketController,
                             repository: widget.repository,
                           ),
                         ),
-                      );
+                      ));
                     },
                     icon: const Icon(Icons.auto_awesome, color: Color(0xFF007AFF)),
                     label: const Text(
@@ -669,6 +671,7 @@ class _VoiceAssistantSettingsPageState extends State<VoiceAssistantSettingsPage>
               child: Semantics(
                 button: true,
                 label: 'Ask BusBuddy. Test the voice assistant.',
+                excludeSemantics: true,
                 child: InkWell(
                   onTap: _openAskBusBuddy,
                   borderRadius: BorderRadius.circular(24),

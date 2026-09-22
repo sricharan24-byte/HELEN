@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+bool enableSimulatedVoiceInput = false;
+
 void playAudioTone({bool isListening = false}) {
   debugPrint('[AudioTone Stub] tone played: isListening=$isListening');
 }
@@ -20,12 +22,19 @@ void resetTurnAudio() {}
 
 void unlockAudioContext() {}
 void setAudioEndedCallback(VoidCallback onEnded) {}
+void disposeAudio() {}
+
 
 void startSpeechRecognition({
-  required Function(String text, bool isFinal) onResult,
-  required Function(String error) onError,
+  required void Function(String text, bool isFinal) onResult,
+  required void Function(String error) onError,
   required VoidCallback onEnd,
 }) {
-  onResult('Where is my bus?', true);
-  onEnd();
+  if (enableSimulatedVoiceInput) {
+    onResult('Where is my bus?', true);
+    onEnd();
+  } else {
+    onError('Microphone voice recognition is currently optimized for Web/Chrome. Please use text input or enable voice simulation.');
+    onEnd();
+  }
 }

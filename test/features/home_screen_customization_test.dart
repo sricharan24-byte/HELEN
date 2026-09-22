@@ -13,9 +13,7 @@ Widget testCustomizationApp() {
 }
 
 void main() {
-  setUp(() {
-    AppSettingsController.instance.resetHomeScreenLayout();
-  });
+  setUp(AppSettingsController.instance.resetHomeScreenLayout);
 
   group('HomeScreenCustomizationPage Rendering', () {
     testWidgets('renders header branding, guidance hero, tip box, and all 9 items', (tester) async {
@@ -94,11 +92,13 @@ void main() {
       expect(itemsAfter[0].id, HomeScreenItem.idMyJourney);
       expect(itemsAfter[1].id, HomeScreenItem.idRouteSearch);
 
-      // Now tap Move Up on the second item to restore
+      // Now tap Move Up on the second card to restore. The first card's
+      // Move Up control is intentionally disabled (already at the top), so
+      // target the enabled control belonging to the second card.
       final moveUpButtons = find.byTooltip('Move Up');
       expect(moveUpButtons, findsWidgets);
 
-      await tester.tap(moveUpButtons.first);
+      await tester.tap(moveUpButtons.at(1));
       await tester.pumpAndSettle();
 
       final itemsRestored = AppSettingsController.instance.homeScreenItems;
@@ -133,7 +133,7 @@ void main() {
           home: Builder(
             builder: (context) => ElevatedButton(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HomeScreenCustomizationPage()),
+                MaterialPageRoute<void>(builder: (_) => const HomeScreenCustomizationPage()),
               ),
               child: const Text('Open Customization'),
             ),

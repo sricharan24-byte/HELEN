@@ -1,18 +1,18 @@
 /// Home page — the task-oriented landing screen for BusBuddy.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/tokens/app_spacing.dart';
-import '../../core/tokens/status_level.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/adaptive_shortcut.dart';
 import '../../data/models/home_screen_item.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
+import '../../domain/ticketing/entities/fare_engine.dart';
 import '../adaptive_ui/adaptive_shortcuts_view.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -82,8 +82,8 @@ class _HomePageState extends State<HomePage> {
             widget.onRouteSelected(matches.first.id);
           }
         }
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => TicketBookingSuitePage(
               ticketController: widget.ticketController,
               journeyController: widget.controller,
@@ -91,7 +91,7 @@ class _HomePageState extends State<HomePage> {
               showTopPrototypeTabs: false,
             ),
           ),
-        );
+        ));
         break;
 
       case AdaptiveShortcutType.liveTracking:
@@ -114,26 +114,35 @@ class _HomePageState extends State<HomePage> {
               destination: destination,
               passengerName: 'Pavan',
               passengerType: PassengerType.general,
-              fareAmount: 25.0,
+              fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
               paymentMethod: PaymentMethod.upi,
               issuedAt: DateTime.now(),
               validUntil: DateTime.now().add(const Duration(hours: 4)),
               status: TicketStatus.active,
-              qrCodeData: 'BB-SHORTCUT-$busId',
+              qrCodeData: Ticket.buildQrPayload(
+                ticketId: 'BB-SHORTCUT-$busId',
+                originId: origin.id,
+                destinationId: destination.id,
+                busId: busId,
+                farePaise: 2000,
+                validUntil: DateTime.now().add(const Duration(hours: 4)),
+                isDemo: true,
+              ),
+              isDemo: true,
             );
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => LiveLocationScreen(
               ticket: ticketToTrack,
               repository: widget.repository,
             ),
           ),
-        );
+        ));
         break;
 
       case AdaptiveShortcutType.ticketBooking:
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => TicketBookingSuitePage(
               ticketController: widget.ticketController,
               journeyController: widget.controller,
@@ -141,7 +150,7 @@ class _HomePageState extends State<HomePage> {
               showTopPrototypeTabs: false,
             ),
           ),
-        );
+        ));
         break;
 
       case AdaptiveShortcutType.savedPlace:
@@ -149,31 +158,31 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case AdaptiveShortcutType.corridorAlerts:
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AlertsPage()),
-        );
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
+        ));
         break;
 
       case AdaptiveShortcutType.safety:
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => SafetySharingPage(
               activeTicket: widget.ticketController.activeTicket,
             ),
           ),
-        );
+        ));
         break;
 
       case AdaptiveShortcutType.feature:
         if (shortcut.actionType == 'voice_assistant') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
+          unawaited(Navigator.of(context).push(
+            MaterialPageRoute<void>(
               builder: (_) => GeminiLiveScreen(
                 ticketController: widget.ticketController,
                 repository: widget.repository,
               ),
             ),
-          );
+          ));
         } else {
           _openRouteSearch();
         }
@@ -182,8 +191,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openRouteSearch() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => TicketBookingSuitePage(
           ticketController: widget.ticketController,
           journeyController: widget.controller,
@@ -191,11 +200,11 @@ class _HomePageState extends State<HomePage> {
           showTopPrototypeTabs: false,
         ),
       ),
-    );
+    ));
   }
 
   void _openSavedPlacesModal() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
@@ -232,7 +241,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildSavedPlaceTile(IconData icon, String title, String subtitle) {
@@ -290,12 +299,14 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Semantics(
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Semantics(
                             headingLevel: 1,
-                            child: Row(
+                            child: Wrap(
+                              spacing: 2,
                               children: [
                                 Text(
                                   'Bus',
@@ -326,6 +337,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ],
+                        ),
                       ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -333,13 +345,14 @@ class _HomePageState extends State<HomePage> {
                           Semantics(
                             button: true,
                             label: 'Corridor Alerts',
+                            excludeSemantics: true,
                             child: IconButton(
                               icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
                               tooltip: 'Corridor Alerts',
                               onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const AlertsPage()),
-                                );
+                                unawaited(Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
+                                ));
                               },
                             ),
                           ),
@@ -347,6 +360,7 @@ class _HomePageState extends State<HomePage> {
                           Semantics(
                             button: true,
                             label: 'User Profile',
+                            excludeSemantics: true,
                             child: const CircleAvatar(
                               radius: 22,
                               backgroundColor: Color(0xFF1E293B),
@@ -363,11 +377,12 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Text(hasActiveTicket ? '☀️ ' : '👋 ', style: const TextStyle(fontSize: 22)),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            hasActiveTicket ? 'Good morning, Pavan!' : 'Good morning!',
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hasActiveTicket ? 'Good morning, Pavan!' : 'Good morning!',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -383,6 +398,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ],
+                        ),
                       ),
                     ],
                   ),
@@ -410,9 +426,10 @@ class _HomePageState extends State<HomePage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: const BoxDecoration(
                                         color: Color(0xFFBBF7D0),
@@ -425,11 +442,12 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                     const SizedBox(width: 14),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'My Journey',
+                                    Flexible(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'My Journey',
                                           style: TextStyle(
                                             color: Color(0xFF14532D),
                                             fontSize: 18,
@@ -444,23 +462,27 @@ class _HomePageState extends State<HomePage> {
                                             fontSize: 16,
                                             fontWeight: FontWeight.w900,
                                           ),
+                                          ),
+                                        ],
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF15803D),
-                                    borderRadius: BorderRadius.circular(20),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Text(
-                                    'On Track',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
+                                ),
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF15803D),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      'On Track',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -476,11 +498,12 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       const Icon(Icons.location_on, color: Color(0xFF15803D), size: 20),
                                       const SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: const [
-                                          Text(
-                                            '3 stops',
+                                      Flexible(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              '3 stops',
                                             style: TextStyle(
                                               color: Color(0xFF14532D),
                                               fontSize: 15,
@@ -495,6 +518,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                         ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -506,25 +530,27 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       const Icon(Icons.access_time_filled, color: Color(0xFF15803D), size: 20),
                                       const SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: const [
-                                          Text(
-                                            '6 min',
-                                            style: TextStyle(
-                                              color: Color(0xFF14532D),
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w900,
+                                      Flexible(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              '6 min',
+                                              style: TextStyle(
+                                                color: Color(0xFF14532D),
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w900,
+                                              ),
                                             ),
-                                          ),
-                                          Text(
-                                            'estimated arrival',
-                                            style: TextStyle(
-                                              color: Color(0xFF15803D),
-                                              fontSize: 12,
+                                            Text(
+                                              'estimated arrival',
+                                              style: TextStyle(
+                                                color: Color(0xFF15803D),
+                                                fontSize: 12,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -541,15 +567,15 @@ class _HomePageState extends State<HomePage> {
                                   if (routes.isNotEmpty) {
                                     widget.controller.selectRoute(routes.first);
                                   }
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
+                                  unawaited(Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
                                       builder: (_) => TicketBookingSuitePage(
                                         ticketController: widget.ticketController,
                                         journeyController: widget.controller,
                                         initialStepIndex: 2,
                                       ),
                                     ),
-                                  );
+                                  ));
                                 },
                                 style: FilledButton.styleFrom(
                                   backgroundColor: const Color(0xFF15803D),
@@ -559,17 +585,19 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Text(
-                                      'View Journey Details',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
+                                  children: [
+                                    const Flexible(
+                                      child: Text(
+                                        'View Journey Details',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
                                     ),
-                                    SizedBox(width: 6),
-                                    Icon(Icons.chevron_right, color: Colors.white, size: 20),
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.chevron_right, color: Colors.white, size: 20),
                                   ],
                                 ),
                               ),
@@ -661,7 +689,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: () => AppSettingsController.instance.resetHomeScreenLayout(),
+            onPressed: AppSettingsController.instance.resetHomeScreenLayout,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF0284C7),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -699,15 +727,15 @@ class _HomePageState extends State<HomePage> {
           subtitle: 'No active journey',
           semanticLabel: '${item.title}. No active journey.',
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => TicketBookingSuitePage(
                   ticketController: widget.ticketController,
                   journeyController: widget.controller,
                   initialStepIndex: 0,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -719,13 +747,13 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => MyTicketsPage(
                   ticketController: widget.ticketController,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -748,14 +776,14 @@ class _HomePageState extends State<HomePage> {
           semanticLabel: '${item.title}. ${item.subtitle}.',
           trailingIcon: Icons.graphic_eq,
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => GeminiLiveScreen(
                   ticketController: widget.ticketController,
                   repository: widget.repository,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -786,21 +814,30 @@ class _HomePageState extends State<HomePage> {
                   destination: destination,
                   passengerName: 'Pavan',
                   passengerType: PassengerType.general,
-                  fareAmount: 25.0,
+                  fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
                   paymentMethod: PaymentMethod.upi,
                   issuedAt: DateTime.now(),
                   validUntil: DateTime.now().add(const Duration(hours: 4)),
                   status: TicketStatus.active,
-                  qrCodeData: 'BB-PREVIEW-CORRIDOR',
+                  qrCodeData: Ticket.buildQrPayload(
+                    ticketId: 'BB-PREVIEW-CORRIDOR',
+                    originId: origin.id,
+                    destinationId: destination.id,
+                    busId: '18B',
+                    farePaise: 2000,
+                    validUntil: DateTime.now().add(const Duration(hours: 4)),
+                    isDemo: true,
+                  ),
+                  isDemo: true,
                 );
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => LiveLocationScreen(
                   ticket: ticketToTrack,
                   repository: widget.repository,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -812,11 +849,11 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => const AlertsPage(),
               ),
-            );
+            ));
           },
         );
 
@@ -828,13 +865,13 @@ class _HomePageState extends State<HomePage> {
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => SafetySharingPage(
                   activeTicket: activeTicket,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -847,14 +884,14 @@ class _HomePageState extends State<HomePage> {
           semanticLabel: '${item.title}. ${item.subtitle}.',
           borderColor: const Color(0xFF334155),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
+            unawaited(Navigator.of(context).push(
+              MaterialPageRoute<void>(
                 builder: (_) => SettingsPage(
                   repository: widget.repository,
                   ticketController: widget.ticketController,
                 ),
               ),
-            );
+            ));
           },
         );
 
@@ -876,6 +913,7 @@ class _HomePageState extends State<HomePage> {
     return Semantics(
       button: true,
       label: semanticLabel,
+      excludeSemantics: true,
       child: Material(
         color: color,
         borderRadius: BorderRadius.circular(22),

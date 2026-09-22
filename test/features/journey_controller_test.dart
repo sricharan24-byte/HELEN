@@ -4,6 +4,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/data/models/transport_models.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
+import 'package:busbuddy/domain/transit/entities/telemetry_state.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,11 @@ class FakeTransportRepository implements TransportRepository {
 
   @override
   Stream<BusLocation> streamBusLocation(String busId, String routeId) {
+    return const Stream.empty();
+  }
+
+  @override
+  Stream<TelemetrySnapshot> streamTelemetry(String busId, String routeId) {
     return const Stream.empty();
   }
 

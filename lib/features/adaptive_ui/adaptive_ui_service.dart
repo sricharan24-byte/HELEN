@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/settings/app_settings_controller.dart';
@@ -106,7 +107,7 @@ class AdaptiveUiService extends ChangeNotifier {
 
   @override
   void notifyListeners() {
-    _store?.write(storageKey, _snapshot());
+    unawaited(_store?.write(storageKey, _snapshot()));
     super.notifyListeners();
   }
 

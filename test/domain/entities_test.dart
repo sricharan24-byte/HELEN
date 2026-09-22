@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/domain/core/failure.dart';
 import 'package:busbuddy/domain/safety/entities/emergency_contact.dart';
+import 'package:busbuddy/domain/ticketing/entities/fare.dart';
 import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/domain/transit/entities/bus_position.dart';
 import 'package:busbuddy/domain/transit/entities/stop.dart';
@@ -135,7 +136,12 @@ void main() {
       busId: 'BUS-18B',
       passengerName: 'Pavan',
       passengerType: PassengerType.student,
-      fareAmount: 12.0,
+      fareQuote: FareQuote.fromPaise(
+        basePaise: 2000,
+        passengerType: PassengerType.student,
+        discountPercentage: 40,
+        hopCount: 4,
+      ),
       paymentMethod: PaymentMethod.upi,
       issuedAt: issued,
       validUntil: validUntil,
@@ -151,6 +157,7 @@ void main() {
       expect(revived.passengerName, ticket.passengerName);
       expect(revived.passengerType, PassengerType.student);
       expect(revived.fareAmount, 12.0);
+      expect(revived.farePaise, 1200);
       expect(revived.paymentMethod, PaymentMethod.upi);
       expect(revived.status, TicketStatus.active);
       expect(revived.origin.name, 'VIT');
@@ -162,13 +169,18 @@ void main() {
       expect(ticket.canTransitionTo(TicketStatus.used), isTrue);
       expect(ticket.canTransitionTo(TicketStatus.expired), isTrue);
 
-      final usedTicket = ticket.transitionTo(TicketStatus.used);
+      final usedResult = ticket.transitionTo(TicketStatus.used);
+      expect(usedResult.isSuccess, isTrue);
+      final usedTicket = usedResult.valueOrNull!;
       expect(usedTicket.status, TicketStatus.used);
 
       // Terminal state cannot transition back to active
       expect(usedTicket.canTransitionTo(TicketStatus.active), isFalse);
+      final illegalResult = usedTicket.transitionTo(TicketStatus.active);
+      expect(illegalResult.isFailure, isTrue);
+      expect(illegalResult.errorOrNull, isA<StateTransitionFailure>());
       expect(
-        () => usedTicket.transitionTo(TicketStatus.active),
+        () => usedTicket.transitionToOrThrow(TicketStatus.active),
         throwsA(isA<StateError>()),
       );
     });

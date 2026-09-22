@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/tokens/status_level.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
@@ -104,9 +103,11 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Stop selectors ─────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                // ── Stop selectors (scrollable at large text scales) ───
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -115,20 +116,20 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                         label: 'Choose starting stop',
                         button: true,
                         excludeSemantics: true,
-                        child: SizedBox(
-                          height: 52,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 52),
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
                               foregroundColor: colors.textPrimary,
                               side: BorderSide(color: colors.border, width: colors.isHighContrast ? 2 : 1),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
                             onPressed: () => _pickStop(isOrigin: true),
                             icon: Icon(Icons.trip_origin, size: 20, color: colors.actionPrimary),
                             label: Text(
                               state.origin?.name ?? 'Choose starting stop',
-                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
                             ),
                           ),
@@ -141,20 +142,20 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                         label: 'Choose destination stop',
                         button: true,
                         excludeSemantics: true,
-                        child: SizedBox(
-                          height: 52,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 52),
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
                               foregroundColor: colors.textPrimary,
                               side: BorderSide(color: colors.border, width: colors.isHighContrast ? 2 : 1),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
                             onPressed: () => _pickStop(isOrigin: false),
                             icon: const Icon(Icons.location_on, size: 20, color: Color(0xFFE11D48)),
                             label: Text(
                               state.destination?.name ?? 'Choose destination stop',
-                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
                             ),
                           ),
@@ -185,14 +186,15 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                         label: 'Search routes',
                         button: true,
                         excludeSemantics: true,
-                        child: SizedBox(
-                          height: 52,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 52),
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
                               backgroundColor: colors.actionPrimary,
                               foregroundColor: colors.onActionPrimary,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
                             onPressed: _canSearch ? _search : null,
                             child: const Text('Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -200,6 +202,8 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                         ),
                       ),
                     ],
+                  ),
+                    ),
                   ),
                 ),
 

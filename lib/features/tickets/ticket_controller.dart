@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../data/datasources/local_json_store.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/ticket_repository.dart';
@@ -12,6 +13,14 @@ class TicketController extends ChangeNotifier {
   List<Ticket> get tickets => _repository.allTickets;
   Ticket? get activeTicket => _repository.activeTicket;
   bool get hasActiveTicket => _repository.hasActiveTicket;
+
+  /// Hydrates ticket state from persistent storage across process death.
+  Future<void> hydrate(LocalJsonStore store) async {
+    if (_repository is LocalTicketRepository) {
+      await (_repository).hydrate(store);
+    }
+    notifyListeners();
+  }
 
   Ticket bookTicket({
     required Stop origin,

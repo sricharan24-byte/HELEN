@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalJsonStore {
-  LocalJsonStore(this._preferences, {String? namespace}) : _namespace = namespace;
+  LocalJsonStore(this._preferences, {this._namespace});
 
   final SharedPreferences? _preferences;
   final String? _namespace;
@@ -32,7 +32,7 @@ class LocalJsonStore {
   }
 
   String _qualified(String key) =>
-      _namespace == null ? key : '${_namespace}:$key';
+      _namespace == null ? key : '$_namespace:$key';
 
   Future<void> flush() => _pending;
 

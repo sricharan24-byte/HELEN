@@ -23,7 +23,11 @@ void main() {
         busId: 'Bus 18B',
         passengerName: 'Pavan K',
         passengerType: PassengerType.student,
-        fareAmount: 10.0,
+        fareQuote: FareQuote.fromPaise(
+          basePaise: 1500,
+          passengerType: PassengerType.student,
+          discountPercentage: 40,
+        ),
         paymentMethod: PaymentMethod.upi,
         issuedAt: DateTime.now(),
         validUntil: DateTime.now().add(const Duration(hours: 2)),
@@ -52,8 +56,8 @@ void main() {
     test('emergency help query returns emergencySos intent', () {
       final response = service.processVoiceQuery('Share my location emergency help');
       expect(response.intent, equals(GeminiLiveIntent.emergencySos));
-      expect(response.actionType, equals('share_location'));
-      expect(response.spokenResponse, contains('emergency safety broadcast'));
+      expect(response.actionType, equals('emergency_sos'));
+      expect(response.spokenResponse, contains('Emergency Safety Broadcast'));
     });
 
     test('conversational queries with help do not trigger emergencySos', () {

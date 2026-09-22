@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'gemini_live_transport_stub.dart';
 export 'gemini_live_transport_stub.dart';
@@ -15,34 +16,36 @@ class IoGeminiLiveTransport implements GeminiLiveTransport {
     String url, {
     required void Function() onOpen,
     required void Function(String message) onMessage,
-    required void Function(dynamic error) onError,
+    required void Function(Object error) onError,
     required void Function(int? code, String? reason) onClose,
   }) {
     close();
-    WebSocket.connect(url).then((socket) {
-      _socket = socket;
-      _connected = true;
-      onOpen();
+    unawaited(
+      WebSocket.connect(url).then((socket) {
+        _socket = socket;
+        _connected = true;
+        onOpen();
 
-      socket.listen(
-        (data) {
-          if (data is String) {
-            onMessage(data);
-          }
-        },
-        onError: (err) {
-          _connected = false;
-          onError(err);
-        },
-        onDone: () {
-          _connected = false;
-          onClose(socket.closeCode, socket.closeReason);
-        },
-      );
-    }).catchError((err) {
-      _connected = false;
-      onError(err);
-    });
+        socket.listen(
+          (data) {
+            if (data is String) {
+              onMessage(data);
+            }
+          },
+          onError: (Object err) {
+            _connected = false;
+            onError(err);
+          },
+          onDone: () {
+            _connected = false;
+            onClose(socket.closeCode, socket.closeReason);
+          },
+        );
+      }).catchError((Object err) {
+        _connected = false;
+        onError(err);
+      }),
+    );
   }
 
   @override
@@ -56,7 +59,7 @@ class IoGeminiLiveTransport implements GeminiLiveTransport {
   void close() {
     _connected = false;
     try {
-      _socket?.close();
+      unawaited(_socket?.close());
     } catch (_) {}
     _socket = null;
   }

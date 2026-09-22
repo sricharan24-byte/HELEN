@@ -1,15 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/tokens/app_spacing.dart';
-import '../../core/tokens/status_level.dart';
 import '../../core/di/service_locator.dart';
-import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
+import '../../domain/ticketing/entities/fare_engine.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
@@ -109,7 +107,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   void _openOriginPicker() {
     final colors = AppTheme.colors(context);
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: colors.background,
       shape: const RoundedRectangleBorder(
@@ -198,12 +196,12 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
         );
       },
-    );
+    ));
   }
 
   void _openDestinationPicker() {
     final colors = AppTheme.colors(context);
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: colors.background,
       shape: const RoundedRectangleBorder(
@@ -268,7 +266,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
         );
       },
-    );
+    ));
   }
 
   void _openDatePicker() async {
@@ -289,24 +287,45 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   void _openAiAssistant() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           ticketController: widget.ticketController,
           repository: AppServiceLocator.instance.transportRepository,
           journeyController: widget.journeyController,
         ),
       ),
+    ));
+  }
+
+  FareQuote _calculateCurrentFareQuote() {
+    final routeId = _resolveRouteId();
+    final dataSource = AppServiceLocator.instance.transportDataSource;
+    final route = dataSource.allRoutes.firstWhere(
+      (r) => r.id == routeId,
+      orElse: () => dataSource.allRoutes.first,
+    );
+    final o = route.orderedStopIds.indexOf(_origin.id);
+    final d = route.orderedStopIds.indexOf(_destination.id);
+    final hops = (o != -1 && d != -1 && d > o)
+        ? (d - o)
+        : (o != -1 && d != -1)
+            ? (d - o).abs()
+            : 4;
+    return FareEngine.calculateByStopCount(
+      stopCount: hops > 0 ? hops : 1,
+      passengerType: PassengerType.general,
     );
   }
 
   void _openCheckoutDialog({
     required String busId,
     required String routeName,
-    required double baseFare,
+    FareQuote? fareQuote,
     String? routeId,
   }) {
-    showModalBottomSheet(
+    final quote = fareQuote ?? _calculateCurrentFareQuote();
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -316,7 +335,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           routeName: routeName,
           origin: _origin,
           destination: _destination,
-          baseFare: baseFare,
+          initialFareQuote: quote,
           routeId: routeId ?? _resolveRouteId(),
           travelDate: _selectedDate,
           onTicketBooked: (ticket) {
@@ -334,7 +353,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           },
         );
       },
-    );
+    ));
   }
 
   String _resolveRouteId() {
@@ -429,7 +448,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () {
-                        Navigator.of(context).maybePop();
+                        unawaited(Navigator.of(context).maybePop());
                       },
                     ),
                     const SizedBox(width: 8),
@@ -750,11 +769,11 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               Expanded(
                 child: InkWell(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
+                    unawaited(Navigator.of(context).push(
+                      MaterialPageRoute<void>(
                         builder: (_) => SavedPage(ticketController: widget.ticketController),
                       ),
-                    );
+                    ));
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -957,6 +976,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               final shortOrigin = _origin.name.trim().split(' ').firstWhere((s) => s.isNotEmpty, orElse: () => _origin.name);
               final shortDest = _destination.name.trim().split(' ').firstWhere((s) => s.isNotEmpty, orElse: () => _destination.name);
               final summaryRouteName = '$shortOrigin → $shortDest';
+              final dynamicQuote = _calculateCurrentFareQuote();
 
               return Column(
                 children: [
@@ -966,7 +986,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     badgeText: 'Arriving Soon',
                     badgeColor: const Color(0xFF16A34A),
                     routeName: summaryRouteName,
-                    fareText: '₹25',
+                    fareText: dynamicQuote.formattedAmount,
                     statusText: '4 minutes away',
                     serviceNote: 'Frequent service',
                     buttonLabel: 'Select This Bus >',
@@ -974,7 +994,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     onSelect: () => _openCheckoutDialog(
                       busId: '18B',
                       routeName: summaryRouteName,
-                      baseFare: 25.0,
+                      fareQuote: dynamicQuote,
                       routeId: _resolveRouteId(),
                     ),
                   ),
@@ -986,7 +1006,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     badgeText: 'In 12 min',
                     badgeColor: const Color(0xFF007AFF),
                     routeName: summaryRouteName,
-                    fareText: '₹30',
+                    fareText: dynamicQuote.formattedAmount,
                     statusText: '12 minutes away',
                     serviceNote: 'Frequent service',
                     buttonLabel: 'Select This Bus',
@@ -994,7 +1014,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     onSelect: () => _openCheckoutDialog(
                       busId: '12A',
                       routeName: summaryRouteName,
-                      baseFare: 30.0,
+                      fareQuote: dynamicQuote,
                       routeId: _resolveRouteId(),
                     ),
                   ),
@@ -1006,7 +1026,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     badgeText: 'In 18 min',
                     badgeColor: const Color(0xFF007AFF),
                     routeName: summaryRouteName,
-                    fareText: '₹25',
+                    fareText: dynamicQuote.formattedAmount,
                     statusText: '18 minutes away',
                     serviceNote: 'Limited stops',
                     buttonLabel: 'Select This Bus',
@@ -1014,7 +1034,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     onSelect: () => _openCheckoutDialog(
                       busId: '20C',
                       routeName: summaryRouteName,
-                      baseFare: 25.0,
+                      fareQuote: dynamicQuote,
                       routeId: _resolveRouteId(),
                     ),
                   ),
@@ -1421,7 +1441,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   onTap: () {
                     final ticket = widget.ticketController.activeTicket ??
                         Ticket(
-                          id: 'BB184256',
+                          id: 'BB-20250906-184256',
                           routeId: 'vit-to-katpadi',
                           routeName: 'VIT → Katpadi',
                           origin: _origin,
@@ -1429,22 +1449,31 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           busId: '18B',
                           passengerName: 'Pavan K',
                           passengerType: PassengerType.general,
-                          fareAmount: 25.0,
+                          fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
                           paymentMethod: PaymentMethod.upi,
                           issuedAt: DateTime.now(),
                           validUntil: DateTime.now().add(const Duration(hours: 4)),
                           status: TicketStatus.active,
-                          qrCodeData: 'BUSBUDDY-PASS-BB184256',
+                          qrCodeData: Ticket.buildQrPayload(
+                            ticketId: 'BB-20250906-184256',
+                            originId: _origin.id,
+                            destinationId: _destination.id,
+                            busId: '18B',
+                            farePaise: 2000,
+                            validUntil: DateTime.now().add(const Duration(hours: 4)),
+                            isDemo: true,
+                          ),
+                          isDemo: true,
                         );
                     final repo = AppServiceLocator.instance.transportRepository;
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
+                    unawaited(Navigator.of(context).push(
+                      MaterialPageRoute<void>(
                         builder: (_) => LiveLocationScreen(
                           ticket: ticket,
                           repository: repo,
                         ),
                       ),
-                    );
+                    ));
                   },
                 ),
               ),
@@ -1471,7 +1500,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   textColor: const Color(0xFF991B1B),
                   iconColor: const Color(0xFFDC2626),
                   onTap: () {
-                    showDialog(
+                    unawaited(showDialog<void>(
                       context: context,
                       builder: (ctx) => AlertDialog(
                         backgroundColor: const Color(0xFF0B101D),
@@ -1488,20 +1517,20 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           ElevatedButton(
                             onPressed: () {
                               Navigator.pop(ctx);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
+                              unawaited(Navigator.of(context).push(
+                                MaterialPageRoute<void>(
                                   builder: (_) => SafetySharingPage(
                                     activeTicket: widget.ticketController.activeTicket,
                                   ),
                                 ),
-                              );
+                              ));
                             },
                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
                             child: const Text('SEND SOS NOW', style: TextStyle(color: Colors.white)),
                           ),
                         ],
                       ),
-                    );
+                    ));
                   },
                 ),
               ),

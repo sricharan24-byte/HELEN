@@ -1,0 +1,742 @@
+BusBuddy Autonomous Engineering Backlog
+Full-Codebase Production Readiness and Accessibility Audit
+Chief Accessibility and Mobile Systems Architecture Review
+20 September 2026
+
+Audit basis and repository reconciliation
+This audit treats the public main branch of sricharan24-byte/HELEN, retrieved on 20 September 2026, as
+authoritative. Source was inspected across the available lib/, test/, android/, and docs/ paths. Direct
+checkout and local execution were blocked by the workspace network proxy, so the reported test count was
+not independently rerun. Every issue below is tied to code visible in the public repository; test status is
+therefore “reported”, not independently verified.
+The inspected branch does not match the supplied completion inventory:
+• The README reports 214 tests, not 236.
+• docs/adr/ADR-002-phase2-accessibility-and-safety-architecture.md is not available at the
+stated public path.
+• The fare engine is at lib/domain/ticketing/entities/fare_engine.dart, while production ticket
+flows continue through legacy double models and hard-coded card fares.
+• Semantic colors are in lib/core/tokens/app_semantic_colors.dart; the light/dark primary blue
+with white text measures approximately 4.10:1, below WCAG AA for normal text, and high-contrast
+error red on the high-contrast background measures approximately 5.15:1, below the claimed 7:1 AAA
+target.
+• The floating overlay does not contain the claimed BlockSemantics barrier or accessible corner-reposition
+actions.
+• Android voice capture returns a delayed hard-coded phrase and Android speech playback completes
+without producing audio. The full voice implementation is web-only.
+These are release-relevant source/documentation discrepancies, not naming preferences.
+
+1
+
+BusBuddy Full-Codebase Production Audit
+
+1
+
+20 September 2026
+
+Section A: Production Readiness Scorecard
+
+Area
+
+Score
+
+Source-backed rationale
+
+Domain Isolation & Currency
+Integrity
+
+4/10
+
+Async Lifecycle & Teardown
+Safety
+
+4/10
+
+WCAG 2.2 / Astra
+Accessibility Compliance
+
+4/10
+
+Multimodal Voice & Audio
+Architecture
+
+3/10
+
+Fault Tolerance & Offline
+Degradation
+
+3/10
+
+Production Release Hardening
+
+2/10
+
+Pure-Dart domain types and integer-paise Fare exist, but
+live repositories and UI use duplicate legacy models, double
+fare fields, hard-coded bus fares, and a second fare formula.
+FareEngine is not the production authority end-to-end.
+The locator centralizes transport instances, but teardown
+does not await StreamController.close(), app-scoped
+ChangeNotifiers and the floating/audio singletons are not
+locator-owned/disposed, and late async work lacks generation cancellation.
+There are useful semantics, map text alternatives, and a
+48dp token. However the app replaces nonlinear platform
+scaling with a linear multiplier, permits downscaling, contains sub-48dp controls, duplicate compound semantics,
+fixed-height layouts, hidden-step announcements, incomplete modal isolation, and unverified contrast claims.
+Web PCM/TTS/STT paths exist, but Android uses simulated speech, the announcement coordinator is not integrated with assistant audio, reconnect/backoff and lifecycle
+pause are absent, and an emergency tool reports success
+before an emergency action occurs.
+Local transport fixtures provide a useful fallback, but
+OSRM has no timeout or status validation, map tiles expose no deterministic recovery state, live telemetry has no
+staleness/out-of-order policy, and most failures are silently
+replaced with apparently live values.
+The Android release build uses the debug signing configuration and placeholder application ID; shrinking is disabled, permissions exceed implemented native behavior,
+ticket/payment/QR flows are demonstrative but visually
+presented as real, and release evidence is not CI-generated.
+
+Overall production readiness: 3.3/10. The repository is a capable prototype, but it is not ready
+for a production transit, payment, emergency, or accessibility claim until all P0 tasks and the P1
+accessibility/fault-tolerance tasks are closed.
+
+2
+
+Section B: Prioritized Production Implementation Tasks
+
+P0 — Release blockers
+BUS-P0-01: Make FareEngine the sole end-to-end fare authority
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gate 1 (deterministic domain authority); WCAG 2.2 SC 3.3.4
+2
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Error Prevention (Legal, Financial, Data)
+Target Files & Symbols: lib/domain/ticketing/entities/fare.dart Fare; lib/domain/
+ticketing/entities/fare_engine.dart FareEngine; lib/data/models/ticket_model.dart Ticket.
+calculateFare, TicketRepository.bookTicket; lib/features/tickets/booking_checkout_dialog.
+dart _issueTicket, _FareSummary; lib/features/tickets/ticket_booking_suite_page.dart
+_buildBusCard
+Observed Defect / Gap: The domain stores paise but accepts a double rupee constructor. The legacy
+ticket model stores doublefare and recalculates concession independently. Checkout receives a hard-coded
+base fare from visual bus cards (Rs. 25/Rs. 30), while the displayed stop count is artificially clamped
+to 1–3. Neither booking nor repository persistence calls FareEngine.calculateByStopCount. Thus the
+supposedly authoritative engine can disagree with the issued ticket and receipt.
+Required Production Solution: Introduce one integer-only Money/FareQuote contract containing base
+paise, discount paise, final paise, passenger type, hop count, and rule version. Remove production double
+fare fields/constructors and duplicate formulas. Resolve ordered boarding/alighting stop occurrences first,
+call FareEngine once, pass the immutable quote through confirmation and booking, and persist the exact
+quote. Format rupees only at presentation boundaries.
+Test Specification: Add test/integration/ticket_fare_authority_test.dart.
+Book general/student/senior tickets at 1, 3, 4, 5, and 6 hops in both directions; assert exact paise values 1500/2000/2500 and 900/1200/1500. Assert origin=destination and unordered stops return
+ValidationFailure; assert displayed checkout total, stored ticket, QR payload, and receipt all equal the
+same quote. Add a source guard that fails on a second production fare formula or doublefare.
+Exit Criteria: Every issued ticket is derived from one FareQuote; no production ticket path contains a
+hard-coded fare or floating-point currency; boundary and end-to-end tests pass.
+
+BUS-P0-02: Enforce a durable ticket/payment state machine and replay protection
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gates 1 and 12; WCAG 2.2 SC 3.3.4 and 3.3.6 Accessible
+Authentication
+Target Files & Symbols: lib/domain/ticketing/entities/ticket.dart Ticket, TicketStatus;
+lib/data/models/ticket_model.dart Ticket, TicketRepository; lib/features/tickets/ticket_
+controller.dart bookTicket, cancelTicket; lib/features/tickets/booking_checkout_dialog.
+dart _issueTicket; ticket detail/QR validation surfaces
+Observed Defect / Gap: Tickets are created directly as active, cancellation is an unrestricted copyWith,
+there is no activation/validation/refund transition contract, no persisted ledger, no idempotency key, and
+IDs combine milliseconds with only 1,000 random values. Checkout labels a button “Pay” but immediately
+issues a ticket without payment authorization. The QR payload is predictable unsigned text, so it can be
+forged or replayed; its embedded expiry can differ from the ticket expiry when a past travel date triggers
+the fallback validity.
+Required Production Solution: Define legal transitions quoted->paymentPending->issued->
+active->used/expired with cancellation/refund terminal branches. Make transition methods return
+Result; record immutable transition timestamps and transaction/idempotency IDs; reject repeated callbacks and terminal-state mutation. Persist tickets atomically. Use server-issued opaque signed tokens for
+real validation, or explicitly label and feature-gate the entire flow as a non-production demo. Correct QR
+expiry to serialize the finalized ticket expiry.
+3
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Test Specification: Add test/domain/ticket_state_machine_test.dart and test/integration/
+ticket_replay_test.dart. Exercise every legal/illegal transition, duplicate payment callback, concurrent
+cancellation/use, clock expiry, app restart, duplicate ID attempt, forged QR, replayed QR, and past travel
+date. Assert one ledger entry, one charge, immutable amount/rule version, and stable terminal state.
+Exit Criteria: Illegal/replayed transitions are impossible through public APIs; tickets survive process
+restart; payment and QR behavior is either production-authenticated or unambiguously disabled/labeled
+as demo.
+
+BUS-P0-03: Preserve the platform TextScaler without downscaling or linearization
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gates 3 and 10; WCAG 2.2 SC 1.4.4 Resize Text and 1.4.10
+Reflow
+Target Files & Symbols: lib/main.dart BusBuddyApp.build; lib/core/settings/app_settings_
+controller.dart AppTextSize, AppSettingsController.textScale
+Observed Defect / Gap: MediaQuery.textScaler.scale(1.0) is multiplied by an app preference
+and replaced with TextScaler.linear. This discards platform nonlinear scaling behavior and allows
+small=0.85 to reduce a user’s chosen accessibility size. It therefore does not satisfy the claimed uncapped
+platform-scaler contract.
+Required Production Solution: Pass the platform TextScaler through unchanged by default. If an
+explicit in-app enlargement feature is retained, compose an enlargement-only transform without reducing
+platform output and document/test the semantics at multiple font sizes; never reconstruct the platform
+scaler from scale(1.0). Deprecate “Small” for accessibility text, or make it affect only app chrome spacing
+rather than text.
+Test Specification: Add test/a11y/platform_text_scaler_test.dart. Inject nonlinear fake scalers
+and system factors equivalent to 100%, 200%, and 300%; assert platform output is never reduced, nonlinear
+values remain nonlinear, and all primary routes render at 320dp without overflow exceptions or unreachable
+actions.
+Exit Criteria: No code replaces the platform scaler with a linear approximation or reduces system-selected
+text; 320dp/300% golden and interaction tests pass.
+
+BUS-P0-04: Make the composition root own and await all app-scoped teardown
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gates 2 and 9; lifecycle reliability prerequisite
+Target
+Files
+&
+Symbols:
+lib/core/di/service_locator.dart AppServiceLocator,
+resetForTesting;
+lib/data/repositories/transport_repository.dart
+LocalTransportRepository,
+dispose;
+lib/data/datasources/live_bus_movement_engine.dart dispose, _refreshPath; lib/features/
+ai_assistant/floating_assistant_controller.dart
+instance,
+reset;
+lib/features/ai_
+assistant/audio_speech_engine.dart dispose
+Observed Defect / Gap: The repository’s async dispose calls a void movement-engine dispose; the
+engine invokes StreamController.close() without awaiting its returned future. Locator reset disposes
+only repositories, not its TicketController/JourneyController; the floating assistant/audio/session
+4
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+singleton sits outside the locator. In-flight OSRM/WebSocket callbacks have no generation token and may
+complete after reset.
+Required Production Solution: Create an AsyncDisposable contract. Make engine, repositories,
+controllers, assistant session/audio, and settings ownership explicit in one composition root. Await
+timer/subscription cancellation and controller close; invalidate late work with a monotonically increasing
+generation/cancellation token; make start/stop/dispose idempotent; and prevent lazy recreation while
+reset is running.
+Test Specification: Extend test/core/di/service_locator_lifecycle_test.dart with concurrent
+first access, double dispose, reset during an OSRM future, reset during a queued timer tick, 100 create/reset
+cycles, and stale callback completion. Assert zero active timers/listeners, closed streams, disposed notifiers,
+no post-dispose notification, and one instance per generation.
+Exit Criteria: A single awaited reset leaves no live timer, stream, socket, audio callback, listener, or
+app-scoped notifier; stress tests are deterministic and green.
+
+BUS-P0-05: Prevent Gemini tools from claiming unexecuted emergency or financial
+actions
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gate 12; WCAG 2.2 SC 3.3.4; safety-critical truthful feedback
+Target
+Files
+&
+Symbols:
+lib/features/ai_assistant/gemini_live_session.dart
+_executeToolCall;
+lib/features/ai_assistant/floating_assistant_controller.dart
+_ensureSession, _handlePrompt, onAction; safety and ticket action handlers
+Observed Defect / Gap: emergency_sos returns a successful tool response stating that SOS was
+activated, but the session only records an action type. The controller later adds a button; it does not
+execute an SOS broadcast. The model may therefore tell a blind user that emergency help was activated
+when nothing happened. The same tool framework can represent booking/sharing actions as successful
+before confirmation or persistence.
+Required Production Solution: Split tools into read-only queries and confirmable commands. Commands return confirmationRequired until the user activates a labeled non-voice/voice confirmation;
+execute through a typed command gateway; return success only after the repository/OS operation acknowledges it. Persist an audit event and expose visible, spoken, and haptic success/failure. Emergency
+failure must retain a direct call/SMS fallback.
+Test Specification: Add test/features/ai_assistant/tool_command_safety_test.dart. Simulate
+SOS, share location, and ticket commands; assert no action before confirmation, cancellation is honored,
+duplicate model calls are idempotent, repository failure returns failure language, and the model never
+receives a success payload before actual completion.
+Exit Criteria: No assistant response can claim an emergency, sharing, booking, or payment action
+succeeded unless an authenticated application command completed.
+
+BUS-P0-06: Replace simulated Android voice behavior or production-gate it
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Astra Gates 6, 9, and 12; WCAG 2.2 SC 2.1.1 Keyboard and 4.1.3
+Status Messages
+5
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Target
+Files
+&
+Symbols:
+lib/features/ai_assistant/audio_speech_engine.dart
+startListening, speak, playPcm24k; lib/features/ai_assistant/gemini_live_session.dart;
+lib/features/ai_assistant/gemini_live_screen.dart;
+Android platform integration and
+pubspec.yaml
+Observed Defect / Gap: On non-web platforms startListening waits and returns the hard-coded
+sentence “Where is my bus?”; speak waits without speech; PCM playback is discarded after a delay. The
+Android-first app therefore presents voice controls that do not capture or speak real content.
+Required Production Solution: Implement real Android STT/TTS/PCM playback with permission
+and audio-focus handling, or hide/disable the live controls behind a capability check with an explicit
+“voice unavailable” explanation and complete keyboard/touch fallback. Do not ship simulated input
+under a microphone UI. Add platform audio session interruption handling and release resources on
+background/dispose.
+Test Specification: Add Android integration tests for granted/denied/permanently-denied microphone
+permission, recognized transcript propagation, TTS completion/interruption, PCM playback, phonecall/audio-focus interruption, background/resume, and a no-capability fallback. Assert that no production
+build can return the hard-coded phrase.
+Exit Criteria: Android voice is genuinely functional and lifecycle-safe, or it is unavailable by design with
+an accessible deterministic fallback; no simulated speech path ships in release.
+
+BUS-P0-07: Configure a genuine Android release identity and signing pipeline
+Severity: P0 (Release Blocker)
+Astra Gate / WCAG Mapping: Production security and supply-chain control; no direct WCAG
+criterion
+Target Files & Symbols: android/app/build.gradle.kts android.defaultConfig, buildTypes.
+release; android/app/src/main/AndroidManifest.xml; CI/release secrets configuration
+Observed Defect / Gap: The application ID is com.example.helanapp and the release build explicitly
+uses signingConfigs.getByName("debug"). A production artifact signed with the shared debug key
+cannot establish a secure update identity and is not a releasable package.
+Required Production Solution: Freeze an organization-owned application ID; configure upload/release
+signing through environment-backed properties or Play App Signing; fail the release build when release
+credentials are absent; separate debug/staging/production product configuration and API endpoints; never
+commit keystore material.
+Test Specification: Add CI jobs that build a signed release AAB, inspect package/application ID and
+certificate fingerprint, assert it differs from the debug certificate, and reject debug signing in a release
+variant.
+Exit Criteria: A reproducible release AAB has the approved application ID and non-debug signing
+identity, with secrets outside source control.
+
+P1 — Critical resilience and accessibility
+BUS-P1-01: Add ordered, stale-aware live telemetry semantics
+Severity: P1 (Critical Resilience / A11y)
+6
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Astra Gate / WCAG Mapping: Astra Gates 7 and 8; WCAG 2.2 SC 1.3.1 and 4.1.3
+Target Files & Symbols: lib/domain/transit/entities/bus_position.dart BusPosition;
+lib/data/models/transport_models.dart LiveBusMetrics;
+lib/data/datasources/live_bus_
+movement_engine.dart; lib/data/repositories/transport_repository.dart; live route/journey
+widgets
+Observed Defect / Gap: Telemetry contains a wall-clock timestamp but no source sequence/generation,
+freshness threshold, accuracy, or ordering guard. UI treats any snapshot as “LIVE GPS” and substitutes
+plausible default ETA/speed before data arrives. A delayed tick, clock rollback, reconnect, or old route
+stream can overwrite newer state and be announced as live.
+Required Production Solution: Add route/bus/session IDs, monotonic sequence, UTC source/received
+timestamps, accuracy, and freshness state. Repository reducers must reject older generation/sequence values
+and derive loading/live/stale/offline/error; UI must never invent live values. Pause announcements
+while stale and expose last-updated time and recovery.
+Test Specification: Add test/data/live_telemetry_ordering_test.dart: deliver ticks 10, 12, 11;
+duplicate 12; clock-skewed timestamps; route switch; 30/60/120-second silence; and reconnect generation.
+Assert state never regresses, stale/offline transitions occur once, and fake defaults are absent.
+Exit Criteria: Out-of-order/old-route telemetry cannot update or announce current state; every live
+surface exposes deterministic freshness.
+
+BUS-P1-02: Model stop occurrences for reverse, circular, and repeated-stop travel
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 1 and 8; WCAG 2.2 SC 3.3.2 Labels or Instructions
+Target Files & Symbols: lib/domain/transit/entities/transit_route.dart TransitRoute.
+stopsBetween;
+lib/data/models/transport_models.dart Route.stopsBetween;
+lib/data/
+repositories/transport_repository.dart findRoutes; lib/domain/ticketing/entities/fare_
+engine.dart
+Observed Defect / Gap: Both route models use indexOf(stopId) and return empty when the
+destination index is not greater than the origin. This cannot distinguish repeated physical stops, circular
+wrap-around, branches, or reverse travel on a single route. Empty results are indistinguishable from
+invalid/no journey and can feed incorrect fare/stop counts.
+Required Production Solution: Represent ordered StopOccurrence values with occurrence ID, sequence, direction/pattern, and physical stop ID. Resolve a specific origin/destination occurrence pair
+through a trip pattern; support or explicitly reject wrap/reverse with a typed failure. Feed the resolved
+segment to both fare and journey logic.
+Test Specification: Add test/domain/route_segment_resolution_test.dart with A-B-C-B-D, circular A-B-C-A, reverse travel, same occurrence, same physical stop at different occurrences, and branch
+patterns. Assert exact occurrence sequences, hop counts, typed ambiguity, and fare parity.
+Exit Criteria: Segment resolution never relies on physical-stop indexOf; circular/repeated/reverse
+behavior is explicit and tested.
+
+BUS-P1-03: Turn AnnouncementCoordinator into a route-scoped audio arbiter
+Severity: P1 (Critical Resilience / A11y)
+7
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Astra Gate / WCAG Mapping: Astra Gates 6, 7, and 9; WCAG 2.2 SC 4.1.3 Status Messages
+Target
+Files
+&
+Symbols:
+lib/core/a11y/announcement_coordinator.dart;
+AnnouncementCoordinator;
+lib/features/route_details/route_details_page.dart; lib/features/tickets/ticket_booking_
+suite_page.dart; assistant audio/controller files
+Observed Defect / Gap: Visual status text is updated before route filtering, so an inactive route
+can overwrite visible status. Active route is set during widget build and is not reliably cleared. Distinct
+ETA messages bypass exact-string debounce and can speak every two seconds. High/normal messages
+are dropped while assistant audio plays; urgent messages collide with audio. Direction is forced LTR.
+Some screens call SemanticsService.announce directly during build, bypassing the coordinator; hidden
+IndexedStack steps remain mounted and can announce.
+Required Production Solution: Use explicit route/screen registration tokens with dispose; filter
+before changing state; convert raw ticks into transition events; maintain bounded priority queues with
+expiry/deduplication; coordinate pause/duck/stop with TTS/PCM; derive locale/text direction; prohibit
+direct announcements outside the coordinator; suppress non-current routes and offstage steps.
+Test Specification: Add test/a11y/announcement_arbiter_test.dart: two routes, hidden IndexedStack step, rapidly changing ETA, assistant PCM/TTS, urgent interruption, locale RTL, page disposal,
+and expired queued messages. Assert exact delivered sequence, no inactive visual update, no collision, and
+no duplicate output.
+Exit Criteria: One audited coordinator owns every announcement; inactive/hidden content is silent;
+urgent and queued messages have deterministic audio behavior.
+
+BUS-P1-04: Enforce modal semantics, focus restoration, and 48dp controls in the
+assistant overlay
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 2, 4, 5, and 9; WCAG 2.2 SC 2.4.3 Focus Order, 2.4.11
+Focus Not Obscured, 2.5.8 Target Size
+Target Files & Symbols: lib/features/ai_assistant/floating_ai_assistant_overlay.dart
+build, _buildWindow, _buildVoiceControl, _buildPromptChips; lib/features/ai_assistant/
+floating_assistant_controller.dart
+Observed Defect / Gap: The background is visually dimmed with a GestureDetector, but underlying
+semantics are not blocked. The window has no modal traversal group or explicit initial/restored focus.
+Bubble repositioning is drag-only; no corner actions exist. Several controls use 38–40dp constraints or
+compact density despite a 48dp token. Infinite pulse/glow animations ignore reduced motion. The bubble
+can be clamped and notify listeners during build.
+Required Production Solution: Wrap modal state in BlockSemantics/ExcludeSemantics as appropriate and a closed-loop traversal group; focus the window heading/primary control on open and restore
+the bubble on close. Add semantic actions/buttons for four corners and reset position. Enforce 48dp
+minimums without compact density; honor disable-animations/reduced-motion; move clamping to layout
+callbacks without notifying during build.
+Test Specification: Extend overlay widget tests at 320dp and 300% scale with TalkBack semantics
+enabled. Assert underlying page nodes disappear in modal mode, focus remains inside, close restores
+bubble focus, all controls are at least 48x48, keyboard/switch users can reposition, and animations stop
+when requested.
+8
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Exit Criteria: Overlay interaction is fully operable without drag, cannot expose/obscure underlying
+focus, restores focus, and passes target/reduced-motion tests.
+
+BUS-P1-05: Remove fixed-height and fixed-row failures at 200–300% text scale
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 3, 4, and 10; WCAG 2.2 SC 1.4.4 and 1.4.10
+Target
+Files
+&
+Symbols:
+lib/features/route_search/route_
+search_page.dart
+_LocationSelector,
+_RouteCard,
+_StopPickerSheet;
+lib/core/a11y/map_text_alternative_widget.dart;
+lib/features/route_details/route_
+lib/features/tickets/booking_checkout_dialog.dart;
+lib/features/
+details_page.dart;
+tickets/ticket_booking_suite_page.dart; safety/assistant cards
+Observed Defect / Gap: Location selectors are fixed at 52dp, compact data is placed in non-wrapping
+rows, passenger/payment options force three cards in one row, many labels use ellipsis, and map alternative
+metrics assume horizontal space. At 320dp with 200–300% text these patterns clip, overflow, or hide
+decision-relevant text.
+Required Production Solution: Replace fixed heights with minimum constraints, use Wrap or breakpointdriven column layouts, allow labels and values to reflow without semantic loss, place secondary content
+below primary content, and use scrollable dialog bodies with pinned accessible actions. Avoid ellipsis for
+fares, stop names, errors, and state.
+Test Specification: Create test/a11y/reflow_matrix_test.dart rendering all named surfaces at
+widths 320/360/600, portrait/landscape, text 1.0/2.0/3.0, and high contrast. Assert no overflow exceptions,
+clipped semantics, hidden buttons, or horizontal scrolling for ordinary cards/forms.
+Exit Criteria: The complete search-to-ticket-to-journey flow remains readable and operable at 320dp
+and 300% platform text scale.
+
+BUS-P1-06: Eliminate duplicate semantics and formalize focus contracts
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 4 and 5; WCAG 2.2 SC 1.3.1, 2.4.3, 2.4.6, and 4.1.2
+Target Files & Symbols: lib/core/a11y/map_text_alternative_widget.dart build; route/ticket
+cards; checkout dialog and stop-picker sheets; safety confirmation dialogs; page headings
+Observed Defect / Gap: Several compound widgets add a parent Semantics(label:...) while leaving
+identical child text exposed, causing duplicate readout. The map alternative uses the legacy boolean
+header property. Dialogs/sheets do not define explicit initial focus or restore the invoking control after
+asynchronous closure. Status and selection cards rely on prose labels instead of native selected/button/radio
+state.
+Required Production Solution: For atomic summaries use excludeSemantics:true; otherwise remove
+the parent label and expose structured children. Use semantic heading levels, selected/toggled/value state,
+and standard controls. Create a navigation/focus policy: page heading on route entry, first error on failed
+submit, invoker restoration on dialog close, and no focus movement from data ticks.
+Test Specification: Add semantics snapshots and focus traversal tests for every compound card, dialog,
+bottom sheet, and route transition. Assert each fact is spoken once, role/state are present, traversal
+matches task order, validation focuses the error, and dismiss restores the exact invoker.
+9
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Exit Criteria: Critical screens have approved semantics snapshots and deterministic initial/restored
+focus with no duplicated spoken content.
+
+BUS-P1-07: Implement explicit OSRM, tile, and offline failure states
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 7, 8, and 11; WCAG 2.2 SC 3.3.1 and 3.3.3
+Target Files & Symbols:
+lib/data/services/osrm_routing_service.dart fetchRoute;
+lib/data/datasources/live_bus_movement_engine.dart _refreshPath; lib/features/journey/
+journey_page.dart _LiveMap; lib/features/route_details/route_details_page.dart
+Observed Defect / Gap: OSRM requests have no timeout, retry policy, response status check, payloadsize limit, or typed failure. Every exception silently returns a straight line. Tile failures have no user-visible
+text state/retry. The route UI can label fallback/default values as live, preventing users from knowing
+that road routing or maps failed.
+Required Production Solution: Return typed routing outcomes: road route, geometric fallback,
+timeout, offline, rate-limited, invalid response. Add bounded timeout and jittered retry only for transient
+failures; validate HTTP status/content and cancel obsolete requests. Expose a persistent text banner with
+last update, fallback meaning, and retry. Keep the list/text journey fully usable when tiles fail.
+Test Specification: Add fake-client tests for connect timeout, slow body, 400/429/500, malformed/oversized JSON, route switch cancellation, offline startup, recovery, and tile errors. Assert
+bounded completion, correct fallback geometry, one plain-language status, working text journey, and no
+“live/road accurate” claim during fallback.
+Exit Criteria: All network failure classes produce deterministic typed state and an accessible recovery
+action within a bounded time.
+
+BUS-P1-08: Add voice permission recovery, reconnection backoff, and lifecycle control
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 6, 9, and 11; WCAG 2.2 SC 3.3.3 and 4.1.3
+Target Files & Symbols: lib/features/ai_assistant/gemini_live_session.dart connect,
+sendUserText, dispose; lib/features/ai_assistant/web_speech_real.dart; lib/features/ai_
+assistant/audio_speech_engine.dart; assistant controller/screen
+Observed Defect / Gap: WebSocket connection is one-shot: no reconnect state, exponential backoff,
+authentication/model capability validation, ping/idle handling, or retry cancellation. REST has no timeout.
+Browser global autoplay listeners are added to window and document and never removed. Microphone
+denial/permanent denial/background states are not modeled; recognition simply restarts. Assistant audio
+is not wired to AnnouncementCoordinator.isAudioPlaying.
+Required Production Solution: Implement a connection state machine with capped exponential
+backoff+jitter, foreground/network gating, cancellation tokens, and explicit offline/manual retry. Add REST
+timeouts and structured errors. Model microphone permission states and settings recovery. Register/remove
+browser listeners through disposable handles. Integrate audio focus with the announcement arbiter and
+stop capture/playback on background or full-screen transitions. Validate the configured model through an
+integration contract rather than a hard-coded unverified name.
+
+10
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Test Specification: Use fake socket/HTTP/audio/permission adapters to test drop-before-setup, repeated
+close, 401/403/429/5xx, backoff cap, offline/online, app pause/resume, permanent denial, listener disposal,
+TalkBack announcement during PCM, and model rejection. Assert no reconnect storm, no capture in
+background, and actionable state text.
+Exit Criteria: Voice sessions recover predictably, respect permissions/lifecycle, release all resources, and
+never collide with accessibility speech.
+
+BUS-P1-09: Replace color claims with machine-verified semantic contrast
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gate 3; WCAG 2.2 SC 1.4.3 Contrast (Minimum), 1.4.11
+Non-text Contrast
+Target Files & Symbols: lib/core/tokens/app_semantic_colors.dart; lib/core/theme/app_
+theme.dart; hard-coded colors in route, ticket, safety, and assistant feature widgets
+Observed Defect / Gap: The standard primary blue #0284C7 with white is about 4.10:1 and fails
+4.5:1 normal-text AA. High-contrast error #FF3333 on #121212 is about 5.15:1, not AAA 7:1. Many
+feature widgets bypass semantic tokens with fixed light/dark colors, so theme/high-contrast mode cannot
+guarantee contrast.
+Required Production Solution: Define foreground/background token pairs with documented minimum
+ratios; adjust failing pairs; distinguish text, large text, icon/border, focus, and disabled requirements.
+Replace feature hex values with semantic roles. Add non-color state cues and a visible high-contrast focus
+indicator. Rename the theme if every normal-text pair is not verified at 7:1.
+Test Specification: Add test/a11y/semantic_color_contrast_test.dart that enumerates every
+allowed token pair in light/dark/high-contrast themes and asserts 4.5:1 normal text, 3:1 large/non-text,
+and 7:1 for every pair marketed AAA. Add a source lint against feature-level Color(0x...) except approved
+illustrations.
+Exit Criteria: All rendered semantic pairs meet their declared ratio automatically; no feature bypasses
+tokens for functional content.
+
+BUS-P1-10: Restore active journey, tickets, and settings after process death
+Severity: P1 (Critical Resilience / A11y)
+Astra Gate / WCAG Mapping: Astra Gates 2, 7, and 12; WCAG 2.2 SC 3.3.7 Redundant Entry
+Target Files & Symbols: lib/features/journey/journey_controller.dart; lib/features/
+tickets/ticket_controller.dart; lib/data/models/ticket_model.dart TicketRepository; lib/
+core/settings/app_settings_controller.dart; lib/data/datasources/local_json_store.dart;
+routing/restoration setup
+Observed Defect / Gap: Journey and tickets are in memory; process death loses an active journey and
+pass. Settings writes are fired without awaiting or surfacing errors, so rapid mutations can appear saved
+before disk completion. No restoration ID/state contract exists for route, selected stops, dialog progress,
+or assistant window.
+Required Production Solution: Persist minimal versioned journey/ticket state transactionally; revalidate expiry and route availability on restore; never persist secrets or raw microphone/camera data. Expose
+
+11
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+save failures. Use Flutter restoration for navigation/form state where appropriate and keep critical domain
+state in a durable repository. Await/serialize settings commits and flush on lifecycle pause.
+Test Specification: Add restart tests that kill/recreate the app during route selection, active journey,
+ticket issuance, cancellation, settings changes, and assistant open state. Assert critical state restores or
+presents an explicit recovery path; expired/stale state is not revived; no secret API key is persisted.
+Exit Criteria: Process death cannot silently erase a valid ticket or leave a journey in a false state;
+persistence failures are visible and recoverable.
+
+P2 — Production polish and governance
+BUS-P2-01: Minimize Android permissions and add contextual permission rationale
+Severity: P2 (Production Polish)
+Astra Gate / WCAG Mapping: Astra Gate 12; privacy and user-control requirement
+Target Files & Symbols: android/app/src/main/AndroidManifest.xml; onboarding/settings permission flows; native feature adapters
+Observed Defect / Gap: Fine/coarse location and microphone permissions are declared although the
+inspected Android voice path is simulated and location behavior is largely fixture-based. Broad declarations
+increase privacy surface without a matching native capability/rationale path.
+Required Production Solution: Declare only permissions required by the production flavor; request just
+in time from the triggering action; explain purpose before the system prompt; support denial/permanent
+denial and settings recovery; document retention and sharing. Remove permissions from demo/offline
+flavors.
+Test Specification: Add manifest merge tests per flavor and Android permission-flow tests for deny,
+deny-and-don’t-ask, revoke while running, approximate location, and feature fallback.
+Exit Criteria: Every manifest permission maps to a working, user-initiated feature and an accessible
+denial fallback; unused permissions are absent.
+
+BUS-P2-02: Enable release shrinking and measure startup/resource cost
+Severity: P2 (Production Polish)
+Astra Gate / WCAG Mapping: Production performance; indirectly supports WCAG timing/stability
+Target Files & Symbols: android/app/build.gradle.kts buildTypes.release; ProGuard/R8 rules;
+lib/main.dart; startup services
+Observed Defect / Gap: Release minification/resource shrinking are not enabled. Multiple app-scoped
+controllers, overlays, JSON store initialization, and voice/map dependencies start near app boot without
+measured startup cost.
+Required Production Solution: Enable R8 and resource shrinking for release, add only evidence-based
+keep rules, and run release smoke tests. Defer voice/map/session initialization until first use, preserve
+accessible first-frame content, and define cold/warm startup and memory budgets.
+Test Specification: CI must build minified APK/AAB, launch every reflection/plugin-dependent feature,
+compare binary size, and collect macrobenchmark cold/warm startup plus memory after ten navigation
+cycles. Assert no accessibility semantics delay/regression.
+12
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+Exit Criteria: Minified release passes smoke tests and documented startup/memory budgets without
+plugin or semantics breakage.
+
+BUS-P2-03: Make CI the source of truth for tests, ADRs, and public claims
+Severity: P2 (Production Polish)
+Astra Gate / WCAG Mapping: All gates; governance and evidence integrity
+Target Files & Symbols: README.md; docs/adr/ADR-001-phase1-domain-and-a11y-contracts.md;
+missing ADR-002 path; CI workflows; test inventory
+Observed Defect / Gap: The request claims 236 tests and ADR-002, while public main reports 214 and
+the ADR path is unavailable. README also claims strict 48dp controls, uncapped scaling, high-contrast
+compliance, Android voice behavior, and authoritative fares that the inspected source does not consistently
+implement.
+Required Production Solution: Generate test count/coverage/build badges from CI; publish ADR-002
+or remove the reference; add claim-to-test traceability for all Astra gates; fail documentation checks when
+named files are absent or accessibility/release claims lack test evidence. Record the audited commit SHA
+in every release report.
+Test Specification: Add a documentation verification job that validates linked files, runs analysis/tests/a11y matrices, derives counts, scans release signing/configuration, and produces an immutable
+evidence artifact.
+Exit Criteria: README, ADRs, release notes, and CI artifacts agree automatically; no manual test
+count or unsupported compliance claim remains.
+
+BUS-P2-04: Strengthen static analysis and modernize browser interop
+Severity: P2 (Production Polish)
+Astra Gate / WCAG Mapping: Astra Gates 2 and 9; maintainability prerequisite
+Target Files & Symbols: analysis_options.yaml; lib/features/ai_assistant/web_speech_real.
+dart; all async UI callbacks
+Observed Defect / Gap: Only default recommended lints are enabled. Browser speech uses dart:js
+and eval; global listener lifecycle is implicit. The codebase contains build-time side effects, unawaited
+persistence, and async UI callbacks that require stronger enforcement.
+Required Production Solution: Enable strict casts/inference/raw types plus lints for discarded futures,
+context after async gaps, close sinks, cancel subscriptions, and deprecated APIs. Replace eval and legacy
+JS interop with typed dart:js_interop/web bindings; hold removable listener references; introduce
+narrowly scoped suppressions with rationale.
+Test Specification: Run flutteranalyze--fatal-infos--fatal-warnings in CI; add browser tests
+under a restrictive CSP that forbids eval and verify initialization/disposal across repeated app mounts.
+Exit Criteria: Strict analysis is clean, browser voice works without eval, and all listeners/futures have
+explicit ownership.
+
+13
+
+BusBuddy Full-Codebase Production Audit
+
+3
+
+20 September 2026
+
+Section C: Master Implementation Order for the Coding Agent
+
+The coding agent should use the following zero-regression loop. At every numbered task: create or update
+the specified tests first, implement only that task, run domain/unit/widget tests plus static analysis, and
+commit only after the baseline is green.
+1. Freeze evidence. Record the current commit SHA, capture current test/analysis output, publish or
+correct ADR-002, and make CI report its own test count (BUS-P2-03). This prevents further audit
+drift.
+2. Correct text scaling first. Implement BUS-P0-03 and its 320dp/300% harness. All subsequent UI
+work must pass that harness.
+3. Unify currency/domain flow. Implement BUS-P0-01 before modifying ticket state, because the
+state machine must persist the canonical quote.
+4. Build ticket ledger/state machine. Implement BUS-P0-02, including durable storage and
+QR/payment feature gating. Run migration/restart/replay tests.
+5. Make teardown deterministic. Implement BUS-P0-04; use the resulting cancellation and ownership
+primitives for later network/audio work.
+6. Correct assistant command truthfulness. Implement BUS-P0-05 before reconnect logic so retries
+cannot duplicate emergency or financial commands.
+7. Implement/gate native Android audio. Complete BUS-P0-06, then run accessibility audio tests
+on a real Android device.
+8. Fix release identity/signing. Complete BUS-P0-07 and create a signed internal release build. No
+public release work proceeds until all P0 tests pass together.
+9. Strengthen route and telemetry domain. Implement BUS-P1-02 followed by BUS-P1-01; migrate
+journey/fare/UI consumers and run end-to-end route tests.
+10. Build the central audio/announcement arbiter. Implement BUS-P1-03, then wire assistant audio
+through it as part of BUS-P1-08.
+11. Harden overlay and focus. Implement BUS-P1-04 and BUS-P1-06 together; validate with keyboard,
+switch-style traversal, TalkBack, and modal focus restoration.
+12. Complete responsive reflow. Implement BUS-P1-05 screen by screen using the established reflow
+matrix; do not add per-screen scaler clamps.
+13. Correct colors and token adoption. Implement BUS-P1-09 after layouts stabilize; regenerate
+light/dark/high-contrast goldens and contrast reports.
+14. Add deterministic network degradation.
+Implement BUS-P1-07, then finish WebSocket/permission/lifecycle resilience in BUS-P1-08 using the same typed state/failure patterns.
+15. Add process restoration. Implement BUS-P1-10 after ticket, journey, network, and lifecycle state
+machines are stable.
+16. Reduce platform exposure. Complete BUS-P2-01, removing permissions not justified by the
+now-final native feature set.
+17. Modernize and tighten analysis. Complete BUS-P2-04, fixing all strict-analysis findings rather
+than broadly suppressing them.
+14
+
+BusBuddy Full-Codebase Production Audit
+
+20 September 2026
+
+18. Optimize the release build. Complete BUS-P2-02 with R8/resource shrinking, release smoke tests,
+startup metrics, and memory-leak navigation loops.
+19. Final verification. Run the full test suite; fatal static analysis; 320dp at 100/200/300% text;
+light/dark/high-contrast contrast tests; Android TalkBack core journeys; keyboard/switch traversal;
+offline/429/5xx recovery; process-death restoration; assistant audio collision; emergency confirmation;
+signed minified AAB install/upgrade; and manual validation with blind/low-vision participants where
+ethically feasible. Publish the generated evidence artifact and update the readiness score only from
+those results.
+
+Release decision
+Decision: NO-GO for production release. The application may continue as a clearly labeled
+prototype. A production release requires all seven P0 tasks and P1 tasks BUS-P1-01 through BUS-P1-10
+to be complete, with independently rerun CI and device evidence. The most consequential defects are not
+cosmetic: the live ticket flow bypasses the currency authority, Android voice is simulated, an AI emergency
+tool can report an action that did not occur, platform text scaling is altered, and the Android release is
+debug-signed.
+
+Primary inspected sources
+• Public repository: https://github.com/sricharan24-byte/HELEN (main, retrieved 20 September
+2026).
+• Key inspected sources include lib/main.dart, domain transit/ticketing entities and repositories,
+service locator, live movement engine, OSRM service, semantic tokens/theme, announcement/map
+alternatives, route/journey/ticket/safety/assistant features, pubspec.yaml, analysis_options.yaml,
+Android manifest/build configuration, ADR-001, README, and available tests.
+• Flutter accessibility guidance and test guidelines: https://docs.flutter.dev/ui/accessibility
+and https://api.flutter.dev/flutter/flutter_test/AccessibilityGuideline-class.html.
+• W3C WCAG 2.2 for non-web software guidance: https://www.w3.org/TR/wcag2ict-22/.
+• Android release signing and shrinking guidance: https://developer.android.com/studio/publish/
+app-signing and https://developer.android.com/build/shrink-code.
+
+15
+
+

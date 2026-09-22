@@ -1,11 +1,11 @@
-// ignore_for_file: deprecated_member_use, uri_does_not_exist
-// ignore: avoid_web_libraries_in_flutter
+// ignore_for_file: deprecated_member_use, uri_does_not_exist, avoid_web_libraries_in_flutter
 import 'dart:js' as js;
 import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart';
 
 import '../../core/settings/app_settings_controller.dart';
 
+bool enableSimulatedVoiceInput = false;
 bool _jsBridgeInitialized = false;
 
 void _ensureJsBridge() {
@@ -40,13 +40,27 @@ void _ensureJsBridge() {
           return window.__bb_audio_ctx;
         };
 
+        window.__bb_remove_unlock_listeners = function() {
+          if (!window.__bb_unlock_listeners_active) return;
+          window.__bb_unlock_listeners_active = false;
+          ["click", "pointerdown", "touchstart", "touchend", "keydown"].forEach(function(evt) {
+            try {
+              window.removeEventListener(evt, window.__bb_unlock_audio, { capture: true });
+              document.removeEventListener(evt, window.__bb_unlock_audio, { capture: true });
+            } catch (_) {}
+          });
+        };
+
         window.__bb_unlock_audio = function() {
           try {
             var ctx = window.__bb_get_audio_ctx();
             if (ctx && ctx.state === "suspended") {
               ctx.resume().then(function() {
                 console.log("[BusBuddy Audio] AudioContext unlocked (" + ctx.sampleRate + "Hz)");
+                window.__bb_remove_unlock_listeners();
               });
+            } else if (ctx && ctx.state === "running") {
+              window.__bb_remove_unlock_listeners();
             }
             // Prime browser audio hardware with a microscopic silent buffer
             if (ctx && ctx.state === "running") {
@@ -62,11 +76,32 @@ void _ensureJsBridge() {
           } catch (_) {}
         };
 
-        // Automatically unlock audio context on ANY user tap, click, touch, or key press
+        // Automatically unlock audio context on user gesture and track active state
+        window.__bb_unlock_listeners_active = true;
         ["click", "pointerdown", "touchstart", "touchend", "keydown"].forEach(function(evt) {
           window.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
           document.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
         });
+
+        window.__bb_dispose_audio = function() {
+          window.__bb_remove_unlock_listeners();
+          if (window.__bb_stop_recognition) {
+            window.__bb_stop_recognition();
+          }
+          if (window.__bb_stop_speech) {
+            window.__bb_stop_speech();
+          }
+          if (window.__bb_active_sources && window.__bb_active_sources.length > 0) {
+            window.__bb_active_sources.forEach(function(s) {
+              try { s.stop(); s.disconnect(); } catch (_) {}
+            });
+            window.__bb_active_sources = [];
+          }
+          if (window.__bb_audio_ctx && window.__bb_audio_ctx.state !== "closed") {
+            try { window.__bb_audio_ctx.close(); } catch (_) {}
+            window.__bb_audio_ctx = null;
+          }
+        };
 
         window.__bb_reset_turn = function() {
           window.__bb_generation = (window.__bb_generation || 0) + 1;
@@ -475,8 +510,8 @@ void stopSpeech() {
 
 /// Listens to real microphone input using Web SpeechRecognition API in Chrome.
 void startSpeechRecognition({
-  required Function(String text, bool isFinal) onResult,
-  required Function(String error) onError,
+  required void Function(String text, bool isFinal) onResult,
+  required void Function(String error) onError,
   required VoidCallback onEnd,
 }) {
   try {
@@ -541,3 +576,12 @@ void setAudioEndedCallback(VoidCallback onEnded) {
     });
   } catch (_) {}
 }
+
+/// Disposes web audio resources, audio context, and removes all global DOM gesture listeners.
+void disposeAudio() {
+  try {
+    _ensureJsBridge();
+    js.context.callMethod('__bb_dispose_audio');
+  } catch (_) {}
+}
+

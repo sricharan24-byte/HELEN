@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/transport_repository.dart';
@@ -57,14 +58,14 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Text size, high contrast, talkback, & haptics',
               trailingText: 'Large · On',
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
+                unawaited(Navigator.of(context).push(
+                  MaterialPageRoute<void>(
                     builder: (_) => AccessibilitySettingsPage(
                       repository: repository,
                       ticketController: ticketController,
                     ),
                   ),
-                );
+                ));
               },
             ),
             const SizedBox(height: 16),
@@ -80,14 +81,14 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Customize home screen, adaptive UI, & layout',
               trailingText: 'Adaptive On',
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
+                unawaited(Navigator.of(context).push(
+                  MaterialPageRoute<void>(
                     builder: (_) => PersonalizationSettingsPage(
                       repository: repository,
                       ticketController: ticketController,
                     ),
                   ),
-                );
+                ));
               },
             ),
             const SizedBox(height: 16),
@@ -103,14 +104,14 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Preferred language, voice speed, & Gemini AI',
               trailingText: 'English',
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
+                unawaited(Navigator.of(context).push(
+                  MaterialPageRoute<void>(
                     builder: (_) => VoiceAssistantSettingsPage(
                       repository: repository,
                       ticketController: ticketController,
                     ),
                   ),
-                );
+                ));
               },
             ),
             const SizedBox(height: 16),
@@ -126,11 +127,11 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Configure 1-tap location alerts & sharing links',
               trailingText: 'Active',
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
+                unawaited(Navigator.of(context).push(
+                  MaterialPageRoute<void>(
                     builder: (_) => const SafetySharingPage(),
                   ),
-                );
+                ));
               },
             ),
           ],
@@ -163,6 +164,7 @@ class SettingsPage extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$title. $subtitle.',
+      excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),

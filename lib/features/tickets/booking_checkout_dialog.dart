@@ -1,8 +1,9 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
@@ -19,7 +20,8 @@ class BookingCheckoutDialog extends StatefulWidget {
     required this.routeName,
     required this.origin,
     required this.destination,
-    required this.baseFare,
+    this.baseFare,
+    this.initialFareQuote,
     required this.onTicketBooked,
     this.routeId = 'vit-to-katpadi',
     this.travelDate,
@@ -29,7 +31,8 @@ class BookingCheckoutDialog extends StatefulWidget {
   final String routeName;
   final Stop origin;
   final Stop destination;
-  final double baseFare;
+  final double? baseFare;
+  final FareQuote? initialFareQuote;
   final void Function(Ticket ticket) onTicketBooked;
   final String routeId;
   final DateTime? travelDate;
@@ -56,30 +59,69 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     super.dispose();
   }
 
-  double get _finalFare {
-    return FareEngine.calculateFromBase(
-      baseFare: widget.baseFare,
-      passengerType: _selectedPassengerType,
-    ).amount;
+  int _resolveHops() {
+    if (widget.initialFareQuote != null && widget.initialFareQuote!.hopCount > 0) {
+      return widget.initialFareQuote!.hopCount;
+    }
+    final dataSource = AppServiceLocator.instance.transportDataSource;
+    final route = dataSource.allRoutes.firstWhere(
+      (r) => r.id == widget.routeId,
+      orElse: () => dataSource.allRoutes.first,
+    );
+    final o = route.orderedStopIds.indexOf(widget.origin.id);
+    final d = route.orderedStopIds.indexOf(widget.destination.id);
+    if (o != -1 && d != -1) {
+      final hops = (d - o).abs();
+      if (hops > 0) return hops;
+    }
+    if (widget.baseFare != null && widget.baseFare! > 0) {
+      if (widget.baseFare! <= 15) return 2;
+      if (widget.baseFare! <= 20) return 4;
+      return 6;
+    }
+    return 4; // Standard corridor fallback
   }
+
+  FareQuote _quoteForType(PassengerType type) {
+    final hopCount = _resolveHops();
+    return FareEngine.calculateByStopCount(
+      stopCount: hopCount,
+      passengerType: type,
+    );
+  }
+
+  FareQuote get _currentFareQuote => _quoteForType(_selectedPassengerType);
 
   void _issueTicket() {
     if (_isIssuing) return;
     setState(() => _isIssuing = true);
 
     final now = DateTime.now();
-    final ticketId = 'BB${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}${Random.secure().nextInt(1296).toRadixString(36).padLeft(2, '0').toUpperCase()}';
+    final ticketId = Ticket.generateSecureTicketId(now);
     final travelDay = widget.travelDate ?? now;
-    final validUntil = DateTime(
+    final dayEnd = DateTime(
       travelDay.year,
       travelDay.month,
       travelDay.day,
       23, 59, 59,
     );
+    final finalizedValidUntil =
+        dayEnd.isBefore(now) ? now.add(const Duration(hours: 4)) : dayEnd;
 
     final passengerName = _passengerNameController.text.trim().isEmpty
         ? 'Passenger'
         : _passengerNameController.text.trim();
+
+    final quote = _currentFareQuote;
+    final qrPayload = Ticket.buildQrPayload(
+      ticketId: ticketId,
+      originId: widget.origin.id,
+      destinationId: widget.destination.id,
+      busId: widget.busId,
+      farePaise: quote.finalPaise,
+      validUntil: finalizedValidUntil,
+      isDemo: true,
+    );
 
     final ticket = Ticket(
       id: ticketId,
@@ -90,18 +132,19 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
       busId: widget.busId,
       passengerName: passengerName,
       passengerType: _selectedPassengerType,
-      fareAmount: _finalFare,
+      fareQuote: quote,
       paymentMethod: _selectedPaymentMethod,
       issuedAt: now,
-      validUntil: validUntil.isBefore(now) ? now.add(const Duration(hours: 4)) : validUntil,
+      validUntil: finalizedValidUntil,
       status: TicketStatus.active,
-      qrCodeData: 'BUSBUDDY|V1|$ticketId|${widget.origin.id}|${widget.destination.id}|${widget.busId}|${validUntil.toIso8601String()}',
+      qrCodeData: qrPayload,
+      isDemo: true,
     );
 
     widget.onTicketBooked(ticket);
 
     AnnouncementCoordinator.instance.announce(
-      'Ticket confirmed for $passengerName. Paid ₹${_finalFare.toStringAsFixed(0)}. Bus ${widget.busId}.',
+      'Ticket confirmed for $passengerName. Paid ₹${(quote.finalPaise / 100).toStringAsFixed(0)}. Bus ${widget.busId}.',
       priority: AnnouncementPriority.high,
     );
 
@@ -113,6 +156,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
+
 
     return Container(
       decoration: BoxDecoration(
@@ -171,6 +215,32 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                           fontSize: 13,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colors.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.science_outlined, size: 12, color: colors.textSecondary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'DEMO MODE • Simulated UPI Gateway',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -227,13 +297,15 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             // Passenger Type Selection
             Row(
               children: [
-                Text(
-                  'PASSENGER TYPE & CONCESSION',
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'PASSENGER TYPE & CONCESSION',
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -270,10 +342,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.general,
                     label: 'General',
-                    sublabel: FareEngine.calculateFromBase(
-                      baseFare: widget.baseFare,
-                      passengerType: PassengerType.general,
-                    ).formattedAmount,
+                    sublabel: _quoteForType(PassengerType.general).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -282,10 +351,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.student,
                     label: 'Student',
-                    sublabel: FareEngine.calculateFromBase(
-                      baseFare: widget.baseFare,
-                      passengerType: PassengerType.student,
-                    ).formattedAmount,
+                    sublabel: _quoteForType(PassengerType.student).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -294,10 +360,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.senior,
                     label: 'Senior',
-                    sublabel: FareEngine.calculateFromBase(
-                      baseFare: widget.baseFare,
-                      passengerType: PassengerType.senior,
-                    ).formattedAmount,
+                    sublabel: _quoteForType(PassengerType.senior).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -349,8 +412,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 border: Border.all(color: colors.border),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                runSpacing: 12,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,7 +430,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '₹${_finalFare.toStringAsFixed(0)}',
+                        _currentFareQuote.formattedAmount,
                         style: TextStyle(
                           color: colors.textPrimary,
                           fontSize: 24,
@@ -374,8 +439,8 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       ),
                     ],
                   ),
-                  SizedBox(
-                    height: AppSpacing.minTouchTarget,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
                     child: ElevatedButton.icon(
                       onPressed: _isIssuing ? null : _issueTicket,
                       icon: _isIssuing
@@ -389,7 +454,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                             )
                           : Icon(Icons.check_circle_outline, color: colors.actionPrimaryText, size: 20),
                       label: Text(
-                        _isIssuing ? 'Processing...' : 'Pay ₹${_finalFare.toStringAsFixed(0)} & Issue',
+                        _isIssuing ? 'Processing...' : 'Pay ${_currentFareQuote.formattedAmount} & Issue',
                         style: TextStyle(
                           color: colors.actionPrimaryText,
                           fontSize: 15,
@@ -400,6 +465,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                         backgroundColor: colors.actionPrimary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 2,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         minimumSize: const Size(120, AppSpacing.minTouchTarget),
                       ),
                     ),
@@ -417,7 +483,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required PassengerType type,
     required String label,
     required String sublabel,
-    required dynamic colors,
+    required AppSemanticColors colors,
   }) {
     final isSelected = _selectedPassengerType == type;
     return Material(
@@ -468,7 +534,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required IconData icon,
     required String title,
     required String subtitle,
-    required dynamic colors,
+    required AppSemanticColors colors,
   }) {
     final isSelected = _selectedPaymentMethod == method;
     return Material(

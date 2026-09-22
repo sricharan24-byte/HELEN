@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/settings/app_settings_controller.dart';
+import '../../domain/assistant/assistant_command.dart';
 import 'gemini_live_transport.dart';
 
 /// Client for the real Google AI Studio Gemini Multimodal Live API (BidiGenerateContent).
@@ -33,6 +35,14 @@ class GeminiLiveSession {
   Completer<void>? _setupCompleter;
   String _currentTurnText = '';
   String? _currentTurnAction;
+  bool _turnInFlight = false;
+
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  bool _isExplicitlyDisconnected = false;
+  static const int maxReconnectAttempts = 5;
+
+  int get reconnectAttempts => _reconnectAttempts;
 
   bool get isConnected => _isConnected && (_transport?.isConnected ?? false);
 
@@ -49,7 +59,8 @@ CRITICAL CONVERSATIONAL RULES:
 2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "open_saved", "function_call", "toolResponse", or "executing").
 3. When triggering or confirming an action, phrase your response in natural, conversational English (e.g., "I've pulled up the live bus tracker for you!", "Here is the ticket booking screen.", "Let me check the buses to Katpadi for you.").
 4. Keep spoken responses concise and natural (1 to 2 sentences). Do NOT output markdown, bullet points, asterisks, or system logs.
-5. Key transit facts: General bus fare is ₹20. Student and senior citizen concession fare is ₹12 (40% discount). Main stops: VIT Main Gate, Green Circle, New Bus Stand, Katpadi Railway Station. Frequent buses: Bus 18B, Bus 12A.''';
+5. Key transit facts: General bus fare is ₹20. Student and senior citizen concession fare is ₹12 (40% discount). Main stops: VIT Main Gate, Green Circle, New Bus Stand, Katpadi Railway Station. Frequent buses: Bus 18B, Bus 12A.
+6. CONFIRMABLE COMMAND SAFETY GATEWAY (Astra BUS-P0-05): For safety-critical or financial actions (Emergency SOS, location sharing, booking tickets), explain that you are opening the confirmation gateway screen for the passenger to review and confirm. NEVER claim or speak as if an emergency was already broadcast or payment was already taken until confirmed by the user.''';
 
   static String _resolveLiveModel(String requested) {
     var model = requested.trim();
@@ -80,11 +91,13 @@ CRITICAL CONVERSATIONAL RULES:
       return;
     }
 
-    disconnect();
+    _isExplicitlyDisconnected = false;
+    _reconnectTimer?.cancel();
+    _internalDisconnect(isExplicit: false);
 
     _setupCompleter = Completer<void>();
     // Prevent unhandled zone error if closed before sendQuery awaits it
-    _setupCompleter!.future.catchError((_) {});
+    unawaited(_setupCompleter!.future.catchError((_) {}));
 
     final modelToUse = _resolveLiveModel(effectiveModel);
     onStatusChanged?.call('Connecting to Gemini Live...', false);
@@ -100,12 +113,12 @@ CRITICAL CONVERSATIONAL RULES:
         debugPrint('[GeminiLive] Connected to AI Studio Live WebSocket ($modelToUse, voice: $effectiveVoice)');
         _isConnected = true;
         _isSetupDone = false;
+        _reconnectAttempts = 0;
+        _reconnectTimer?.cancel();
         onStatusChanged?.call('Live Connected', true);
         _sendSetupHandshake();
       },
-      onMessage: (message) {
-        _handleServerMessage(message);
-      },
+      onMessage: _handleServerMessage,
       onError: (err) {
         debugPrint('[GeminiLive] WebSocket error: $err');
         _isConnected = false;
@@ -115,6 +128,7 @@ CRITICAL CONVERSATIONAL RULES:
         }
         onStatusChanged?.call('Connection Error', false);
         onError?.call('WebSocket error: $err');
+        _handleUnexpectedDisconnect();
       },
       onClose: (code, reason) {
         debugPrint('[GeminiLive] WebSocket closed: code=$code, reason=$reason');
@@ -124,15 +138,57 @@ CRITICAL CONVERSATIONAL RULES:
           _setupCompleter!.completeError('Closed: $code $reason');
         }
         onStatusChanged?.call('Disconnected', false);
+        if (code != 1000) {
+          _handleUnexpectedDisconnect();
+        }
       },
     );
   }
 
+  void _handleUnexpectedDisconnect() {
+    if (_isExplicitlyDisconnected) return;
+    if (effectiveApiKey.trim().isEmpty) return;
+
+    if (_reconnectAttempts >= maxReconnectAttempts) {
+      debugPrint('[GeminiLive] Reached maximum reconnection attempts ($maxReconnectAttempts).');
+      onStatusChanged?.call('Connection lost. Tap to reconnect.', false);
+      onError?.call('Could not reconnect to Gemini Live after $maxReconnectAttempts attempts.');
+      return;
+    }
+
+    _reconnectAttempts++;
+    final baseDelayMs = 500 * (1 << (_reconnectAttempts - 1));
+    final cappedDelayMs = baseDelayMs > 8000 ? 8000 : baseDelayMs;
+    final jitterMs = Random().nextInt(200);
+    final totalDelayMs = cappedDelayMs + jitterMs;
+
+    debugPrint('[GeminiLive] Scheduling reconnect attempt $_reconnectAttempts/$maxReconnectAttempts in ${totalDelayMs}ms');
+    onStatusChanged?.call('Reconnecting in ${(totalDelayMs / 1000).toStringAsFixed(1)}s...', false);
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(milliseconds: totalDelayMs), () {
+      if (!_isExplicitlyDisconnected && !_isConnected) {
+        connect();
+      }
+    });
+  }
+
   void disconnect() {
+    _isExplicitlyDisconnected = true;
+    _reconnectTimer?.cancel();
+    _reconnectAttempts = 0;
+    _internalDisconnect(isExplicit: true);
+  }
+
+  void dispose() {
+    disconnect();
+  }
+
+  void _internalDisconnect({bool isExplicit = false}) {
     _isConnected = false;
     _isSetupDone = false;
     if (_setupCompleter != null && !_setupCompleter!.isCompleted) {
-      _setupCompleter!.completeError('Disconnected');
+      _setupCompleter!.completeError(isExplicit ? 'Disconnected' : 'Reconnecting');
     }
     _setupCompleter = null;
     _transport?.close();
@@ -165,28 +221,12 @@ CRITICAL CONVERSATIONAL RULES:
         },
         'tools': [
           {
-            'functionDeclarations': [
-              {
-                'name': 'track_bus',
-                'description': 'Opens the live GPS map tracker for the active bus route.'
-              },
-              {
-                'name': 'book_ticket',
-                'description': 'Opens ticket booking and payment checkout flow.'
-              },
-              {
-                'name': 'search_route',
-                'description': 'Finds available buses and shows route options between origin and destination.'
-              },
-              {
-                'name': 'emergency_sos',
-                'description': 'Triggers emergency safety broadcast and shares live location.'
-              },
-              {
-                'name': 'open_saved',
-                'description': 'Opens saved places like Home, College, or Hostel.'
-              }
-            ]
+            'functionDeclarations': AssistantCommandGateway.registry.values
+                .map((tool) => {
+                      'name': tool.name,
+                      'description': tool.description,
+                    })
+                .toList(),
           }
         ]
       }
@@ -198,7 +238,24 @@ CRITICAL CONVERSATIONAL RULES:
   }
 
   /// Streams a user query to the Gemini Multimodal Live API.
+  ///
+  /// Single-voice gating: only one in-flight turn per session. Concurrent
+  /// sends race across the WebSocket/REST transports and produce overlapping
+  /// AI voices saying different turns at once.
   Future<void> sendQuery(String query) async {
+    if (_turnInFlight) {
+      debugPrint('[GeminiLive] sendQuery ignored: turn already in flight');
+      return;
+    }
+    _turnInFlight = true;
+    try {
+      await _sendQueryLocked(query);
+    } finally {
+      _turnInFlight = false;
+    }
+  }
+
+  Future<void> _sendQueryLocked(String query) async {
     _currentTurnText = '';
     _currentTurnAction = null;
 
@@ -328,44 +385,8 @@ CRITICAL CONVERSATIONAL RULES:
               debugPrint('[GeminiLive] Tool call received: $name (id: $callId)');
               onAction?.call(name, args);
 
-              Map<String, dynamic> outputContext;
-              switch (name) {
-                case 'track_bus':
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Live GPS bus map tracker is now open on the passenger\'s screen.',
-                  };
-                  break;
-                case 'book_ticket':
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Ticket booking and payment checkout is now open on the screen.',
-                  };
-                  break;
-                case 'search_route':
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Available buses and route timetable between VIT Main Gate and Katpadi are displayed on the screen.',
-                  };
-                  break;
-                case 'emergency_sos':
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Emergency SOS broadcast activated and live location shared with emergency contacts.',
-                  };
-                  break;
-                case 'open_saved':
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Saved places and favorite routes are open on the passenger\'s screen.',
-                  };
-                  break;
-                default:
-                  outputContext = {
-                    'status': 'success',
-                    'result': 'Action completed successfully on the passenger screen.',
-                  };
-              }
+              final outputContext =
+                  AssistantCommandGateway.buildToolResponseContext(name);
 
               functionResponses.add({
                 'id': callId,
@@ -434,28 +455,12 @@ CRITICAL CONVERSATIONAL RULES:
         },
         'tools': [
           {
-            'functionDeclarations': [
-              {
-                'name': 'track_bus',
-                'description': 'Opens the live GPS map tracker for the active bus.'
-              },
-              {
-                'name': 'book_ticket',
-                'description': 'Opens ticket booking and checkout.'
-              },
-              {
-                'name': 'search_route',
-                'description': 'Searches for available buses on the corridor.'
-              },
-              {
-                'name': 'emergency_sos',
-                'description': 'Triggers emergency safety location broadcast.'
-              },
-              {
-                'name': 'open_saved',
-                'description': 'Opens saved places.'
-              }
-            ]
+            'functionDeclarations': AssistantCommandGateway.registry.values
+                .map((tool) => {
+                      'name': tool.name,
+                      'description': tool.description,
+                    })
+                .toList(),
           }
         ]
       };
@@ -464,6 +469,11 @@ CRITICAL CONVERSATIONAL RULES:
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Gemini REST API request timed out after 10 seconds.');
+        },
       );
 
       if (res.statusCode == 200) {
@@ -499,25 +509,9 @@ CRITICAL CONVERSATIONAL RULES:
             if (trimmed.isEmpty ||
                 trimmed.toLowerCase().contains('executing') ||
                 trimmed.toLowerCase().contains(actionName.toLowerCase())) {
-              switch (actionName) {
-                case 'track_bus':
-                  responseText = 'I\'ve opened the live bus tracker for you.';
-                  break;
-                case 'book_ticket':
-                  responseText = 'Opening ticket booking for you now.';
-                  break;
-                case 'search_route':
-                  responseText = 'Here are the available buses for your route.';
-                  break;
-                case 'emergency_sos':
-                  responseText = 'Emergency safety broadcast has been activated.';
-                  break;
-                case 'open_saved':
-                  responseText = 'Here are your saved places and routes.';
-                  break;
-                default:
-                  responseText = 'Sure, right away.';
-              }
+              responseText =
+                  AssistantCommandGateway.getMetadata(actionName)?.promptSummary ??
+                      'Sure, right away.';
             }
           }
 
@@ -527,6 +521,9 @@ CRITICAL CONVERSATIONAL RULES:
       } else {
         onError?.call('Gemini API error (${res.statusCode}): ${res.body}');
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[GeminiLive] REST fallback timeout: $e');
+      onError?.call('Request timed out. Please check your internet connection.');
     } catch (e) {
       debugPrint('[GeminiLive] REST fallback error: $e');
       onError?.call('Could not connect to Gemini API: $e');

@@ -1,10 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/di/service_locator.dart';
-import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
-import '../../data/repositories/ticket_repository.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
@@ -18,6 +17,7 @@ import 'audio_speech_engine.dart';
 import 'floating_assistant_controller.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
+import 'tts_fallback_arbiter.dart';
 
 /// Full-Screen & Modal Interactive Gemini Live Conversational Overlay Screen.
 class GeminiLiveScreen extends StatefulWidget {
@@ -50,7 +50,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
   bool _isListening = true;
   bool _isSpeaking = false;
+  bool _isPermissionBlocked = false;
   bool _receivedPcmThisTurn = false;
+  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter();
   String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
   GeminiLiveResponse? _lastResponse;
@@ -71,6 +73,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
+      // BUS-P2-04 (discarded_futures): `repeat()` returns a TickerFuture that
+      // never completes while the screen is alive. Awaiting it would stall
+      // initState; it is intentionally fire-and-forget for the pulse loop.
+      // ignore: discarded_futures
     )..repeat(reverse: true);
 
     _liveSession = GeminiLiveSession(
@@ -88,6 +94,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         if (!mounted) return;
         _receivedPcmThisTurn = true;
         _speechTimer?.cancel();
+        _ttsArbiter.notifyPcmReceived();
         if (!_isSpeaking || _spokenOutput.startsWith('Thinking...')) {
           setState(() {
             _isSpeaking = true;
@@ -132,11 +139,22 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           }
         });
 
-        // Safety fallback timer for text-only turns; PCM playback completion is governed by onAudioEnded
+        // If native PCM already arrived, any deferred TTS fallback for this
+        // turn must be cancelled so we do not speak both via PCM and TTS.
+        _ttsArbiter.cancel();
+
+        // Safety fallback audio: when the Live API did not stream PCM, speak
+        // the turn text via Web SpeechSynthesis so the response is audible.
         _speechTimer?.cancel();
         if (!_receivedPcmThisTurn) {
           if (_spokenOutput.isNotEmpty) {
-            _audioEngine.speak(_spokenOutput);
+            _ttsArbiter.scheduleFallback(() {
+              if (mounted) {
+                _speechTimer?.cancel();
+                _audioEngine.speak(_spokenOutput);
+                _endSpeakingAfterFallback();
+              }
+            });
           }
           final wordCount = _spokenOutput.split(' ').length;
           final fallbackMs = (wordCount * 300).clamp(1500, 10000);
@@ -241,13 +259,33 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _continuousListening = false;
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
+    _ttsArbiter.dispose();
     FloatingAssistantController.instance.setFullScreenActive(false);
-    _liveSession.disconnect();
+    _liveSession.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();
     _pulseController.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  /// Ends the speaking UI state after a deferred Web SpeechSynthesis fallback
+  /// actually starts, resyncing the word-count end timer from speech start.
+  void _endSpeakingAfterFallback() {
+    if (!mounted) return;
+    _speechTimer?.cancel();
+    final wordCount = _spokenOutput.split(' ').length;
+    final fallbackMs = (wordCount * 300).clamp(1500, 10000);
+    _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
+      if (mounted && _isSpeaking) {
+        setState(() {
+          _isSpeaking = false;
+        });
+        if (_continuousListening && !_isListening) {
+          _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        }
+      }
+    });
   }
 
   void _startMicrophoneListening({bool playChimeTone = false, bool isRestart = false}) {
@@ -264,6 +302,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     }
 
     setState(() {
+      _isPermissionBlocked = false;
       _isListening = true;
       _isSpeaking = false;
       _liveTranscription = 'Listening... Speak into your microphone.';
@@ -293,6 +332,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _continuousListening = false;
           _restartListenTimer?.cancel();
           setState(() {
+            _isPermissionBlocked = true;
             _isListening = false;
             _liveTranscription = 'Microphone permission blocked. Please allow mic access in your browser.';
           });
@@ -369,6 +409,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();
     _restartListenTimer?.cancel();
+    _ttsArbiter.beginTurn();
     _audioEngine.stop();
     _audioEngine.stopListening();
     _audioEngine.resetTurn();
@@ -389,7 +430,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _liveTranscription = 'Gemini Live API key is required.';
         _spokenOutput = msg;
       });
-      _audioEngine.speak(msg);
+      _ttsArbiter.speakNow(() => _audioEngine.speak(msg));
       final wordCount = msg.split(' ').length;
       final fallbackMs = (wordCount * 300).clamp(1500, 10000);
       _speechTimer?.cancel();
@@ -408,14 +449,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isSpeaking = true;
       _spokenOutput = 'Thinking... (streaming from Google AI Studio Live API)';
     });
-    _liveSession.sendQuery(clean);
+    unawaited(_liveSession.sendQuery(clean));
   }
 
   void _showApiKeyDialog() {
     final textCtrl = TextEditingController(text: AppSettingsController.instance.geminiApiKey);
     String selectedModel = AppSettingsController.instance.geminiModel;
     String selectedVoice = AppSettingsController.instance.geminiVoice;
-
     final modelOptions = const [
       {
         'id': 'models/gemini-3.8-live',
@@ -445,8 +485,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       selectedVoice = 'Aoede';
     }
 
-    showDialog(
-      context: context,
+    unawaited(
+      showDialog<void>(
+        context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF111C33),
@@ -597,73 +638,74 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           ],
         ),
       ),
-    ).then((_) => textCtrl.dispose());
+    ).then((_) => textCtrl.dispose()),
+    );
   }
 
   void _executeAction(String actionType) {
     if (_actionExecutedThisTurn) return;
     _actionExecutedThisTurn = true;
     if (actionType == 'book_ticket') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => TicketBookingSuitePage(
             ticketController: _ticketController,
             initialStepIndex: 0,
           ),
         ),
-      );
+      ));
     } else if (actionType == 'track_bus') {
       final ticket = _activeTicket;
       if (ticket != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => LiveLocationScreen(
               ticket: ticket,
               repository: _repository,
             ),
           ),
-        );
+        ));
       } else {
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => TicketBookingSuitePage(
               ticketController: _ticketController,
               initialStepIndex: 0,
             ),
           ),
-        );
+        ));
       }
     } else if (actionType == 'search_route') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => TicketBookingSuitePage(
             ticketController: _ticketController,
             initialStepIndex: 1,
           ),
         ),
-      );
+      ));
     } else if (actionType == 'share_location') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => SafetySharingPage(
             activeTicket: _activeTicket,
           ),
         ),
-      );
+      ));
     } else if (actionType == 'open_saved') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => SavedPage(
             ticketController: _ticketController,
           ),
         ),
-      );
+      ));
     } else if (actionType == 'customize_home') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => const HomeScreenCustomizationPage(),
         ),
-      );
+      ));
     } else if (actionType == 'reset_home') {
       AppSettingsController.instance.resetHomeScreenLayout();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -904,12 +946,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ],
                         if (_lastResponse?.actionType != null) ...[
                           const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minWidth: double.infinity, minHeight: 48),
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFF007AFF),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
@@ -982,11 +1024,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               _startMicrophoneListening(playChimeTone: true);
                             }
                           },
-                          child: Tooltip(
-                            message: _isListening
-                                ? 'Microphone listening. Tap to pause.'
-                                : 'Microphone paused. Tap to start continuous voice.',
-                            child: Container(
+                          child: Semantics(
+                            button: true,
+                            label: 'Microphone orb. Double tap to start or pause continuous voice.',
+                            child: Tooltip(
+                              message: _isListening
+                                  ? 'Microphone listening. Tap to pause.'
+                                  : 'Microphone paused. Tap to start continuous voice.',
+                              child: Container(
                               width: 64,
                               height: 64,
                               decoration: const BoxDecoration(
@@ -1004,6 +1049,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                                     : const Color(0xFF64748B),
                                 size: 32,
                               ),
+                            ),
                             ),
                           ),
                         ),
@@ -1048,15 +1094,72 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ),
                       ),
                     ],
-                    Text(
-                      _liveTranscription,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    if (_isPermissionBlocked) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.mic_off, color: Color(0xFFF87171), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Microphone Permission Blocked',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Microphone access is blocked. Allow microphone access in your browser or device settings, then tap Try Again.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () {
+                                  _startMicrophoneListening(playChimeTone: true);
+                                },
+                                icon: const Icon(Icons.refresh, size: 18),
+                                label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      Text(
+                        _liveTranscription,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

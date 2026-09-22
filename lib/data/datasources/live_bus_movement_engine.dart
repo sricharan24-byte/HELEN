@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:latlong2/latlong.dart';
 
+import '../../core/di/async_disposable.dart';
 import '../models/transport_models.dart';
 import '../services/corridor_road_paths.dart';
 import '../services/osrm_routing_service.dart';
@@ -11,7 +12,7 @@ import 'local_transport_data_source.dart';
 /// Simulated live bus movement that drives along the real street path of the
 /// route (OSRM geometry when online, pre-fetched corridor geometry offline)
 /// instead of hopping in straight lines between stops.
-class LiveBusMovementEngine {
+class LiveBusMovementEngine implements AsyncDisposable {
   LiveBusMovementEngine({
     required this.busId,
     required this.route,
@@ -23,9 +24,17 @@ class LiveBusMovementEngine {
   final LocalTransportDataSource _dataSource;
   final OsrmRoutingService _routingService = const OsrmRoutingService();
 
+  // Sink ownership: created lazily in [locationStream], closed in [dispose()]
+  // and _stopSimulation; lint cannot model the onListen/onCancel lifetime.
+  // ignore: close_sinks
   StreamController<BusLocation>? _controller;
   Timer? _timer;
   bool _refreshingPath = false;
+  int _generation = 0;
+  bool _isDisposed = false;
+
+  bool get isDisposed => _isDisposed;
+  int get generation => _generation;
 
   /// Demo loop length: the full corridor is traversed in ~2 minutes so the
   /// prototype shows a complete end-to-end journey quickly.
@@ -33,6 +42,7 @@ class LiveBusMovementEngine {
   static const Duration _tickInterval = Duration(seconds: 2);
 
   int _tick = 0;
+  int _sequence = 0;
 
   List<LatLng> _roadPath = const [];
   List<double> _cumulativeDistances = const [];
@@ -75,14 +85,16 @@ class LiveBusMovementEngine {
     _timer = Timer.periodic(_tickInterval, (_) => _emitNextStep());
 
     // Refine with a live OSRM street route when the network allows it.
-    _refreshPathFromOsrm(stops);
+    unawaited(_refreshPathFromOsrm(stops));
   }
 
   Future<void> _refreshPathFromOsrm(List<Stop> stops) async {
-    if (_refreshingPath) return;
+    if (_refreshingPath || _isDisposed) return;
     _refreshingPath = true;
+    final token = _generation;
     try {
       final fresh = await _routingService.fetchRoutePolyline(stops);
+      if (_isDisposed || token != _generation) return;
       if (fresh.length > 2) _applyPath(fresh);
     } catch (_) {
       // Keep the baked corridor path.
@@ -173,6 +185,7 @@ class LiveBusMovementEngine {
     // Smoothly varying simulated speed within the 22-36 km/h town-bus range.
     final speed = 28 + 6 * sin(_tick * 0.7);
 
+    _sequence++;
     final location = BusLocation(
       busId: busId,
       routeId: route.id,
@@ -184,6 +197,11 @@ class LiveBusMovementEngine {
       etaMinutes: etaMinutes,
       timestamp: DateTime.now(),
       progressPercentage: fraction.clamp(0.0, 1.0),
+      sequence: _sequence,
+      generation: _generation,
+      accuracyMeters: 4.5,
+      isSimulated: true,
+      receivedTimestamp: DateTime.now().toUtc(),
     );
 
     _controller!.add(location);
@@ -228,8 +246,16 @@ class LiveBusMovementEngine {
     return earthRadius * 2 * atan2(sqrt(h), sqrt(1 - h));
   }
 
-  void dispose() {
+  @override
+  Future<void> dispose() async {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _generation++;
     _stopSimulation();
-    _controller?.close();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null && !controller.isClosed) {
+      await controller.close();
+    }
   }
 }

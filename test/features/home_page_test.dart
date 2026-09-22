@@ -41,9 +41,7 @@ Widget testApp({
 
 void main() {
   setUpAll(stubMapTiles);
-  setUp(() {
-    AppSettingsController.instance.resetHomeScreenLayout();
-  });
+  setUp(AppSettingsController.instance.resetHomeScreenLayout);
 
   // ── Header & Branding ────────────────────────────────────────────────
   group('Header & Branding', () {

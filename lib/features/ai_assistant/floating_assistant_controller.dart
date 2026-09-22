@@ -5,6 +5,7 @@ import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
+import '../../domain/assistant/assistant_command.dart';
 import '../journey/journey_controller.dart';
 import '../route_details/route_details_page.dart';
 import '../safety/safety_sharing_page.dart';
@@ -13,7 +14,6 @@ import '../settings/home_screen_customization_page.dart';
 import '../settings/voice_assistant_settings_page.dart';
 import '../tickets/booking_page.dart';
 import '../tickets/live_location_screen.dart';
-import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
 import 'audio_speech_engine.dart';
 import 'floating_chat_message.dart';
@@ -52,6 +52,7 @@ class FloatingAssistantController extends ChangeNotifier {
   bool _continuousListening = false;
   Timer? _restartListenTimer;
 
+  bool _isPermissionBlocked = false;
   Offset _position = const Offset(24, 480);
   bool _hasCustomPosition = false;
 
@@ -65,6 +66,7 @@ class FloatingAssistantController extends ChangeNotifier {
   bool get isListening => _isListening;
   bool get isSpeaking => _isSpeaking;
   bool get isFullScreenActive => _isFullScreenActive;
+  bool get isPermissionBlocked => _isPermissionBlocked;
   bool get hasUnread => _hasUnread;
   bool get isContinuousListening => _continuousListening;
   String get liveStatus => _liveStatus;
@@ -95,9 +97,22 @@ class FloatingAssistantController extends ChangeNotifier {
     }
   }
 
+  void _setSpeaking(bool value) {
+    if (_isSpeaking == value) return;
+    _isSpeaking = value;
+    AnnouncementCoordinator.instance.setAudioPlaying(value);
+  }
+
+  /// Public hook for external audio engines/tests to toggle speaking state.
+  /// Synchronizes with [AnnouncementCoordinator.isAudioPlaying] so accessibility
+  /// announcements are queued while the assistant voice is active.
+  void setSpeaking(bool value) => _setSpeaking(value);
+
   void _initAudio() {
+    AnnouncementCoordinator.instance.onUrgentAlertTriggered = stopSpeaking;
+
     _audioEngine.setAudioEndedCallback(() {
-      _isSpeaking = false;
+      _setSpeaking(false);
       _speechTimer?.cancel();
       if (_continuousListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
         _scheduleRestartListening(delayMs: 350, playChimeTone: true);
@@ -300,6 +315,7 @@ class FloatingAssistantController extends ChangeNotifier {
       _audioEngine.playChime(isListening: true);
     }
 
+    _isPermissionBlocked = false;
     _isListening = true;
     _liveStatus = 'Listening...';
     _lastInterimTranscript = null;
@@ -322,11 +338,14 @@ class FloatingAssistantController extends ChangeNotifier {
             err.toLowerCase().contains('denied') ||
             err.toLowerCase().contains('not-allowed');
         if (isPermission) {
+          _isPermissionBlocked = true;
           _continuousListening = false;
           _restartListenTimer?.cancel();
         }
         _isListening = false;
-        _liveStatus = 'Mic error: $err';
+        _liveStatus = isPermission
+            ? 'Microphone permission blocked.'
+            : 'Mic error: $err';
         notifyListeners();
 
         if (!isPermission && _continuousListening && !_isSpeaking && !_isMuted && !_isFullScreenActive && _isWindowOpen) {
@@ -393,7 +412,7 @@ class FloatingAssistantController extends ChangeNotifier {
     // Check if live AI Studio WebSocket key is available
     if (AppSettingsController.instance.geminiApiKey.isNotEmpty) {
       _ensureSession();
-      _liveSession?.sendQuery(query);
+      unawaited(_liveSession?.sendQuery(query));
     } else {
       final ticket = activeTicket;
       final resp = _liveService.processVoiceQuery(query, activeTicket: ticket);
@@ -448,30 +467,30 @@ class FloatingAssistantController extends ChangeNotifier {
         final currentTicket = activeTicket;
         final currentRepo = repository;
         if (currentTicket != null && currentRepo != null) {
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => LiveLocationScreen(
                 ticket: currentTicket,
                 repository: currentRepo,
               ),
             ),
-          );
+          ));
         } else if (ticketController != null) {
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => BookingPage(ticketController: ticketController!),
             ),
-          );
+          ));
         }
         break;
 
       case 'book_ticket':
         if (ticketController != null) {
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => BookingPage(ticketController: ticketController!),
             ),
-          );
+          ));
         }
         break;
 
@@ -480,61 +499,61 @@ class FloatingAssistantController extends ChangeNotifier {
           if (journeyController!.state.selectedRoute == null && repository!.allRoutes.isNotEmpty) {
             journeyController!.selectRoute(repository!.allRoutes.first);
           }
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => RouteDetailsPage(
                 controller: journeyController!,
                 repository: repository!,
               ),
             ),
-          );
+          ));
         } else if (ticketController != null) {
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => BookingPage(ticketController: ticketController!),
             ),
-          );
+          ));
         }
         break;
 
       case 'open_saved':
         if (ticketController != null) {
-          nav.push(
-            MaterialPageRoute(
+          unawaited(nav.push(
+            MaterialPageRoute<void>(
               builder: (_) => SavedPage(ticketController: ticketController!),
             ),
-          );
+          ));
         }
         break;
 
       case 'emergency_sos':
       case 'share_location':
-        nav.push(
-          MaterialPageRoute(
+        unawaited(nav.push(
+          MaterialPageRoute<void>(
             builder: (_) => SafetySharingPage(
               activeTicket: activeTicket,
             ),
           ),
-        );
+        ));
         break;
 
       case 'customize_home':
-        nav.push(
-          MaterialPageRoute(
+        unawaited(nav.push(
+          MaterialPageRoute<void>(
             builder: (_) => const HomeScreenCustomizationPage(),
           ),
-        );
+        ));
         break;
 
       case 'open_settings':
-        nav.push(
-          MaterialPageRoute(
+        unawaited(nav.push(
+          MaterialPageRoute<void>(
             builder: (_) => VoiceAssistantSettingsPage(
               ticketController: ticketController,
               repository: repository,
             ),
           ),
-        );
+        ));
         break;
 
       case 'reset_home':
@@ -554,8 +573,8 @@ class FloatingAssistantController extends ChangeNotifier {
     closeWindow();
     setFullScreenActive(true);
 
-    nav.push(
-      MaterialPageRoute(
+    unawaited(nav.push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           ticketController: ticketController,
           repository: repository,
@@ -564,7 +583,7 @@ class FloatingAssistantController extends ChangeNotifier {
       ),
     ).then((_) {
       setFullScreenActive(false);
-    });
+    }));
   }
 
   void setFullScreenActive(bool active) {
@@ -626,7 +645,12 @@ class FloatingAssistantController extends ChangeNotifier {
   void resetForTesting() {
     _speechTimer?.cancel();
     _restartListenTimer?.cancel();
+    _audioEngine.stopListening();
+    _audioEngine.stop();
     _liveSession?.disconnect();
+    _liveSession = null;
+    _connectedApiKey = null;
+    _connectedVoice = null;
     _isWindowOpen = false;
     _isMuted = false;
     _isListening = false;
@@ -638,6 +662,9 @@ class FloatingAssistantController extends ChangeNotifier {
     _continuousListening = false;
     _hasCustomPosition = false;
     _messages.clear();
+    ticketController = null;
+    repository = null;
+    journeyController = null;
     notifyListeners();
   }
 
@@ -674,19 +701,18 @@ class FloatingAssistantController extends ChangeNotifier {
   }
 
   String _getActionLabel(String? actionType) {
+    if (actionType == null) return 'Transit Action';
+    final metadata = AssistantCommandGateway.getMetadata(actionType);
+    if (metadata != null) {
+      return metadata.gatewayScreenPrompt;
+    }
     switch (actionType) {
-      case 'track_bus':
-        return '📍 Open Live Bus Map';
-      case 'book_ticket':
-        return '🎫 Book Bus Ticket';
-      case 'search_route':
-        return '🚌 View Route Options';
-      case 'open_saved':
-        return '⭐ Saved Places';
       case 'open_settings':
         return '⚙️ Setup Gemini Live Key';
-      case 'emergency_sos':
-        return '🚨 Safety Broadcast';
+      case 'customize_home':
+        return '🎨 Customize Layout';
+      case 'reset_home':
+        return '🔄 Restore Layout';
       default:
         return 'Transit Action';
     }

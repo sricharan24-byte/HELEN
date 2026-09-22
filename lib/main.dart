@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/a11y/enlarging_text_scaler.dart';
@@ -5,10 +6,8 @@ import 'core/di/service_locator.dart';
 import 'core/settings/app_settings_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'data/datasources/local_json_store.dart';
-import 'data/datasources/local_transport_data_source.dart';
 import 'data/repositories/emergency_contact_repository.dart';
 import 'data/models/transport_models.dart' as models;
-import 'data/repositories/ticket_repository.dart';
 import 'data/repositories/transport_repository.dart';
 import 'features/ai_assistant/floating_ai_assistant_overlay.dart';
 import 'features/home/home_page.dart';
@@ -26,12 +25,11 @@ Future<void> main() async {
 
   // ── Composition root ─────────────────────────────────────────────────
   final locator = AppServiceLocator.instance;
-  if (locator.ticketRepository is LocalTicketRepository) {
-    await (locator.ticketRepository as LocalTicketRepository).hydrate(store);
-  }
-  final journeyController = locator.journeyController;
-  final repository = locator.transportRepository;
   final ticketController = locator.ticketController;
+  await ticketController.hydrate(store);
+  final journeyController = locator.journeyController;
+  await journeyController.hydrate(store);
+  final repository = locator.transportRepository;
 
   runApp(
     MyApp(
@@ -124,14 +122,14 @@ class MyApp extends StatelessWidget {
 
           journeyController.selectRoute(resolved);
 
-          _navigatorKey.currentState?.push(
-            MaterialPageRoute(
+          unawaited(_navigatorKey.currentState?.push(
+            MaterialPageRoute<void>(
               builder: (_) => RouteDetailsPage(
                 controller: journeyController,
                 repository: repository,
               ),
             ),
-          );
+          ));
         },
       ),
     );

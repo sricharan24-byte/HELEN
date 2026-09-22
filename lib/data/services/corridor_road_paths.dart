@@ -216,9 +216,9 @@ abstract final class CorridorRoadPaths {
   /// Returns the baked road path for a pair of endpoint stop ids in either
   /// direction, or `null` when the pair has no baked corridor.
   static List<LatLng>? pathForEndpoints(String stopIdA, String stopIdB) {
-    final forward = corridorEndStopIds['${stopIdA}|${stopIdB}'];
+    final forward = corridorEndStopIds['$stopIdA|$stopIdB'];
     if (forward != null) return _pathForCorridor(forward);
-    final reverse = corridorEndStopIds['${stopIdB}|${stopIdA}'];
+    final reverse = corridorEndStopIds['$stopIdB|$stopIdA'];
     if (reverse != null) return _pathForCorridor(reverse).reversed.toList();
     return null;
   }

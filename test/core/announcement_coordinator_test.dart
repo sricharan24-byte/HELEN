@@ -6,13 +6,9 @@ void main() {
 
   final coordinator = AnnouncementCoordinator.instance;
 
-  setUp(() {
-    coordinator.reset();
-  });
+  setUp(coordinator.reset);
 
-  tearDown(() {
-    coordinator.reset();
-  });
+  tearDown(coordinator.reset);
 
   group('AnnouncementCoordinator (Astra Step 2.2)', () {
     test('updates visualStatusText and returns true for valid message', () {

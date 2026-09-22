@@ -46,12 +46,12 @@ void main() {
       // Move to bottom left
       controller.moveToBottomLeft(screenSize, safeArea);
       expect(controller.position.dx, equals(16.0));
-      expect(controller.position.dy, equals(800.0 - 20.0 - 64.0 - 16.0));
+      expect(controller.position.dy, equals(800.0 - 20.0 - 150.0));
 
-      // Move to bottom right
+      // Move to bottom right (reset)
       controller.moveToBottomRight(screenSize, safeArea);
-      expect(controller.position.dx, equals(400.0 - 64.0 - 16.0));
-      expect(controller.position.dy, equals(800.0 - 20.0 - 64.0 - 16.0));
+      expect(controller.position.dx, equals(400.0 - 64.0 - 20.0));
+      expect(controller.position.dy, equals(800.0 - 20.0 - 64.0 - 90.0));
     });
 
     test('isSpeaking state synchronizes with AnnouncementCoordinator.isAudioPlaying', () {
@@ -100,19 +100,46 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Bubble is visible, window is closed
-      expect(find.byType(BlockSemantics), findsNothing);
+      // Bubble is visible, window is closed (exclude the Navigator's own ModalBarrier
+      // BlockSemantics by scoping the finder to the overlay widget)
+      expect(
+        find.descendant(
+          of: find.byType(FloatingAiAssistantOverlay),
+          matching: find.byType(BlockSemantics),
+        ),
+        findsNothing,
+      );
 
       // Open window
       await tester.tap(find.byIcon(Icons.auto_awesome));
       await tester.pumpAndSettle();
 
-      // BlockSemantics should now be present to isolate focus inside modal assistant
-      final blockSemanticsFinder = find.byType(BlockSemantics);
-      expect(blockSemanticsFinder, findsOneWidget);
+      // Verify BlockSemantics barrier is scoped to the floating overlay window
+      // (MaterialApp's own Navigator ModalBarrier also contains a BlockSemantics)
+      final overlayBlockSemantics = find.descendant(
+        of: find.byType(FloatingAiAssistantOverlay),
+        matching: find.byType(BlockSemantics),
+      );
+      expect(overlayBlockSemantics, findsOneWidget);
 
-      final blockSemanticsWidget = tester.widget<BlockSemantics>(blockSemanticsFinder);
+      final blockSemanticsWidget = tester.widget<BlockSemantics>(overlayBlockSemantics);
       expect(blockSemanticsWidget.blocking, isTrue);
+
+      // Verify controls have >= 48dp minimum hit targets
+      // Close control uses a tooltip; asserted below via the icon finder.
+
+      // Even if tooltip is not set, find by icon Icons.close
+      final closeIconFinder = find.byIcon(Icons.close);
+      expect(closeIconFinder, findsOneWidget);
+      final closeSize = tester.getSize(find.ancestor(of: closeIconFinder, matching: find.byType(IconButton)));
+      expect(closeSize.width, greaterThanOrEqualTo(48.0));
+      expect(closeSize.height, greaterThanOrEqualTo(48.0));
+
+      final sendIconFinder = find.byIcon(Icons.send);
+      expect(sendIconFinder, findsOneWidget);
+      final sendSize = tester.getSize(find.ancestor(of: sendIconFinder, matching: find.byType(IconButton)));
+      expect(sendSize.width, greaterThanOrEqualTo(48.0));
+      expect(sendSize.height, greaterThanOrEqualTo(48.0));
 
       // Clean up
       controller.closeWindow();

@@ -34,13 +34,9 @@ Widget testHomePageApp({TicketController? ticketController}) {
 
 void main() {
   setUpAll(stubMapTiles);
-  setUp(() {
-    AppSettingsController.instance.resetHomeScreenLayout();
-  });
+  setUp(AppSettingsController.instance.resetHomeScreenLayout);
 
-  tearDown(() {
-    AppSettingsController.instance.resetHomeScreenLayout();
-  });
+  tearDown(AppSettingsController.instance.resetHomeScreenLayout);
 
   group('HomePage Custom Layout Rendering', () {
     testWidgets('renders cards according to customized order in AppSettingsController', (tester) async {

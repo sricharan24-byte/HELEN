@@ -56,6 +56,7 @@ class MapTextAlternativeWidget extends StatelessWidget {
               Expanded(
                 child: Semantics(
                   header: true,
+                  headingLevel: 2,
                   child: Text(
                     'Live Bus Status (Map Alternative)',
                     style: TextStyle(
@@ -90,22 +91,22 @@ class MapTextAlternativeWidget extends StatelessWidget {
           // Next stop row
           Semantics(
             label: 'Next Stop: $nextStopText',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            excludeSemantics: true,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
               children: [
                 Text(
-                  'Next Stop:',
+                  'Next Stop: ',
                   style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
-                Flexible(
-                  child: Text(
-                    nextStopText,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  nextStopText,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -116,11 +117,14 @@ class MapTextAlternativeWidget extends StatelessWidget {
           // ETA row
           Semantics(
             label: 'Estimated Arrival: $etaText',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            excludeSemantics: true,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
               children: [
                 Text(
-                  'Estimated Arrival:',
+                  'Estimated Arrival: ',
                   style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
                 Text(
@@ -139,11 +143,14 @@ class MapTextAlternativeWidget extends StatelessWidget {
           // Speed & Remaining stops row
           Semantics(
             label: 'Speed: $speedText, $stopCountText',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            excludeSemantics: true,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
               children: [
                 Text(
-                  'Current Speed:',
+                  'Current Speed: ',
                   style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
                 Text(
@@ -160,14 +167,17 @@ class MapTextAlternativeWidget extends StatelessWidget {
 
           if (onViewStopDetails != null) ...[
             const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              height: AppSpacing.minTouchTarget,
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: double.infinity,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
                   foregroundColor: colors.textPrimary,
                   side: BorderSide(color: colors.border),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   ),

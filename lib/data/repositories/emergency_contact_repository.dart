@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../datasources/local_json_store.dart';
@@ -14,7 +15,7 @@ class EmergencyContactRepository extends ChangeNotifier {
   ];
 
   List<Map<String, String>> get contacts => List.unmodifiable(
-    _contacts.map((contact) => Map<String, String>.unmodifiable(contact)),
+    _contacts.map(Map<String, String>.unmodifiable),
   );
 
   static bool _valid(Object? value) =>
@@ -62,7 +63,7 @@ class EmergencyContactRepository extends ChangeNotifier {
   }
 
   void _persist() {
-    _store?.write(storageKey, _contacts);
+    unawaited(_store?.write(storageKey, _contacts));
     notifyListeners();
   }
 }

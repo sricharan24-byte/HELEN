@@ -1,9 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/di/service_locator.dart';
-import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
-import '../../data/repositories/ticket_repository.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../safety/safety_sharing_page.dart';
 import '../tickets/booking_page.dart';
@@ -79,31 +78,31 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
     Navigator.of(context).pop(); // Close dialog first
 
     if (actionType == 'book_ticket') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => BookingPage(ticketController: _ticketController),
         ),
-      );
+      ));
     } else if (actionType == 'track_bus') {
       final ticket = _activeTicket;
       if (ticket != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute<void>(
             builder: (_) => LiveLocationScreen(
               ticket: ticket,
               repository: _repository,
             ),
           ),
-        );
+        ));
       }
     } else if (actionType == 'share_location') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
           builder: (_) => SafetySharingPage(
             activeTicket: _activeTicket,
           ),
         ),
-      );
+      ));
     }
   }
 
@@ -122,14 +121,14 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
 
   void _openGeminiLiveScreen() {
     Navigator.of(context).pop();
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           ticketController: _ticketController,
           repository: _repository,
         ),
       ),
-    );
+    ));
   }
 
   @override

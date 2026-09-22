@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -38,7 +40,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
   void _showTextSizePicker() {
     final colors = AppTheme.colors(context);
 
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
@@ -89,18 +91,18 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
           ),
         );
       },
-    );
+    ));
   }
 
   void _openAskBusBuddy() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           repository: widget.repository,
           ticketController: widget.ticketController,
         ),
       ),
-    );
+    ));
   }
 
   @override
@@ -219,7 +221,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                     ],
                   ),
                   onTap: () {
-                    setState(() => _settings.toggleHighContrast());
+                    setState(_settings.toggleHighContrast);
                     AnnouncementCoordinator.instance.announce(
                       'High contrast ${_settings.highContrast == 'On' ? 'enabled (WCAG AAA 7:1 ratio)' : 'disabled'}',
                       priority: AnnouncementPriority.normal,
@@ -236,14 +238,14 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   subtitle: 'App voice, TalkBack support',
                   trailing: Icon(Icons.chevron_right, color: colors.textSecondary, size: 20),
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
+                    unawaited(Navigator.of(context).push(
+                      MaterialPageRoute<void>(
                         builder: (_) => VoiceAssistantSettingsPage(
                           repository: widget.repository,
                           ticketController: widget.ticketController,
                         ),
                       ),
-                    );
+                    ));
                   },
                   colors: colors,
                 ),
@@ -344,6 +346,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
               child: Semantics(
                 button: true,
                 label: 'Ask BusBuddy. Need help with settings? Just ask.',
+                excludeSemantics: true,
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
@@ -407,7 +410,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
     required String title,
     required String subtitle,
     required Widget trailing,
-    required dynamic colors,
+    required AppSemanticColors colors,
     VoidCallback? onTap,
   }) {
     return Semantics(

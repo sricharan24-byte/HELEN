@@ -34,8 +34,8 @@ void main() {
     expect(find.text('ACTIVE'), findsOneWidget);
     expect(find.text('Today, 6 Sep 2025'), findsOneWidget);
     expect(find.text('10:30 AM'), findsOneWidget);
-    expect(find.text('₹25'), findsOneWidget);
-    expect(find.text('Ticket ID: BB184256'), findsOneWidget);
+    expect(find.text('₹20'), findsOneWidget);
+    expect(find.text('Ticket ID: BB-20250906-184256'), findsOneWidget);
     expect(find.text('Valid Ticket'), findsOneWidget);
 
     // Verify Buttons & Quick Actions
@@ -78,7 +78,7 @@ void main() {
     expect(find.text('Valid Ticket'), findsOneWidget);
     expect(find.text('Show this ticket while boarding'), findsOneWidget);
     expect(find.text('Passenger: Pavan K'), findsOneWidget);
-    expect(find.text('BB184256'), findsAtLeastNWidgets(1));
+    expect(find.text('BB-20250906-184256'), findsAtLeastNWidgets(1));
     expect(find.text('Scan this QR code while boarding'), findsOneWidget);
     expect(find.text('Important'), findsOneWidget);
   });

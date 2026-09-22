@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
 
 /// Digital Ticket Pass details screen matching Image 2 reference UI with QR code and ticket perforation notches.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
@@ -43,12 +44,12 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
 
   void _pinShortcut(AdaptiveShortcut shortcut) {
     _service.acceptShortcut(shortcut.id);
-    SemanticsService.announce('Pinned ${shortcut.title}', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), 'Pinned ${shortcut.title}', TextDirection.ltr));
   }
 
   void _dismissShortcut(AdaptiveShortcut shortcut) {
     _service.dismissShortcut(shortcut.id);
-    SemanticsService.announce('Dismissed ${shortcut.title}', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), 'Dismissed ${shortcut.title}', TextDirection.ltr));
   }
 
   @override
@@ -58,6 +59,10 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
     final shortcuts = _service.visibleShortcuts;
     if (shortcuts.isEmpty) return const SizedBox.shrink();
 
+    // Scale the horizontal strip height with the platform text scaler so card
+    // content reflows at 200–300% accessibility text sizes (Astra BUS-P1-05).
+    final shortcutStripHeight = MediaQuery.textScalerOf(context).scale(114.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -65,20 +70,24 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: const [
-                Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 16),
-                SizedBox(width: 8),
-                Text(
-                  'Suggested for You',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
+            Expanded(
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 16),
+                  const SizedBox(width: 8),
+                  const Flexible(
+                    child: Text(
+                      'Suggested for You',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             TextButton(
               onPressed: () => AdaptiveShortcutsModal.show(context),
@@ -101,11 +110,11 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
 
         // ── Horizontal Scrollable Shortcut Cards ───────────────────────
         SizedBox(
-          height: 114,
+          height: shortcutStripHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: shortcuts.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final shortcut = shortcuts[index];
               return _buildShortcutCard(shortcut);
@@ -123,6 +132,7 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
     return Semantics(
       button: true,
       label: '${shortcut.title}. ${shortcut.subtitle}. Tap to execute shortcut.',
+      excludeSemantics: true,
       child: Material(
         color: const Color(0xFF111C33),
         borderRadius: BorderRadius.circular(20),
@@ -183,10 +193,10 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                           Semantics(
                             button: true,
                             label: 'Pin ${shortcut.title}',
+                            excludeSemantics: true,
                             child: IconButton(
                               icon: const Icon(Icons.check, size: 18, color: Color(0xFF22C55E)),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               tooltip: 'Pin Shortcut',
                               onPressed: () => _pinShortcut(shortcut),
@@ -195,10 +205,10 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                           Semantics(
                             button: true,
                             label: 'Dismiss ${shortcut.title}',
+                            excludeSemantics: true,
                             child: IconButton(
                               icon: const Icon(Icons.close, size: 18, color: Color(0xFF94A3B8)),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               tooltip: 'Dismiss',
                               onPressed: () => _dismissShortcut(shortcut),

@@ -122,7 +122,11 @@ void main() {
         busId: 'Bus 18B',
         passengerName: 'Passenger',
         passengerType: PassengerType.student,
-        fareAmount: 10.0,
+        fareQuote: FareQuote.fromPaise(
+          basePaise: 1500,
+          passengerType: PassengerType.student,
+          discountPercentage: 40,
+        ),
         paymentMethod: PaymentMethod.upi,
         issuedAt: DateTime.now(),
         validUntil: DateTime.now().add(const Duration(hours: 2)),
@@ -169,9 +173,7 @@ void main() {
 
       final controller = FloatingAssistantController.instance;
       controller.resetForTesting();
-      addTearDown(() {
-        controller.resetForTesting();
-      });
+      addTearDown(controller.resetForTesting);
       controller.initialize(
         ticketCtrl: ticketController,
         repo: repository,
@@ -295,6 +297,9 @@ void main() {
       // Tap 'Find route' chip to trigger a message with an action button
       await tester.tap(find.text('Find route'));
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      // Second pump lets the 250ms auto-scroll-to-newest-message animation
+      // finish so the action button bubble is actually built in the tree.
       await tester.pump(const Duration(seconds: 1));
 
       // Locate the action button "View Route Options" in chat feed and tap

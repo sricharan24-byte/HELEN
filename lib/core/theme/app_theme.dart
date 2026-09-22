@@ -120,7 +120,7 @@ class AppTheme {
       secondary: c.actionSecondary,
       onSecondary: c.onActionSecondary,
       error: c.statusError,
-      onError: Colors.white,
+      onError: const Color(0xFF0F172A),
     );
 
     return ThemeData(

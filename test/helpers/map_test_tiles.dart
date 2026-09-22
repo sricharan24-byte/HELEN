@@ -26,5 +26,5 @@ class SilentTileProvider extends TileProvider {
 /// Call from `setUpAll` (or `setUp`) in widget tests that pump screens with a
 /// map so `pumpAndSettle` never races real tile requests.
 void stubMapTiles() {
-  LiveLocationMapWidget.debugTileProviderFactory = () => SilentTileProvider();
+  LiveLocationMapWidget.debugTileProviderFactory = SilentTileProvider.new;
 }

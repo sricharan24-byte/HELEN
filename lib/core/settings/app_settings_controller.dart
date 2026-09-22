@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/datasources/local_json_store.dart';
@@ -96,7 +97,7 @@ class AppSettingsController extends ChangeNotifier {
 
   @override
   void notifyListeners() {
-    _store?.write(storageKey, _snapshot());
+    unawaited(_store?.write(storageKey, _snapshot()));
     super.notifyListeners();
   }
 

@@ -1,15 +1,66 @@
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import '../../transit/entities/stop.dart';
+import '../../core/failure.dart';
+import '../../core/result.dart';
+import 'fare.dart';
 
-enum TicketStatus { active, used, expired }
+enum TicketStatus {
+  quoted,
+  paymentPending,
+  issued,
+  active,
+  used,
+  expired,
+  cancelled,
+  refunded,
+}
 
 enum PassengerType { general, student, senior }
 
 enum PaymentMethod { upi, card, netBanking, wallet }
 
+/// Audit ledger record capturing state transition history.
+@immutable
+class TicketLedgerEntry {
+  const TicketLedgerEntry({
+    required this.status,
+    required this.timestamp,
+    this.reason = '',
+    this.transactionId = '',
+  });
+
+  final TicketStatus status;
+  final DateTime timestamp;
+  final String reason;
+  final String transactionId;
+
+  Map<String, Object?> toJson() => {
+        'status': status.name,
+        'timestamp': timestamp.toIso8601String(),
+        'reason': reason,
+        'transactionId': transactionId,
+      };
+
+  factory TicketLedgerEntry.fromJson(Map<String, dynamic> json) {
+    return TicketLedgerEntry(
+      status: TicketStatus.values.byName(json['status'] as String),
+      timestamp: DateTime.parse(json['timestamp'] as String),
+      reason: json['reason'] as String? ?? '',
+      transactionId: json['transactionId'] as String? ?? '',
+    );
+  }
+
+  @override
+  String toString() =>
+      'TicketLedgerEntry(${status.name}, $timestamp, reason: $reason, txId: $transactionId)';
+}
+
 /// Pure-Dart Ticket domain entity.
-/// Zero Flutter imports.
+/// Sole authority on ticket state transitions and fare integrity per BUS-P0-01 and BUS-P0-02.
+@immutable
 class Ticket {
-  const Ticket({
+  Ticket({
     required this.id,
     required this.routeId,
     required this.routeName,
@@ -18,13 +69,26 @@ class Ticket {
     required this.busId,
     required this.passengerName,
     required this.passengerType,
-    required this.fareAmount,
+    required this.fareQuote,
     required this.paymentMethod,
     required this.issuedAt,
     required this.validUntil,
     this.status = TicketStatus.active,
     required this.qrCodeData,
-  });
+    String? idempotencyKey,
+    List<TicketLedgerEntry>? ledger,
+    this.isDemo = true,
+  })  : idempotencyKey = idempotencyKey ?? _generateSecureIdempotencyKey(id),
+        ledger = ledger != null
+            ? List.unmodifiable(ledger)
+            : List.unmodifiable([
+                TicketLedgerEntry(
+                  status: status,
+                  timestamp: issuedAt,
+                  reason: 'Initial state: ${status.name}',
+                  transactionId: idempotencyKey ?? id,
+                ),
+              ]);
 
   final String id;
   final String routeId;
@@ -34,32 +98,150 @@ class Ticket {
   final String busId;
   final String passengerName;
   final PassengerType passengerType;
-  final double fareAmount;
+  final FareQuote fareQuote;
   final PaymentMethod paymentMethod;
   final DateTime issuedAt;
   final DateTime validUntil;
   final TicketStatus status;
   final String qrCodeData;
+  final String idempotencyKey;
+  final List<TicketLedgerEntry> ledger;
+  final bool isDemo;
 
-  bool get isActive => status == TicketStatus.active && DateTime.now().isBefore(validUntil);
+  /// Presentation getter for integer paise.
+  int get farePaise => fareQuote.finalPaise;
+
+  /// Presentation helper in double rupees for display-only formatting.
+  double get fareAmount => fareQuote.finalPaise / 100.0;
+
+  bool get isActive =>
+      status == TicketStatus.active && DateTime.now().isBefore(validUntil);
+
+  bool get isTerminal =>
+      status == TicketStatus.used ||
+      status == TicketStatus.expired ||
+      status == TicketStatus.cancelled ||
+      status == TicketStatus.refunded;
 
   /// Checks if a transition from current status to [newStatus] is allowed per Astra Table 2.1.
   bool canTransitionTo(TicketStatus newStatus) {
-    if (status == newStatus) return true;
+    if (status == newStatus) return false; // Prevent duplicate transition callbacks
+    if (isTerminal) return false; // Terminal states are immutable
+
     return switch (status) {
-      TicketStatus.active => newStatus == TicketStatus.used || newStatus == TicketStatus.expired,
-      TicketStatus.used || TicketStatus.expired => false,
+      TicketStatus.quoted =>
+        newStatus == TicketStatus.paymentPending || newStatus == TicketStatus.cancelled,
+      TicketStatus.paymentPending =>
+        newStatus == TicketStatus.issued || newStatus == TicketStatus.cancelled,
+      TicketStatus.issued =>
+        newStatus == TicketStatus.active ||
+        newStatus == TicketStatus.cancelled ||
+        newStatus == TicketStatus.refunded,
+      TicketStatus.active =>
+        newStatus == TicketStatus.used ||
+        newStatus == TicketStatus.expired ||
+        newStatus == TicketStatus.cancelled ||
+        newStatus == TicketStatus.refunded,
+      TicketStatus.used ||
+      TicketStatus.expired ||
+      TicketStatus.cancelled ||
+      TicketStatus.refunded =>
+        false,
     };
   }
 
-  /// Transitions the ticket to [newStatus], throwing [StateError] on illegal transition.
-  Ticket transitionTo(TicketStatus newStatus) {
+  /// Transitions ticket to [newStatus] returning a [Result].
+  /// Appends transition entry to the immutable [ledger].
+  Result<Ticket, StateTransitionFailure> transitionTo(
+    TicketStatus newStatus, {
+    DateTime? timestamp,
+    String? reason,
+    String? transactionId,
+  }) {
     if (!canTransitionTo(newStatus)) {
-      throw StateError(
-        'Illegal ticket state transition from ${status.name} to ${newStatus.name} for ticket $id.',
+      return FailureResult(
+        StateTransitionFailure(
+          'Illegal ticket state transition from ${status.name} to ${newStatus.name} for ticket $id.',
+        ),
       );
     }
-    return copyWith(status: newStatus);
+
+    final effectiveTimestamp = timestamp ?? DateTime.now();
+    final newLedger = [
+      ...ledger,
+      TicketLedgerEntry(
+        status: newStatus,
+        timestamp: effectiveTimestamp,
+        reason: reason ?? 'Transitioned to ${newStatus.name}',
+        transactionId: transactionId ?? idempotencyKey,
+      ),
+    ];
+
+    return Success(
+      _copyInternal(
+        status: newStatus,
+        ledger: newLedger,
+      ),
+    );
+  }
+
+  /// Throws [StateError] if transition fails, for backwards-compatibility with legacy test cases.
+  Ticket transitionToOrThrow(
+    TicketStatus newStatus, {
+    DateTime? timestamp,
+    String? reason,
+    String? transactionId,
+  }) {
+    final result = transitionTo(
+      newStatus,
+      timestamp: timestamp,
+      reason: reason,
+      transactionId: transactionId,
+    );
+    return result.when(
+      success: (ticket) => ticket,
+      failure: (failure) => throw StateError(failure.message),
+    );
+  }
+
+  Ticket _copyInternal({
+    String? id,
+    String? routeId,
+    String? routeName,
+    Stop? origin,
+    Stop? destination,
+    String? busId,
+    String? passengerName,
+    PassengerType? passengerType,
+    FareQuote? fareQuote,
+    PaymentMethod? paymentMethod,
+    DateTime? issuedAt,
+    DateTime? validUntil,
+    TicketStatus? status,
+    String? qrCodeData,
+    String? idempotencyKey,
+    List<TicketLedgerEntry>? ledger,
+    bool? isDemo,
+  }) {
+    return Ticket(
+      id: id ?? this.id,
+      routeId: routeId ?? this.routeId,
+      routeName: routeName ?? this.routeName,
+      origin: origin ?? this.origin,
+      destination: destination ?? this.destination,
+      busId: busId ?? this.busId,
+      passengerName: passengerName ?? this.passengerName,
+      passengerType: passengerType ?? this.passengerType,
+      fareQuote: fareQuote ?? this.fareQuote,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      issuedAt: issuedAt ?? this.issuedAt,
+      validUntil: validUntil ?? this.validUntil,
+      status: status ?? this.status,
+      qrCodeData: qrCodeData ?? this.qrCodeData,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      ledger: ledger ?? this.ledger,
+      isDemo: isDemo ?? this.isDemo,
+    );
   }
 
   Ticket copyWith({
@@ -71,29 +253,96 @@ class Ticket {
     String? busId,
     String? passengerName,
     PassengerType? passengerType,
-    double? fareAmount,
+    FareQuote? fareQuote,
     PaymentMethod? paymentMethod,
     DateTime? issuedAt,
     DateTime? validUntil,
     TicketStatus? status,
     String? qrCodeData,
+    String? idempotencyKey,
+    List<TicketLedgerEntry>? ledger,
+    bool? isDemo,
   }) {
-    return Ticket(
-      id: id ?? this.id,
-      routeId: routeId ?? this.routeId,
-      routeName: routeName ?? this.routeName,
-      origin: origin ?? this.origin,
-      destination: destination ?? this.destination,
-      busId: busId ?? this.busId,
-      passengerName: passengerName ?? this.passengerName,
-      passengerType: passengerType ?? this.passengerType,
-      fareAmount: fareAmount ?? this.fareAmount,
-      paymentMethod: paymentMethod ?? this.paymentMethod,
-      issuedAt: issuedAt ?? this.issuedAt,
-      validUntil: validUntil ?? this.validUntil,
-      status: status ?? this.status,
-      qrCodeData: qrCodeData ?? this.qrCodeData,
+    return _copyInternal(
+      id: id,
+      routeId: routeId,
+      routeName: routeName,
+      origin: origin,
+      destination: destination,
+      busId: busId,
+      passengerName: passengerName,
+      passengerType: passengerType,
+      fareQuote: fareQuote,
+      paymentMethod: paymentMethod,
+      issuedAt: issuedAt,
+      validUntil: validUntil,
+      status: status,
+      qrCodeData: qrCodeData,
+      idempotencyKey: idempotencyKey,
+      ledger: ledger,
+      isDemo: isDemo,
     );
+  }
+
+  /// Generates a cryptographically secure Ticket ID with date prefix.
+  static String generateSecureTicketId([DateTime? date]) {
+    final now = date ?? DateTime.now();
+    final y = now.year.toString().padLeft(4, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    final secureBytes = List<int>.generate(4, (_) => Random.secure().nextInt(256));
+    final hex = secureBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join();
+    return 'BB-$y$m$d-$hex';
+  }
+
+  static String _generateSecureIdempotencyKey(String ticketId) {
+    final secureBytes = List<int>.generate(8, (_) => Random.secure().nextInt(256));
+    final hex = secureBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join();
+    return 'IDEMP-$ticketId-$hex';
+  }
+
+  /// Builds standardized tamper-evident QR code payload with serialized ticket expiry.
+  static String buildQrPayload({
+    required String ticketId,
+    required String originId,
+    required String destinationId,
+    required String busId,
+    required int farePaise,
+    required DateTime validUntil,
+    bool isDemo = true,
+  }) {
+    final prefix = isDemo ? 'DEMO' : 'PROD';
+    final expiryIso = validUntil.toIso8601String();
+    return 'BUSBUDDY|V2|$prefix|$ticketId|$originId|$destinationId|$busId|$farePaise|$expiryIso';
+  }
+
+  /// Verifies QR code data against the ticket and clock expiry.
+  static bool verifyQrPayload(String payload, Ticket ticket) {
+    final parts = payload.split('|');
+    if (parts.length < 9) return false;
+    if (parts[0] != 'BUSBUDDY' || parts[1] != 'V2') return false;
+    final ticketId = parts[3];
+    final originId = parts[4];
+    final destinationId = parts[5];
+    final busId = parts[6];
+    final farePaise = int.tryParse(parts[7]);
+    final expiryIso = parts[8];
+
+    if (ticketId != ticket.id ||
+        originId != ticket.origin.id ||
+        destinationId != ticket.destination.id ||
+        busId != ticket.busId ||
+        farePaise != ticket.farePaise ||
+        expiryIso != ticket.validUntil.toIso8601String()) {
+      return false;
+    }
+
+    final parsedExpiry = DateTime.tryParse(expiryIso);
+    if (parsedExpiry == null || DateTime.now().isAfter(parsedExpiry)) {
+      return false;
+    }
+
+    return true;
   }
 
   Map<String, Object?> toJson() {
@@ -114,12 +363,17 @@ class Ticket {
       'busId': busId,
       'passengerName': passengerName,
       'passengerType': passengerType.name,
+      'farePaise': farePaise,
       'fareAmount': fareAmount,
+      'fareQuote': fareQuote.toJson(),
       'paymentMethod': paymentMethod.name,
       'issuedAt': issuedAt.toIso8601String(),
       'validUntil': validUntil.toIso8601String(),
       'status': status.name,
       'qrCodeData': qrCodeData,
+      'idempotencyKey': idempotencyKey,
+      'ledger': ledger.map((e) => e.toJson()).toList(),
+      'isDemo': isDemo,
     };
   }
 
@@ -170,15 +424,51 @@ class Ticket {
       return parsed;
     }
 
-    final fare = json['fareAmount'];
-    if (fare is! num || !fare.isFinite || fare < 0) {
+    final passengerType = enumValue('passengerType', PassengerType.values);
+
+    // Reject negative fare payloads regardless of which field is present,
+    // keeping the integer-paise monetary invariant authoritative (BUS-P0-01).
+    if ((json['farePaise'] is num && (json['farePaise'] as num) < 0) ||
+        (json['fareAmount'] is num && (json['fareAmount'] as num) < 0)) {
+      throw const FormatException('Invalid fare: negative amounts are rejected');
+    }
+
+    final FareQuote fareQuote;
+    if (json['fareQuote'] is Map<String, dynamic>) {
+      fareQuote = FareQuote.fromJson(json['fareQuote'] as Map<String, dynamic>);
+    } else if (json['farePaise'] is num) {
+      final paise = (json['farePaise'] as num).toInt();
+      fareQuote = FareQuote.fromPaise(
+        basePaise: paise,
+        passengerType: passengerType,
+        discountPercentage: 0,
+      );
+    } else if (json['fareAmount'] is num) {
+      final paise = ((json['fareAmount'] as num) * 100).round();
+      fareQuote = FareQuote.fromPaise(
+        basePaise: paise,
+        passengerType: passengerType,
+        discountPercentage: 0,
+      );
+    } else {
       throw const FormatException('Invalid fare');
     }
+
     final issuedAt = date('issuedAt');
     final validUntil = date('validUntil');
     if (validUntil.isBefore(issuedAt)) {
       throw const FormatException('Invalid validity period');
     }
+
+    final ledgerList = <TicketLedgerEntry>[];
+    if (json['ledger'] is List) {
+      for (final entry in json['ledger'] as List) {
+        if (entry is Map<String, dynamic>) {
+          ledgerList.add(TicketLedgerEntry.fromJson(entry));
+        }
+      }
+    }
+
     return Ticket(
       id: text(json, 'id'),
       routeId: text(json, 'routeId'),
@@ -187,13 +477,16 @@ class Ticket {
       destination: stop(json['destination']),
       busId: text(json, 'busId'),
       passengerName: text(json, 'passengerName'),
-      passengerType: enumValue('passengerType', PassengerType.values),
-      fareAmount: fare.toDouble(),
+      passengerType: passengerType,
+      fareQuote: fareQuote,
       paymentMethod: enumValue('paymentMethod', PaymentMethod.values),
       issuedAt: issuedAt,
       validUntil: validUntil,
       status: enumValue('status', TicketStatus.values),
       qrCodeData: text(json, 'qrCodeData'),
+      idempotencyKey: json['idempotencyKey'] as String?,
+      ledger: ledgerList.isNotEmpty ? ledgerList : null,
+      isDemo: json['isDemo'] as bool? ?? true,
     );
   }
 
@@ -205,13 +498,14 @@ class Ticket {
           id == other.id &&
           routeId == other.routeId &&
           busId == other.busId &&
-          fareAmount == other.fareAmount &&
+          farePaise == other.farePaise &&
           status == other.status;
 
   @override
-  int get hashCode => Object.hash(id, routeId, busId, fareAmount, status);
+  int get hashCode => Object.hash(id, routeId, busId, farePaise, status);
 
   @override
   String toString() =>
-      'Ticket($id, route: $routeName, bus: $busId, passenger: $passengerName, fare: ₹${fareAmount.toStringAsFixed(0)}, status: ${status.name})';
+      'Ticket($id, route: $routeName, bus: $busId, passenger: $passengerName, fare: ₹${(farePaise / 100).toStringAsFixed(0)}, status: ${status.name})';
 }
+

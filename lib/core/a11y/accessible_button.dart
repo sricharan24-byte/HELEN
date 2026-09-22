@@ -84,6 +84,7 @@ class AccessibleButton extends StatelessWidget {
       button: true,
       enabled: isEnabled,
       label: effectiveSemanticsLabel,
+      excludeSemantics: true,
       child: buttonWidget,
     );
   }

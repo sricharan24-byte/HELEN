@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/tokens/status_level.dart';
 import '../journey/journey_controller.dart';
@@ -44,7 +45,7 @@ class JourneyPage extends StatelessWidget {
   }
 
   /// Builds the view for an active journey.
-  Widget _buildActiveView(BuildContext context, JourneyState state, dynamic colors) {
+  Widget _buildActiveView(BuildContext context, JourneyState state, AppSemanticColors colors) {
     final originName = state.origin?.name ?? 'Unknown origin';
     final destinationName = state.destination?.name ?? 'Unknown destination';
     final routeName = state.selectedRoute?.displayName ?? 'Unknown route';
@@ -162,7 +163,7 @@ class JourneyPage extends StatelessWidget {
   }
 
   /// Builds the view when no journey is active.
-  Widget _buildIdleView(BuildContext context, dynamic colors) {
+  Widget _buildIdleView(BuildContext context, AppSemanticColors colors) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

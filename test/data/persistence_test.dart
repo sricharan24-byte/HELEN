@@ -142,7 +142,11 @@ void main() {
         busId: 'Bus 18B',
         passengerName: 'Pavan K',
         passengerType: PassengerType.general,
-        fareAmount: 25.0,
+        fareQuote: FareQuote.fromPaise(
+          basePaise: 2500,
+          passengerType: PassengerType.general,
+          discountPercentage: 0,
+        ),
         paymentMethod: PaymentMethod.upi,
         issuedAt: DateTime.now(),
         validUntil: DateTime.now().add(const Duration(hours: 4)),

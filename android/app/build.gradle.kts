@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.busbuddy"
+    namespace = "com.busbuddy.app"
     compileSdk = flutter.compileSdkVersion
     // Pinned to the only build-tools installed locally, so AGP never tries to
     // auto-download another version (which re-triggers the license check).
@@ -24,11 +24,24 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = project.findProperty("RELEASE_STORE_FILE")?.toString()
+                ?: System.getenv("RELEASE_STORE_FILE")
+            if (keystoreFile != null && file(keystoreFile).exists()) {
+                storeFile = file(keystoreFile)
+                storePassword = project.findProperty("RELEASE_STORE_PASSWORD")?.toString()
+                    ?: System.getenv("RELEASE_STORE_PASSWORD") ?: ""
+                keyAlias = project.findProperty("RELEASE_KEY_ALIAS")?.toString()
+                    ?: System.getenv("RELEASE_KEY_ALIAS") ?: ""
+                keyPassword = project.findProperty("RELEASE_KEY_PASSWORD")?.toString()
+                    ?: System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.busbuddy"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.busbuddy.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -37,9 +50,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            val releaseSigning = signingConfigs.findByName("release")
+            signingConfig = if (releaseSigning?.storeFile != null) {
+                releaseSigning
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            // BUS-P2-02: R8 code shrinking + resource shrinking for release.
+            // Keep rules live in android/app/proguard-rules.pro and are
+            // limited to evidence-based keeps (Flutter embedding + plugins);
+            // release smoke tests must re-verify reflection/plugin features.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
@@ -10,7 +11,7 @@ class AdaptiveShortcutsModal extends StatefulWidget {
   const AdaptiveShortcutsModal({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF0B101D),
@@ -46,7 +47,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
 
   void _accept(AdaptiveShortcut shortcut) {
     _adaptiveService.acceptShortcut(shortcut.id);
-    SemanticsService.announce('${shortcut.title} accepted and pinned to home screen shortcuts.', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), '${shortcut.title} accepted and pinned to home screen shortcuts.', TextDirection.ltr));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pinned "${shortcut.title}" to your home shortcuts.'),
@@ -58,7 +59,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
 
   void _dismiss(AdaptiveShortcut shortcut) {
     _adaptiveService.dismissShortcut(shortcut.id);
-    SemanticsService.announce('${shortcut.title} suggestion dismissed.', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), '${shortcut.title} suggestion dismissed.', TextDirection.ltr));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Dismissed "${shortcut.title}".'),
@@ -69,12 +70,12 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
 
   void _remove(AdaptiveShortcut shortcut) {
     _adaptiveService.removeShortcut(shortcut.id);
-    SemanticsService.announce('${shortcut.title} removed.', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), '${shortcut.title} removed.', TextDirection.ltr));
   }
 
   void _clearAll() {
     _adaptiveService.resetAllLearningData();
-    SemanticsService.announce('All learning data and shortcuts cleared.', TextDirection.ltr);
+    unawaited(SemanticsService.sendAnnouncement(View.of(context), 'All learning data and shortcuts cleared.', TextDirection.ltr));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('All adaptive shortcuts and learning history cleared.'),
@@ -85,7 +86,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
   }
 
   void _confirmClearAll() {
-    showDialog(
+    unawaited(showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
@@ -109,7 +110,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   @override
@@ -202,7 +203,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: shortcuts.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) => _buildShortcutTile(shortcuts[index]),
                 ),
               ),
@@ -312,6 +313,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
             Semantics(
               button: true,
               label: 'Pin ${shortcut.title}',
+              excludeSemantics: true,
               child: IconButton(
                 icon: const Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 22),
                 tooltip: 'Pin Shortcut',
@@ -321,6 +323,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
             Semantics(
               button: true,
               label: 'Dismiss ${shortcut.title}',
+              excludeSemantics: true,
               child: IconButton(
                 icon: const Icon(Icons.cancel_outlined, color: Color(0xFF94A3B8), size: 22),
                 tooltip: 'Dismiss',
@@ -331,6 +334,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
             Semantics(
               button: true,
               label: 'Remove ${shortcut.title}',
+              excludeSemantics: true,
               child: IconButton(
                 icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
                 tooltip: 'Remove',

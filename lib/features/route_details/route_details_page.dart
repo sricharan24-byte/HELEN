@@ -1,6 +1,8 @@
 /// Route details page — shows route details and real-time live bus tracking stream.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
@@ -123,45 +125,51 @@ class RouteDetailsPage extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.directions_bus, color: Colors.white, size: 22),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          busId,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 16,
-                                          ),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
                                         ),
-                                        Row(
+                                        child: const Icon(Icons.directions_bus, color: Colors.white, size: 22),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Flexible(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Icon(StatusLevel.info.icon, size: 13, color: const Color(0xFF38BDF8)),
-                                            const SizedBox(width: 4),
                                             Text(
-                                              'Speed: $speed km/h',
+                                              busId,
                                               style: const TextStyle(
-                                                color: Color(0xFF38BDF8),
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 12,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 16,
                                               ),
+                                            ),
+                                            Row(
+                                              children: [
+                                                Icon(StatusLevel.info.icon, size: 13, color: const Color(0xFF38BDF8)),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    'Speed: $speed km/h',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF38BDF8),
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                      ],
-                                    ),
-                                  ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -191,8 +199,10 @@ class RouteDetailsPage extends StatelessWidget {
                             const SizedBox(height: 16),
                             const Divider(color: Colors.white24),
                             const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              runSpacing: 8,
                               children: [
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,8 +391,8 @@ class RouteDetailsPage extends StatelessWidget {
                     button: true,
                     excludeSemantics: true,
                     label: 'Start this journey',
-                    child: SizedBox(
-                      height: 54,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 54),
                       child: FilledButton.icon(
                         onPressed: () {
                           controller.startJourney();
@@ -391,11 +401,11 @@ class RouteDetailsPage extends StatelessWidget {
                             routeId: route.id,
                             priority: AnnouncementPriority.high,
                           );
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
+                          unawaited(Navigator.of(context).push(
+                            MaterialPageRoute<void>(
                               builder: (_) => JourneyPage(controller: controller),
                             ),
-                          );
+                          ));
                         },
                         icon: const Icon(Icons.navigation_outlined, size: 22),
                         label: const Text(
@@ -407,6 +417,7 @@ class RouteDetailsPage extends StatelessWidget {
                           backgroundColor: colors.actionPrimary,
                           foregroundColor: colors.onActionPrimary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                       ),
                     ),

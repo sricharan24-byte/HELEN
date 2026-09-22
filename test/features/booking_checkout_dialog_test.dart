@@ -53,12 +53,16 @@ void main() {
     await tester.tap(find.textContaining('& Issue'));
     await tester.pumpAndSettle();
 
-    // Verify Ticket object was passed to callback with correct values
+    // Verify Ticket object was passed to callback with correct values.
+    // Fare authority is FareEngine (BUS-P0-01): the 4-hop VIT ↔ Katpadi
+    // corridor base is 2000 paise, so a 40% student concession issues
+    // 1200 paise (₹12) regardless of the advisory baseFare hint.
     expect(bookedTicket, isNotNull);
     expect(bookedTicket!.busId, equals('18B'));
     expect(bookedTicket!.passengerType, equals(PassengerType.student));
     expect(bookedTicket!.paymentMethod, equals(PaymentMethod.wallet));
-    expect(bookedTicket!.fareAmount, equals(15.0));
+    expect(bookedTicket!.fareAmount, equals(12.0));
+    expect(bookedTicket!.farePaise, equals(1200));
     expect(bookedTicket!.status, equals(TicketStatus.active));
   });
 }

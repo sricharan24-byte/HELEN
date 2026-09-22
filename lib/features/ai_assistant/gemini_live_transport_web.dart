@@ -17,7 +17,7 @@ class WebGeminiLiveTransport implements GeminiLiveTransport {
     String url, {
     required void Function() onOpen,
     required void Function(String message) onMessage,
-    required void Function(dynamic error) onError,
+    required void Function(Object error) onError,
     required void Function(int? code, String? reason) onClose,
   }) {
     try {

@@ -1,6 +1,5 @@
 import '../../core/di/service_locator.dart';
 import '../../core/settings/app_settings_controller.dart';
-import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 
@@ -140,9 +139,9 @@ class GeminiLiveService {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'Opening digital ticket booking. General fare is 20 rupees, and Student or Senior citizen concession is 12 rupees.',
+            'Opening digital ticket booking gateway. Please choose your origin, destination, and passenger type to proceed.',
         displayText:
-            'Opening Ticket Booking Checkout...\nSelect passenger type & payment method.',
+            'Opening Ticket Booking Gateway...\nSelect stops and tap Proceed to book.',
         intent: GeminiLiveIntent.bookTicket,
         actionType: 'book_ticket',
       );
@@ -159,11 +158,11 @@ class GeminiLiveService {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'Initiating emergency safety broadcast. Generating live tracking link to send to your trusted contacts.',
+            'Opening Emergency Safety Broadcast gateway. Please tap confirm on your screen to notify your trusted contacts.',
         displayText:
-            '🚨 Emergency Broadcast Triggered\nLive tracking link generated for trusted emergency contacts.',
+            '🚨 Emergency Safety Gateway\nTap below to confirm and broadcast your location.',
         intent: GeminiLiveIntent.emergencySos,
-        actionType: 'share_location',
+        actionType: 'emergency_sos',
       );
     }
 

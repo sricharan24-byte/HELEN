@@ -1,11 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- BUS-P2-01 (Astra Gate 12, privacy minimization): INTERNET is the only
+         permission justified by a working capability. It backs OpenStreetMap
+         tile loading, OSRM route requests, and the Gemini Live WebSocket.
+
+         Deliberately removed (no matching native capability in the dependency
+         tree — no geolocator/permission_handler/record plugins; location is
+         fixture-based and voice input runs through web speech APIs on Chrome):
+           - ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
+           - RECORD_AUDIO
+         Re-add a permission only together with a just-in-time runtime request,
+         a contextual purpose rationale shown before the system prompt, and an
+         accessible denial fallback (see docs/audit BUS-P2-01). -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
-        android:label="busbuddy"
+        android:label="BusBuddy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

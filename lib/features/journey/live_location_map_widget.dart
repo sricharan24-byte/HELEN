@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -57,10 +58,13 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
     return stops.sublist(startIndex, endIndex + 1);
   }
 
+  RoutingOutcome? _routingOutcome;
+  bool _isLoadingRoute = false;
+
   @override
   void initState() {
     super.initState();
-    _loadRoadPolyline();
+    unawaited(_loadRoadPolyline());
   }
 
   @override
@@ -69,15 +73,18 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
     if (oldWidget.stops != widget.stops ||
         oldWidget.originStopId != widget.originStopId ||
         oldWidget.destinationStopId != widget.destinationStopId) {
-      _loadRoadPolyline();
+      unawaited(_loadRoadPolyline());
     }
   }
 
   Future<void> _loadRoadPolyline() async {
-    final points = await _routingService.fetchRoutePolyline(_journeyStops);
+    setState(() => _isLoadingRoute = true);
+    final outcome = await _routingService.fetchRouteOutcome(_journeyStops);
     if (mounted) {
       setState(() {
-        _roadPolylinePoints = points;
+        _routingOutcome = outcome;
+        _roadPolylinePoints = outcome.points;
+        _isLoadingRoute = false;
       });
     }
   }
@@ -254,15 +261,18 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                 // OpenStreetMap Tile Layer
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.busbuddy',
+                  userAgentPackageName: 'com.busbuddy.app',
                   tileProvider: LiveLocationMapWidget
                           .debugTileProviderFactory
                           ?.call() ??
                       NetworkTileProvider(
                         headers: {
-                          'User-Agent': 'BusBuddy/1.0 (com.example.busbuddy)'
+                          'User-Agent': 'BusBuddy/1.0 (com.busbuddy.app)'
                         },
                       ),
+                  errorTileCallback: (tile, error, stackTrace) {
+                    // Handled gracefully without crash
+                  },
                 ),
 
                 // Real Turn-by-Turn Street Polyline Layer
@@ -337,6 +347,65 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                 ],
               ),
             ),
+
+            // Persistent Offline / Fallback Route Status Banner
+            if (_routingOutcome != null && _routingOutcome!.isFallback)
+              Positioned(
+                top: 52,
+                left: 14,
+                right: 14,
+                child: Semantics(
+                  liveRegion: true,
+                  label: _routingOutcome!.userStatusMessage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cloud_off_outlined, color: Color(0xFFF59E0B), size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _routingOutcome!.userStatusMessage,
+                            style: const TextStyle(
+                              color: Color(0xFFFDE68A),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: _isLoadingRoute ? null : _loadRoadPolyline,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: _isLoadingRoute
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFF59E0B)),
+                                  )
+                                : const Text(
+                                    'Retry',
+                                    style: TextStyle(
+                                      color: Color(0xFF38BDF8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
             // Recenter Action Button (Bottom Right)
             Positioned(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/settings/app_settings_controller.dart';
@@ -46,7 +47,7 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
   }
 
   void _showStartingScreenPicker() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
@@ -85,7 +86,7 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
           ),
         );
       },
-    );
+    ));
   }
 
   void _resetLayout() {
@@ -102,14 +103,14 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
   }
 
   void _openAskBusBuddy() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => GeminiLiveScreen(
           repository: widget.repository,
           ticketController: widget.ticketController,
         ),
       ),
-    );
+    ));
   }
 
   @override
@@ -194,11 +195,11 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                   subtitle: 'Rearrange and choose features',
                   trailing: const Icon(Icons.chevron_right, color: Color(0xFF0F172A), size: 22),
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
+                    unawaited(Navigator.of(context).push(
+                      MaterialPageRoute<void>(
                         builder: (_) => const HomeScreenCustomizationPage(),
                       ),
-                    );
+                    ));
                   },
                 ),
                 const SizedBox(height: 12),
@@ -299,6 +300,7 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
               child: Semantics(
                 button: true,
                 label: 'Ask BusBuddy. Customize my home screen.',
+                excludeSemantics: true,
                 child: InkWell(
                   onTap: _openAskBusBuddy,
                   borderRadius: BorderRadius.circular(24),

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/core/a11y/enlarging_text_scaler.dart';
 import 'package:busbuddy/core/settings/app_settings_controller.dart';
 import 'package:busbuddy/main.dart';
-import 'package:busbuddy/core/di/service_locator.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
@@ -19,6 +18,9 @@ class FakeNonlinearTextScaler implements TextScaler {
   const FakeNonlinearTextScaler({required this.factor});
 
   final double factor;
+
+  @override
+  double get textScaleFactor => scale(1.0);
 
   @override
   double scale(double fontSize) {
@@ -130,8 +132,15 @@ void main() {
       expect(find.text('Bus'), findsOneWidget);
       expect(find.text('Buddy'), findsOneWidget);
 
-      // Verify that primary action buttons remain present and operable at 320dp / 300% scale
+      // Verify that primary action buttons remain present and operable at
+      // 320dp / 300% scale. The home feed scrolls at such extreme scaling,
+      // so scroll each action into view before asserting presence (scoping the
+      // drag to the vertical feed, since the shortcuts carousel also scrolls).
+      final verticalFeed = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Find a Place'), 200, scrollable: verticalFeed);
       expect(find.text('Find a Place'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('My Journey'), 200, scrollable: verticalFeed);
       expect(find.text('My Journey'), findsOneWidget);
     });
   });

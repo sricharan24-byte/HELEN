@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/tokens/app_spacing.dart';
@@ -36,17 +37,17 @@ class SavedPage extends StatelessWidget {
                 icon: const Icon(Icons.confirmation_number),
                 tooltip: 'My Tickets Hub',
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
+                  unawaited(Navigator.of(context).push(
+                    MaterialPageRoute<void>(
                       builder: (_) => MyTicketsPage(ticketController: ticketController),
                     ),
-                  );
+                  ));
                 },
               ),
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
+            padding: AppSpacing.cardPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -62,15 +63,15 @@ class SavedPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   InkWell(
                     onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
+                      unawaited(Navigator.of(context).push(
+                        MaterialPageRoute<void>(
                           builder: (_) => TicketDetailsPage(ticket: activeTicket),
                         ),
-                      );
+                      ));
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                      padding: AppSpacing.cardPadding,
                       decoration: BoxDecoration(
                         color: colors.primaryBlue,
                         borderRadius: BorderRadius.circular(20),
@@ -78,10 +79,13 @@ class SavedPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            runSpacing: 6,
                             children: [
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.confirmation_number_outlined, color: colors.cardBackground, size: 24),
                                   const SizedBox(width: 10),
@@ -112,11 +116,13 @@ class SavedPage extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             'Bus ${activeTicket.busId} • ${activeTicket.origin.name} → ${activeTicket.destination.name}',
-                            style: TextStyle(color: colors.cardBackground.withOpacity(0.8), fontSize: 13),
+                            style: TextStyle(color: colors.cardBackground.withValues(alpha: 0.8), fontSize: 13),
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            runSpacing: 6,
                             children: [
                               Text('Tap to view QR Code Pass', style: TextStyle(color: colors.accentYellow, fontWeight: FontWeight.w700)),
                               Icon(Icons.qr_code_2, color: colors.cardBackground, size: 28),
@@ -130,7 +136,7 @@ class SavedPage extends StatelessWidget {
                 ] else ...[
                   // Empty state book pass prompt
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                    padding: AppSpacing.cardPadding,
                     decoration: BoxDecoration(
                       color: colors.surfaceCard,
                       borderRadius: BorderRadius.circular(20),
@@ -156,11 +162,11 @@ class SavedPage extends StatelessWidget {
                         const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
+                            unawaited(Navigator.of(context).push(
+                              MaterialPageRoute<void>(
                                 builder: (_) => BookingPage(ticketController: ticketController),
                               ),
-                            );
+                            ));
                           },
                           icon: const Icon(Icons.confirmation_number_outlined, size: 18),
                           label: const Text('Book Digital Pass Now'),
@@ -202,7 +208,7 @@ class SavedPage extends StatelessWidget {
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           leading: CircleAvatar(
-                            backgroundColor: colors.primaryBlue.withOpacity(0.12),
+                            backgroundColor: colors.primaryBlue.withValues(alpha: 0.12),
                             foregroundColor: colors.primaryBlue,
                             child: const Icon(Icons.receipt_long),
                           ),
@@ -213,11 +219,11 @@ class SavedPage extends StatelessWidget {
                           ),
                           trailing: Icon(Icons.chevron_right, color: colors.textMuted),
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
+                            unawaited(Navigator.of(context).push(
+                              MaterialPageRoute<void>(
                                 builder: (_) => TicketDetailsPage(ticket: t),
                               ),
-                            );
+                            ));
                           },
                         ),
                       ),

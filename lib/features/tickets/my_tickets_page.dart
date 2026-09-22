@@ -1,11 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/tokens/status_level.dart';
 import '../../core/di/service_locator.dart';
-import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -94,6 +93,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                 selected: _selectedTabIndex == 0,
                                 button: true,
                                 label: 'Current Ticket tab',
+                                excludeSemantics: true,
                                 child: InkWell(
                                   onTap: () {
                                     setState(() => _selectedTabIndex = 0);
@@ -128,6 +128,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                 selected: _selectedTabIndex == 1,
                                 button: true,
                                 label: 'Previous Tickets tab',
+                                excludeSemantics: true,
                                 child: InkWell(
                                   onTap: () {
                                     setState(() => _selectedTabIndex = 1);
@@ -163,7 +164,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Tab Body Content ─────────────────────────────────
+                    // ── Active Tab Body ──────────────────────────────────────
                     Expanded(
                       child: _selectedTabIndex == 0
                           ? _buildCurrentTicketTab(activeTicket)
@@ -182,16 +183,17 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     label: _selectedTabIndex == 0
                         ? 'Ask BusBuddy. Show my ticket, check ticket status, etc.'
                         : 'Ask BusBuddy. Get details about a previous ticket',
+                    excludeSemantics: true,
                     child: InkWell(
                       onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
+                        unawaited(Navigator.of(context).push(
+                          MaterialPageRoute<void>(
                             builder: (_) => GeminiLiveScreen(
                               ticketController: widget.ticketController,
                               repository: widget.repository,
                             ),
                           ),
-                        );
+                        ));
                       },
                       borderRadius: BorderRadius.circular(24),
                       child: Container(
@@ -395,11 +397,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 height: 52,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
+                    unawaited(Navigator.of(context).push(
+                      MaterialPageRoute<void>(
                         builder: (_) => TicketDetailsPage(ticket: activeTicket),
                       ),
-                    );
+                    ));
                   },
                   icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 22),
                   label: Row(
@@ -446,14 +448,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 subtitle: 'Track real bus location',
                 onTap: () {
                   final repo = widget.repository ?? AppServiceLocator.instance.transportRepository;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
+                  unawaited(Navigator.of(context).push(
+                    MaterialPageRoute<void>(
                       builder: (_) => LiveLocationScreen(
                         ticket: activeTicket,
                         repository: repo,
                       ),
                     ),
-                  );
+                  ));
                 },
               ),
             ),
@@ -515,6 +517,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     return Semantics(
       button: true,
       label: '$title. $subtitle.',
+      excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
@@ -594,13 +597,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           child: Semantics(
             button: true,
             label: '${ticket.busId}, ${ticket.routeName}, ${ticket.fareAmount} rupees.',
+            excludeSemantics: true,
             child: InkWell(
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
+                unawaited(Navigator.of(context).push(
+                  MaterialPageRoute<void>(
                     builder: (_) => TicketDetailsPage(ticket: ticket),
                   ),
-                );
+                ));
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
