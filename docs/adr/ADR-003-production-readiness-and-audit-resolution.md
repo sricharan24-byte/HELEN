@@ -145,4 +145,4 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 - **Bracket / Syntax Integrity**: 0 syntax errors, 0 bracket imbalances.
 - **Import Resolution**: 0 unresolved internal or package imports.
 - **Deliverable Artifact**: Updated `BusBuddy_Implementation_Research_and_UI_Design.docx`.
-- **2026-09-22 gate**: `flutter analyze` clean; full suite **341/341**; minified release APK builds; UI polish `0164afc`; BUS-P2-01/02/03 tooling + tests landed (device harnesses ready when adb target available).
+- **2026-09-22 gate**: `flutter analyze` clean; full suite **354/354** (341 + 13 new P2 docs/permission-flow tests); minified release APK builds; UI polish `0164afc`; BUS-P2-01/02/03 tooling + tests landed (device harnesses ready when adb target available).

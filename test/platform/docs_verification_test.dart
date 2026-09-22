@@ -67,6 +67,7 @@ void main() {
       expect(ci, contains('flutter test'));
       expect(ci, contains('tool/ci/verify_docs.sh'));
       expect(ci, contains('flutter build apk --release'));
+      expect(ci, contains('flutter build appbundle --release'));
       expect(ci, contains('flutter build web --release'));
       expect(ci, contains('upload-artifact'));
       expect(ci, contains('commit_sha'));

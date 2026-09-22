@@ -79,12 +79,26 @@ jobs:
       - name: Build minified release APK (BUS-P2-02)
         run: |
           set -euo pipefail
-          flutter build apk --release --analyze-size 2>&1 | tee evidence/apk-analyze-size.log
+          # --analyze-size only supports a single ABI: run an arm64-only
+          # analysis build first for the size-breakdown log...
+          flutter build apk --release --target-platform=android-arm64 --analyze-size 2>&1 | tee evidence/apk-analyze-size.log
+          # ...then the shippable multi-ABI release APK (R8 + shrink).
+          flutter build apk --release 2>&1 | tee evidence/apk-build.log
           APK=build/app/outputs/flutter-apk/app-release.apk
           test -f "$APK"
           cp "$APK" evidence/app-release.apk
           sha256sum "$APK" | tee evidence/app-release.apk.sha256
           stat -c 'apk_bytes=%s' "$APK" | tee -a evidence/build-info.properties
+
+      - name: Build minified release AAB (BUS-P2-02)
+        run: |
+          set -euo pipefail
+          flutter build appbundle --release 2>&1 | tee evidence/aab-build.log
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          test -f "$AAB"
+          cp "$AAB" evidence/app-release.aab
+          sha256sum "$AAB" | tee evidence/app-release.aab.sha256
+          stat -c 'aab_bytes=%s' "$AAB" | tee -a evidence/build-info.properties
 
       - name: Build release web (Chrome voice path)
         run: |
