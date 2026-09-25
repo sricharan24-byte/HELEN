@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 25, 2026 (Chunk 42: floating AI assistant removed — GeminiLiveScreen is the single voice surface; API-key dialog crash fixed; 368/368 tests, analyze clean)
+**Last Updated**: September 25, 2026 (Chunk 43: voice-reply feature rebuilt as single-speaker TTS — Gemini PCM path + TTS arbiter removed; 349/349 tests, analyze clean)
 
 ---
 
@@ -902,3 +902,24 @@ With the floating assistant gone there is exactly ONE session, ONE mic listener,
 - **Fix**: the live region now announces only the state transition (`Gemini is speaking` / `Gemini Live response ready`) and never interpolates the reply text; the sentence remains a regular semantics node reachable by navigation.
 - **Regression test**: `test/features/ai_assistant/live_region_single_voice_test.dart` asserts every live region on the screen uses only the stable state labels.
 - **Verification**: `flutter analyze` clean, `flutter test` **369/369 green**.
+
+---
+
+## 🛠️ Session Log — 2026-09-25: Chunk 43 — Voice Reply Feature Removed & Rebuilt (Single Speaker)
+
+> **User report**: double voice persisted after Chunks 41–42. User directive: remove the feature and rebuild it. Done — the entire dual-path audio architecture was removed and rebuilt around exactly one speaker.
+
+### ✅ What was removed
+
+- **Gemini native PCM playback, everywhere**: `__bb_play_pcm` and the whole 24 kHz Web Audio jitter-scheduling machinery in the JS bridge; `playPcmAudio`/`playPcm16Audio` from `AudioSpeechEngine` and the web stubs; the `onAudioPcmChunk` handler from the screen. The Live session still streams — its audio is simply never played.
+- **`TtsFallbackArbiter`** (`tts_fallback_arbiter.dart`) and its 20-test suite — the arbitration layer existed only to police the PCM-vs-TTS race, which no longer exists. Grace windows, first-starter-wins claims, generation guards: all gone.
+- **The 600 ms end-of-speech confirmation timer** — it compensated for premature PCM-gap end events; with a single utterance per reply, `utterance.onend` is the sole truth.
+
+### ✅ The rebuilt contract
+
+- **JS bridge v5** (`web_speech_real.dart`): `__bb_speak_text` is THE single speech producer in the app. Stop-before-speak (cancel + generation bump), markdown sanitization, one utterance, `onend`/`onerror` → the one `__bb_on_audio_ended` callback. Chime, audio unlock, and mic recognition are unchanged.
+- **Screen** (`gemini_live_screen.dart`): `onTurnComplete` speaks the reply text exactly once (`stop()` → `speak()`). No-arm, no-grace, no second path. A monotonic `_turnCounter` staleness-guards the 30 s watchdog. Silent protocol turns stay silent.
+- **Net effect**: two different voices saying the same reply is impossible by construction — there is exactly one thing in the entire page that can emit speech.
+- **Trade-off (accepted by rebuild directive)**: replies are spoken in the browser's SpeechSynthesis voice instead of Gemini's native audio persona. Voice/model settings still govern recognition language, rate, and the Live session model.
+
+- **Verification**: `flutter analyze` clean, `flutter test` **349/349 green**, docs gate pass. AGENTS.md rewritten (Single-Speaker Audio Architecture).

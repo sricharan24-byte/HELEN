@@ -18,7 +18,6 @@ import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
-import 'tts_fallback_arbiter.dart';
 
 /// Full-Screen & Modal Interactive Gemini Live Conversational Overlay Screen.
 class GeminiLiveScreen extends StatefulWidget {
@@ -53,8 +52,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _isListening = true;
   bool _isSpeaking = false;
   bool _isPermissionBlocked = false;
-  bool _receivedPcmThisTurn = false;
-  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter.shared;
+  int _turnCounter = 0;
   Timer? _watchdogTimer;
   String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
@@ -89,10 +87,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _liveSession = GeminiLiveSession(
       onTextChunk: (text) {
         if (!mounted) return;
-        // Single-voice: streaming text goes to the transcript only. The
-        // spoken voice is either native PCM (streamed below) or the single
-        // TTS fallback fired from onTurnComplete — never both, and never a
-        // half-built string.
+        // Streaming text goes to the transcript only. The voice is spoken
+        // exactly once from onTurnComplete — never a half-built string.
         setState(() {
           if (_liveTranscription.startsWith('Listening') ||
               _liveTranscription.startsWith('Recognized') ||
@@ -103,39 +99,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           }
         });
       },
-      onAudioPcmChunk: (pcmBase64) {
-        if (!mounted) return;
-        // First-starter-wins: if browser TTS already started for this turn,
-        // drop late PCM so the single started voice finishes alone.
-        if (!_ttsArbiter.tryClaimPcm()) {
-          debugPrint('[SingleVoice] dropped late PCM chunk (TTS already speaking)');
-          return;
-        }
-        _receivedPcmThisTurn = true;
-        _armWatchdog();
-        // Audio is still streaming: cancel any pending end-of-speech
-        // confirmation so the speaking state (and the TalkBack live-region
-        // gate with it) is not released mid-reply.
-        _audioEndConfirmTimer?.cancel();
-        if (!_isSpeaking || _spokenOutput.startsWith('Thinking...')) {
-          setState(() {
-            _isSpeaking = true;
-            if (_spokenOutput.startsWith('Thinking...')) {
-              _spokenOutput = 'Speaking...';
-            }
-          });
-        }
-        // Stream native 24kHz audio sequentially from Google AI Studio Live API!
-        // First-starter-wins is enforced by the arbiter claim above: PCM that
-        // arrives after browser TTS started is dropped, never layered on top.
-        _audioEngine.playPcmAudio(pcmBase64);
-      },
       onTurnComplete: (fullText, actionType) {
         if (!mounted) return;
-        final turnGen = _ttsArbiter.generation;
-        // Slot-tool protocol turns are silent: no TTS is ever scheduled for
-        // them (the follow-up answer turn carries the voice). Speaking one
-        // would layer a second voice over the answer saying the same words.
+        _turnCounter++;
+        // Slot-tool protocol turns are silent: the follow-up answer turn
+        // carries the voice, so speaking one would repeat the same words.
         final bool silentProtocol =
             AssistantCommandGateway.isSilentProtocol(actionType);
         setState(() {
@@ -143,7 +111,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           if (fullText.isNotEmpty) {
             _spokenOutput = fullText;
             _liveTranscription = fullText;
-          } else if (!_receivedPcmThisTurn && !silentProtocol) {
+          } else if (!silentProtocol) {
             if (actionType != null) {
               switch (actionType) {
                 case 'track_bus':
@@ -170,29 +138,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           }
         });
 
-        // If native PCM already arrived, any deferred TTS fallback for this
-        // turn must be cancelled so we do not speak both via PCM and TTS.
-        _ttsArbiter.cancel();
-
-        // Safety fallback audio: when the Live API did not stream PCM, speak
-        // the turn text via Web SpeechSynthesis so the response is audible.
-        // Live turns get the extended grace; stale generations never speak.
-        // Silent protocol turns never schedule TTS at all.
-        if (!_receivedPcmThisTurn && !silentProtocol) {
-          if (_spokenOutput.isNotEmpty) {
-            final spoken = _spokenOutput;
-            debugPrint('[SingleVoice] TTS fallback armed (live grace, gen $turnGen)');
-            _ttsArbiter.scheduleFallback(() {
-              if (!mounted || turnGen != _ttsArbiter.generation) return;
-              // Stop-before-speak: kill any stray audio from a prior turn
-              // before starting this turn's single TTS voice.
-              debugPrint('[SingleVoice] TTS fallback speaking now');
-              _audioEngine.stop();
-              _audioEngine.speak(spoken);
-              _armWatchdog();
-            }, isLive: true);
-          }
-        } else {
+        // Single speaker: every reply is spoken exactly once through the one
+        // speech engine. The bridge's speak() is stop-before-speak, so even a
+        // duplicated call can never layer a second voice.
+        if (!silentProtocol && _spokenOutput.isNotEmpty) {
+          final spoken = _spokenOutput;
+          debugPrint('[SingleVoice] speaking turn via TTS (turn $_turnCounter)');
+          _audioEngine.stop();
+          _audioEngine.speak(spoken);
           _armWatchdog();
         }
 
@@ -207,11 +160,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       onInterrupted: () {
         if (!mounted) return;
         _audioEngine.stop();
-        _ttsArbiter.cancel();
         _speechTimer?.cancel();
         _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
-        _audioEndConfirmTimer?.cancel();
         setState(() {
           _isSpeaking = false;
         });
@@ -222,11 +173,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       onError: (err) {
         if (!mounted) return;
         debugPrint('[GeminiLiveScreen] Session error: $err');
-        _ttsArbiter.cancel();
         _speechTimer?.cancel();
         _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
-        _audioEndConfirmTimer?.cancel();
         setState(() {
           _isSpeaking = false;
           _isListening = false;
@@ -250,30 +199,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // Unlock audio context
     _audioEngine.unlockAudio();
 
-    // Register audio completion callback so _isSpeaking resets cleanly and resumes continuous listening.
-    //
-    // The web bridge fires this callback after only 250 ms of queued-audio
-    // silence, which on a jittery network happens BETWEEN PCM chunks of the
-    // same reply. Releasing _isSpeaking immediately would (a) flip the
-    // TalkBack live region back to the full reply text, so the screen reader
-    // announces the same words OVER the still-streaming Gemini voice — two
-    // different voices at once — and (b) restart the mic into the reply tail,
-    // producing an echo reply. Both are avoided by confirming the end of
-    // speech over a 600 ms window; any new PCM chunk cancels the confirmation.
+    // Register audio completion callback so _isSpeaking resets cleanly and
+    // continuous listening resumes. With the single-speaker bridge this
+    // fires exactly once per utterance (utterance onend/onerror).
     _audioEngine.setAudioEndedCallback(() {
       if (!mounted) return;
       _speechTimer?.cancel();
       _watchdogTimer?.cancel();
-      _audioEndConfirmTimer?.cancel();
-      _audioEndConfirmTimer = Timer(const Duration(milliseconds: 600), () {
-        if (!mounted || !_isSpeaking) return;
-        setState(() {
-          _isSpeaking = false;
-        });
-        if (_continuousListening && !_isListening) {
-          _scheduleRestartListening(delayMs: 350, playChimeTone: true);
-        }
+      setState(() {
+        _isSpeaking = false;
       });
+      if (_continuousListening && !_isListening) {
+        _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+      }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -297,7 +235,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _continuousListening = true;
   Timer? _restartListenTimer;
   Timer? _speechTimer;
-  Timer? _audioEndConfirmTimer;
 
   @override
   void dispose() {
@@ -305,8 +242,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
     _watchdogTimer?.cancel();
-    _audioEndConfirmTimer?.cancel();
-    _ttsArbiter.dispose();
     _liveSession.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();
@@ -321,10 +256,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   /// and cause echo/self-answer overlap.
   void _armWatchdog() {
     _watchdogTimer?.cancel();
-    final gen = _ttsArbiter.generation;
+    final turn = _turnCounter;
     _watchdogTimer = Timer(const Duration(seconds: 30), () {
       if (!mounted) return;
-      if (gen != _ttsArbiter.generation) return;
+      if (turn != _turnCounter) return;
       if (_isSpeaking) {
         setState(() {
           _isSpeaking = false;
@@ -487,12 +422,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _lastVoiceInputTime = now;
     _lastProcessedQuery = clean;
 
-    _receivedPcmThisTurn = false;
+    _turnCounter++;
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();
     _restartListenTimer?.cancel();
-    _audioEndConfirmTimer?.cancel();
-    _ttsArbiter.beginTurn();
     _audioEngine.stop();
     _audioEngine.stopListening();
     _audioEngine.resetTurn();
@@ -513,7 +446,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _liveTranscription = 'Gemini Live API key is required.';
         _spokenOutput = msg;
       });
-      _ttsArbiter.speakNow(() => _audioEngine.speak(msg));
+      _audioEngine.speak(msg);
       final wordCount = msg.split(' ').length;
       final fallbackMs = (wordCount * 300).clamp(1500, 10000);
       _speechTimer?.cancel();

@@ -37,13 +37,6 @@ class AudioSpeechEngine {
     }
   }
 
-  /// Plays native PCM audio returned directly from the Gemini Live API.
-  void playPcmAudio(String base64Pcm, {int sampleRate = 24000}) {
-    if (kIsWeb) {
-      speech_impl.playPcm16Audio(base64Pcm, sampleRate: sampleRate);
-    }
-  }
-
   /// Resets audio timing and clears queue for a fresh conversational response.
   void resetTurn() {
     if (kIsWeb) {

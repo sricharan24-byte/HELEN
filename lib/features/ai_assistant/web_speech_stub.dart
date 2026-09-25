@@ -6,10 +6,6 @@ void playAudioTone({bool isListening = false}) {
   debugPrint('[AudioTone Stub] tone played: isListening=$isListening');
 }
 
-void playPcm16Audio(String base64Pcm, {int sampleRate = 24000}) {
-  debugPrint('[PcmAudio Stub] ${base64Pcm.length} chars @ $sampleRate Hz');
-}
-
 void speakText(String text) {
   debugPrint('[TTS Stub] $text');
 }
