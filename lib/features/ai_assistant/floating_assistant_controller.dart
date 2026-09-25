@@ -35,7 +35,7 @@ class FloatingAssistantController extends ChangeNotifier {
   final AudioSpeechEngine _audioEngine = const AudioSpeechEngine();
   final GeminiLiveService _liveService = const GeminiLiveService();
   final AppAutomationController automation = AppAutomationController();
-  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter();
+  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter.shared;
   GeminiLiveSession? _liveSession;
   String? _connectedApiKey;
   String? _connectedVoice;
@@ -62,6 +62,7 @@ class FloatingAssistantController extends ChangeNotifier {
 
   final List<FloatingChatMessage> _messages = [];
   Timer? _speechTimer;
+  Timer? _audioEndConfirmTimer;
   bool _receivedPcmThisTurn = false;
   String _lastSpokenText = '';
 
@@ -120,13 +121,27 @@ class FloatingAssistantController extends ChangeNotifier {
   }
 
   void _registerAudioEndedCallback() {
+    // The web bridge fires this callback after only 250 ms of queued-audio
+    // silence, which on a jittery network happens BETWEEN PCM chunks of the
+    // same reply. Releasing the speaking state immediately would re-open the
+    // screen-reader announcement gate and restart the mic into the reply
+    // tail (echo reply over the streaming voice). Confirm the end of speech
+    // over a 600 ms window; any new PCM chunk cancels the confirmation.
     _audioEngine.setAudioEndedCallback(() {
-      _setSpeaking(false);
       _speechTimer?.cancel();
-      if (_continuousListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
-        _scheduleRestartListening(delayMs: 350, playChimeTone: true);
-      }
-      notifyListeners();
+      _audioEndConfirmTimer?.cancel();
+      _audioEndConfirmTimer = Timer(const Duration(milliseconds: 600), () {
+        if (_isSpeaking) _setSpeaking(false);
+        if (_continuousListening &&
+            !_isFullScreenActive &&
+            !_isMuted &&
+            _isWindowOpen &&
+            !_isListening &&
+            !_isSpeaking) {
+          _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        }
+        notifyListeners();
+      });
     });
   }
 
@@ -162,6 +177,9 @@ class FloatingAssistantController extends ChangeNotifier {
         // First-starter-wins: drop late PCM once TTS has started.
         if (!_ttsArbiter.tryClaimPcm()) return;
         _receivedPcmThisTurn = true;
+        // Audio still streaming: keep the speaking state held (see
+        // _registerAudioEndedCallback for the end-of-speech confirmation).
+        _audioEndConfirmTimer?.cancel();
         if (!_isSpeaking) {
           _isSpeaking = true;
           notifyListeners();
@@ -233,6 +251,7 @@ class FloatingAssistantController extends ChangeNotifier {
         _ttsArbiter.cancel();
         _speechTimer?.cancel();
         _restartListenTimer?.cancel();
+        _audioEndConfirmTimer?.cancel();
         _isSpeaking = false;
         _isListening = false;
         if (_continuousListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
@@ -299,6 +318,7 @@ class FloatingAssistantController extends ChangeNotifier {
   void stopSpeaking() {
     _isSpeaking = false;
     _speechTimer?.cancel();
+    _audioEndConfirmTimer?.cancel();
     _audioEngine.stop();
     notifyListeners();
   }
@@ -439,6 +459,10 @@ class FloatingAssistantController extends ChangeNotifier {
 
   // ── Send Query ─────────────────────────────────────────────────────────────
   void sendQuery(String rawQuery, {bool isUserTap = false}) {
+    // While the full-screen Live screen owns the session and the audio
+    // bridge, this controller must never process a query — a reply here
+    // would speak over the screen's voice.
+    if (_isFullScreenActive) return;
     final query = rawQuery.trim();
     if (query.isEmpty) return;
 
@@ -459,6 +483,7 @@ class FloatingAssistantController extends ChangeNotifier {
     stopSpeaking();
     stopListening(disableContinuous: false);
     _audioEngine.resetTurn();
+    _audioEndConfirmTimer?.cancel();
     _ttsArbiter.beginTurn();
     _receivedPcmThisTurn = false;
 
@@ -901,6 +926,7 @@ class FloatingAssistantController extends ChangeNotifier {
     _continuousListening = false;
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
+    _audioEndConfirmTimer?.cancel();
     _ttsArbiter.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();

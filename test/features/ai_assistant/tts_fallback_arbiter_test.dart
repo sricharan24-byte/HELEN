@@ -186,4 +186,58 @@ void main() {
       expect(AssistantCommandGateway.isSilentProtocol(null), isFalse);
     });
   });
+
+  group('TtsFallbackArbiter.shared cross-owner arbitration', () {
+    // The Gemini Live screen and the floating assistant drive separate
+    // sessions but share one global audio bridge; these tests pin the
+    // contract that both owners arbitrate against the SAME instance so a
+    // voice from one owner can never be doubled by the other.
+    test('is a single app-wide instance', () {
+      expect(identical(TtsFallbackArbiter.shared, TtsFallbackArbiter.shared),
+          isTrue);
+    });
+
+    test('PCM claimed by one owner suppresses TTS armed by the other', () {
+      fakeAsync((async) {
+        final shared = TtsFallbackArbiter.shared;
+        shared.beginTurn(); // isolate from any prior test state
+        var ttsSpeaks = 0;
+        // Screen owner arms the deferred fallback for its turn...
+        shared.scheduleFallback(() => ttsSpeaks++, isLive: true);
+        // ...and the floating owner's late PCM claims playback first.
+        expect(shared.tryClaimPcm(), isTrue);
+        async.elapse(const Duration(seconds: 5));
+        expect(ttsSpeaks, 0);
+        shared.beginTurn(); // clean up shared state for other tests
+      });
+    });
+
+    test('handoff beginTurn from the other owner drops a stale armed TTS', () {
+      fakeAsync((async) {
+        final shared = TtsFallbackArbiter.shared;
+        shared.beginTurn();
+        var ttsSpeaks = 0;
+        // TTS armed while the previous owner still held the turn...
+        shared.scheduleFallback(() => ttsSpeaks++, isLive: true);
+        // ...then the other owner takes over (fullscreen handoff).
+        shared.beginTurn();
+        async.elapse(const Duration(seconds: 5));
+        expect(ttsSpeaks, 0);
+      });
+    });
+
+    test('TTS started by one owner drops late PCM claimed by the other', () {
+      fakeAsync((async) {
+        final shared = TtsFallbackArbiter.shared;
+        shared.beginTurn();
+        var ttsSpeaks = 0;
+        shared.scheduleFallback(() => ttsSpeaks++);
+        async.elapse(const Duration(milliseconds: 600));
+        expect(ttsSpeaks, 1);
+        // Late PCM from the other owner's session must not layer a voice.
+        expect(shared.tryClaimPcm(), isFalse);
+        shared.beginTurn();
+      });
+    });
+  });
 }

@@ -16,6 +16,16 @@ class TtsFallbackArbiter {
     this.liveGrace = const Duration(milliseconds: 1800),
   });
 
+  /// App-wide arbitration instance. The Gemini Live screen and the floating
+  /// assistant drive separate sessions but share ONE global audio bridge
+  /// (native PCM + browser TTS on the same window object); each owner's
+  /// private arbiter can only arbitrate its own turns, so handoff moments
+  /// (fullscreen transitions, in-flight turns) could let an armed TTS from
+  /// one owner overlap late PCM from the other. First-starter-wins must be
+  /// enforced against the single shared output, so both owners must use
+  /// this same instance.
+  static final TtsFallbackArbiter shared = TtsFallbackArbiter();
+
   /// Grace for offline/REST turns (PCM impossible or unlikely).
   final Duration grace;
 

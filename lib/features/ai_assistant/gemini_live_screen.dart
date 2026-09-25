@@ -55,7 +55,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _isSpeaking = false;
   bool _isPermissionBlocked = false;
   bool _receivedPcmThisTurn = false;
-  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter();
+  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter.shared;
   Timer? _watchdogTimer;
   String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
@@ -114,6 +114,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         }
         _receivedPcmThisTurn = true;
         _armWatchdog();
+        // Audio is still streaming: cancel any pending end-of-speech
+        // confirmation so the speaking state (and the TalkBack live-region
+        // gate with it) is not released mid-reply.
+        _audioEndConfirmTimer?.cancel();
         if (!_isSpeaking || _spokenOutput.startsWith('Thinking...')) {
           setState(() {
             _isSpeaking = true;
@@ -208,6 +212,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _speechTimer?.cancel();
         _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
+        _audioEndConfirmTimer?.cancel();
         setState(() {
           _isSpeaking = false;
         });
@@ -222,6 +227,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _speechTimer?.cancel();
         _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
+        _audioEndConfirmTimer?.cancel();
         setState(() {
           _isSpeaking = false;
           _isListening = false;
@@ -245,18 +251,30 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // Unlock audio context
     _audioEngine.unlockAudio();
 
-    // Register audio completion callback so _isSpeaking resets cleanly and resumes continuous listening
+    // Register audio completion callback so _isSpeaking resets cleanly and resumes continuous listening.
+    //
+    // The web bridge fires this callback after only 250 ms of queued-audio
+    // silence, which on a jittery network happens BETWEEN PCM chunks of the
+    // same reply. Releasing _isSpeaking immediately would (a) flip the
+    // TalkBack live region back to the full reply text, so the screen reader
+    // announces the same words OVER the still-streaming Gemini voice — two
+    // different voices at once — and (b) restart the mic into the reply tail,
+    // producing an echo reply. Both are avoided by confirming the end of
+    // speech over a 600 ms window; any new PCM chunk cancels the confirmation.
     _audioEngine.setAudioEndedCallback(() {
-      if (mounted) {
-        _speechTimer?.cancel();
-        _watchdogTimer?.cancel();
+      if (!mounted) return;
+      _speechTimer?.cancel();
+      _watchdogTimer?.cancel();
+      _audioEndConfirmTimer?.cancel();
+      _audioEndConfirmTimer = Timer(const Duration(milliseconds: 600), () {
+        if (!mounted || !_isSpeaking) return;
         setState(() {
           _isSpeaking = false;
         });
-        if (_continuousListening) {
+        if (_continuousListening && !_isListening) {
           _scheduleRestartListening(delayMs: 350, playChimeTone: true);
         }
-      }
+      });
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -281,6 +299,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _continuousListening = true;
   Timer? _restartListenTimer;
   Timer? _speechTimer;
+  Timer? _audioEndConfirmTimer;
 
   @override
   void dispose() {
@@ -288,6 +307,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
     _watchdogTimer?.cancel();
+    _audioEndConfirmTimer?.cancel();
     _ttsArbiter.dispose();
     FloatingAssistantController.instance.setFullScreenActive(false);
     _liveSession.dispose();
@@ -477,6 +497,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();
     _restartListenTimer?.cancel();
+    _audioEndConfirmTimer?.cancel();
     _ttsArbiter.beginTurn();
     _audioEngine.stop();
     _audioEngine.stopListening();

@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 22, 2026 (Chunk 40 journey lifecycle + follow-ups: analyze clean, 368/368 tests, docs gate pass; only device harnesses remain open)
+**Last Updated**: September 25, 2026 (Chunk 41 single-voice double-audio fix: app-wide TTS arbiter + deferred end-of-speech confirmation; 386/386 tests, analyze clean)
 
 ---
 
@@ -850,3 +850,18 @@ The application provides intuitive journey planning, digital ticket booking with
   - **No pre-booked ticket on fresh start**: removed the seeded active demo ticket (`BB-20250906-184256`) from `LocalTicketRepository` — only expired history seeds remain. `hydrate()` additionally drops the legacy active demo ticket from already-persisted stores (one-time migration). Home/My Tickets/Saved correctly render their empty states until the rider books.
   - **Latent crash hardened**: `LiveLocationScreen.initState` called `recordLiveTracking` synchronously, whose global notify hit `setState`-during-build whenever the pushed route mounted outside an ancestor build pass (surfaced as 2 red tests once the seed no longer masked the timing). Recording is now deferred to a post-frame callback.
   - Tests updated to the ticketless-start contract (`home_page_test`, `safety_and_tabs_test`, `my_tickets_ui_test` book their own tickets; `trip_completion_test` asserts `expired`).
+
+---
+
+## 🛠️ Session Log — 2026-09-25: Chunk 41 — Single-Voice Fix for Simultaneous Double-Audio Replies
+
+> **User report**: when the AI responds, the same reply is heard in two different voices simultaneously.
+
+### ✅ Root-cause analysis & fixes
+
+- **1. App-wide shared TTS arbiter** ([tts_fallback_arbiter.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/tts_fallback_arbiter.dart), [gemini_live_screen.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/gemini_live_screen.dart), [floating_assistant_controller.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/floating_assistant_controller.dart)): the Live screen and the floating assistant each held a private `TtsFallbackArbiter`, but both share ONE global audio bridge (native PCM + browser SpeechSynthesis on the same window object). A private arbiter can only arbitrate its own turns, so handoff moments (fullscreen transitions, in-flight turns) could let an armed TTS fallback from one owner overlap late PCM from the other. Added `TtsFallbackArbiter.shared`; both owners now arbitrate against the same instance so first-starter-wins is enforced against the single real output.
+- **2. Deferred end-of-speech confirmation (600 ms)** (both owners): the web bridge fires `__bb_on_audio_ended` after only 250 ms of queued-audio silence, which on a jittery network happens *between PCM chunks of the same reply*. Releasing `_isSpeaking` immediately would (a) flip the TalkBack live region back to the full reply text so the screen reader announces the same words *over* the still-streaming Gemini voice, and (b) restart the mic into the reply tail, producing an echo reply. Both owners now confirm end-of-speech over a 600 ms window; any new PCM chunk cancels the confirmation and keeps the speaking state held. Timer is cancelled on new turns (`beginTurn` path), `onInterrupted`, `onError`, `stopSpeaking`, and `dispose`.
+- **3. `sendQuery` fullscreen guard** ([floating_assistant_controller.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/floating_assistant_controller.dart)): the controller now refuses queries while the full-screen Live screen owns the session, so a reply can never be produced on both sessions.
+- **Regression tests** (`test/features/ai_assistant/tts_fallback_arbiter_test.dart`, new group): shared instance identity, PCM claimed by one owner suppresses TTS armed by the other, handoff `beginTurn` drops a stale armed TTS, and late PCM is dropped after the other owner's TTS started.
+- **Verification**: `flutter analyze` clean, `flutter test` **386/386 green** (382 + 4 new), docs gate pass.
+- **Note**: the voice task-agent (`AppAutomationController`, booking-draft Live tool calling) was committed in `46e985b` with Chunks 39–40.
