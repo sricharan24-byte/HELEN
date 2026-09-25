@@ -24,10 +24,24 @@ abstract class TransportRepository {
   List<Route> get allRoutes;
 
   /// Stream live GPS bus location updates for a specific bus & route.
-  Stream<BusLocation> streamBusLocation(String busId, String routeId);
+  ///
+  /// When [originStopId]/[destinationStopId] are given, the simulated bus
+  /// starts at boarding and terminates at alighting (closing the stream on
+  /// arrival). Otherwise the full corridor is simulated.
+  Stream<BusLocation> streamBusLocation(
+    String busId,
+    String routeId, {
+    String? originStopId,
+    String? destinationStopId,
+  });
 
   /// Stream ordered, freshness-aware telemetry snapshots per Astra BUS-P1-01.
   Stream<TelemetrySnapshot> streamTelemetry(String busId, String routeId);
+
+  /// Stops and disposes the movement engine(s) for a bus & route journey
+  /// (arrival, End Trip, or cancellation) so no orphaned GPS timer survives
+  /// the end of the ride.
+  Future<void> stopJourney(String busId, String routeId);
 }
 
 /// Concrete [TransportRepository] backed by [LocalTransportDataSource].
@@ -64,9 +78,20 @@ class LocalTransportRepository implements TransportRepository, AsyncDisposable {
   List<Route> get allRoutes => _dataSource.allRoutes;
 
   @override
-  Stream<BusLocation> streamBusLocation(String busId, String routeId) {
-    final key = '$busId::$routeId';
-    if (!_activeEngines.containsKey(key)) {
+  Stream<BusLocation> streamBusLocation(
+    String busId,
+    String routeId, {
+    String? originStopId,
+    String? destinationStopId,
+  }) {
+    final key =
+        '$busId::$routeId::${originStopId ?? ''}::${destinationStopId ?? ''}';
+    final existing = _activeEngines[key];
+    if (existing == null || existing.isCompleted || existing.isDisposed) {
+      if (existing != null) {
+        unawaited(existing.dispose());
+        _activeEngines.remove(key);
+      }
       final all = _dataSource.allRoutes;
       final targetRoute = all.firstWhere(
         (r) => r.id == routeId,
@@ -83,9 +108,28 @@ class LocalTransportRepository implements TransportRepository, AsyncDisposable {
         busId: busId,
         route: targetRoute,
         dataSource: _dataSource,
+        originStopId: originStopId,
+        destinationStopId: destinationStopId,
       );
     }
     return _activeEngines[key]!.locationStream;
+  }
+
+  /// Stops and disposes the movement engine(s) for a bus & route journey
+  /// (e.g. after arrival, End Trip, or cancellation) so no orphaned GPS timer
+  /// keeps running once the ride is over.
+  @override
+  Future<void> stopJourney(String busId, String routeId) async {
+    final prefix = '$busId::$routeId::';
+    final keys = _activeEngines.keys
+        .where((k) => k.startsWith(prefix))
+        .toList();
+    for (final key in keys) {
+      final engine = _activeEngines.remove(key);
+      if (engine != null) {
+        await engine.dispose();
+      }
+    }
   }
 
   @override

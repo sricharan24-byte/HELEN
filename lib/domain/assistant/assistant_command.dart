@@ -13,6 +13,8 @@ class AssistantToolMetadata {
     required this.description,
     required this.promptSummary,
     required this.gatewayScreenPrompt,
+    this.parameters = const {},
+    this.requiredParams = const [],
   });
 
   final String name;
@@ -21,9 +23,30 @@ class AssistantToolMetadata {
   final String promptSummary;
   final String gatewayScreenPrompt;
 
+  /// OpenAPI-style JSON Schema properties for Gemini Live function calling.
+  /// e.g. {'origin': {'type': 'string', 'description': '...'}, ...}
+  final Map<String, Map<String, String>> parameters;
+  final List<String> requiredParams;
+
   bool get isConfirmable =>
       safetyLevel == CommandSafetyLevel.requiresUserConfirmation;
   bool get isReadOnly => safetyLevel == CommandSafetyLevel.readOnly;
+
+  /// Serializes to a Gemini Live / REST functionDeclaration entry.
+  Map<String, dynamic> toFunctionDeclaration() {
+    final Map<String, dynamic> decl = {
+      'name': name,
+      'description': description,
+    };
+    if (parameters.isNotEmpty) {
+      decl['parameters'] = {
+        'type': 'object',
+        'properties': parameters,
+        if (requiredParams.isNotEmpty) 'required': requiredParams,
+      };
+    }
+    return decl;
+  }
 }
 
 class AssistantCommandGateway {
@@ -76,17 +99,110 @@ class AssistantCommandGateway {
           'Opening digital ticket booking. Please review your route and confirm booking.',
       gatewayScreenPrompt: '🎫 Review & Confirm Booking',
     ),
+    // ── Voice task-agent booking tools (Live Gemini only, Chunk 41) ──
+    // Read-only slot setters drive JourneyController + checkout pre-fill.
+    // Only confirm_booking is confirmable; it opens BookingCheckoutDialog.
+    'set_trip': AssistantToolMetadata(
+      name: 'set_trip',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description:
+          'Sets the trip origin and destination stops for booking. Resolves stop names like VIT Main Gate or Katpadi Railway Station.',
+      promptSummary: 'Trip route updated.',
+      gatewayScreenPrompt: '🗺️ Trip Updated',
+      parameters: {
+        'origin': {
+          'type': 'string',
+          'description': 'Origin stop name or id, e.g. VIT Main Gate',
+        },
+        'destination': {
+          'type': 'string',
+          'description':
+              'Destination stop name or id, e.g. Katpadi Railway Station',
+        },
+      },
+    ),
+    'select_bus': AssistantToolMetadata(
+      name: 'select_bus',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description:
+          'Selects a bus for the active trip, e.g. Bus 18B. Must be called after set_trip.',
+      promptSummary: 'Bus selected.',
+      gatewayScreenPrompt: '🚌 Bus Selected',
+      parameters: {
+        'busId': {
+          'type': 'string',
+          'description': 'Bus identifier, e.g. 18B or Bus 18B',
+        },
+      },
+    ),
+    'set_passenger': AssistantToolMetadata(
+      name: 'set_passenger',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description:
+          'Sets passenger type and optional name for the checkout. Student and senior get 40% concession.',
+      promptSummary: 'Passenger details updated.',
+      gatewayScreenPrompt: '🧾 Passenger Updated',
+      parameters: {
+        'type': {
+          'type': 'string',
+          'description': 'Passenger type: general, student, or senior',
+        },
+        'name': {
+          'type': 'string',
+          'description': 'Passenger display name (optional)',
+        },
+      },
+    ),
+    'set_payment': AssistantToolMetadata(
+      name: 'set_payment',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description: 'Sets payment method for the checkout.',
+      promptSummary: 'Payment method updated.',
+      gatewayScreenPrompt: '💳 Payment Updated',
+      parameters: {
+        'method': {
+          'type': 'string',
+          'description': 'Payment method: upi, card, or wallet',
+        },
+      },
+    ),
+    'confirm_booking': AssistantToolMetadata(
+      name: 'confirm_booking',
+      safetyLevel: CommandSafetyLevel.requiresUserConfirmation,
+      description:
+          'Opens the ticket booking confirmation gateway with the current trip, bus, passenger and payment pre-filled. Requires explicit passenger tap before payment is taken.',
+      promptSummary:
+          'Opening booking confirmation. Please review and confirm on your screen.',
+      gatewayScreenPrompt: '🎫 Review & Confirm Booking',
+    ),
   };
 
   static bool requiresConfirmation(String actionType) {
     return registry[actionType]?.isConfirmable ?? false;
   }
 
+  /// Slot-filling protocol tools for the voice task agent. These turns are
+  /// machine protocol, not user-facing speech: the UI must never speak their
+  /// turn text (neither partial nor default), otherwise the protocol turn's
+  /// TTS overlaps the follow-up answer's voice saying the same words.
+  static const Set<String> silentProtocolActions = {
+    'set_trip',
+    'select_bus',
+    'set_passenger',
+    'set_payment',
+  };
+
+  static bool isSilentProtocol(String? actionType) =>
+      actionType != null && silentProtocolActions.contains(actionType);
+
   static AssistantToolMetadata? getMetadata(String actionType) {
     return registry[actionType];
   }
 
-  static Map<String, dynamic> buildToolResponseContext(String actionName) {
+  static Map<String, dynamic> buildToolResponseContext(
+    String actionName, [
+    Map<String, dynamic>? args,
+  ]) {
     final meta = registry[actionName];
     if (meta == null) {
       return {
@@ -101,12 +217,14 @@ class AssistantCommandGateway {
         'requiresConfirmation': true,
         'result':
             'Confirmation gateway screen opened. Explicit user confirmation is strictly required before execution.',
+        if (args != null && args.isNotEmpty) 'appliedArgs': args,
       };
     }
     return {
       'status': 'success',
       'requiresConfirmation': false,
       'result': meta.promptSummary,
+      if (args != null && args.isNotEmpty) 'appliedArgs': args,
     };
   }
 }

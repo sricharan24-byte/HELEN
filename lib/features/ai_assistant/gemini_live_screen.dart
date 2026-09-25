@@ -13,6 +13,8 @@ import '../tickets/live_location_screen.dart';
 import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
+import '../../domain/assistant/assistant_command.dart';
+import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
 import 'floating_assistant_controller.dart';
 import 'gemini_live_service.dart';
@@ -42,6 +44,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     with SingleTickerProviderStateMixin {
   final GeminiLiveService _liveService = const GeminiLiveService();
   final AudioSpeechEngine _audioEngine = const AudioSpeechEngine();
+  final AppAutomationController _automation = AppAutomationController();
 
   late final TicketController _ticketController;
   late final TransportRepository _repository;
@@ -53,6 +56,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _isPermissionBlocked = false;
   bool _receivedPcmThisTurn = false;
   final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter();
+  Timer? _watchdogTimer;
   String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
   GeminiLiveResponse? _lastResponse;
@@ -69,6 +73,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         widget.repository ?? AppServiceLocator.instance.transportRepository;
     _ticketController =
         widget.ticketController ?? AppServiceLocator.instance.ticketController;
+    _automation.attach(
+      repo: _repository,
+      journeyCtrl: widget.journeyController,
+    );
 
     _pulseController = AnimationController(
       vsync: this,
@@ -82,19 +90,30 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _liveSession = GeminiLiveSession(
       onTextChunk: (text) {
         if (!mounted) return;
+        // Single-voice: streaming text goes to the transcript only. The
+        // spoken voice is either native PCM (streamed below) or the single
+        // TTS fallback fired from onTurnComplete — never both, and never a
+        // half-built string.
         setState(() {
-          if (_spokenOutput.startsWith('Thinking...')) {
-            _spokenOutput = text;
+          if (_liveTranscription.startsWith('Listening') ||
+              _liveTranscription.startsWith('Recognized') ||
+              _spokenOutput.startsWith('Thinking...')) {
+            _liveTranscription = text;
           } else {
-            _spokenOutput += text;
+            _liveTranscription += text;
           }
         });
       },
       onAudioPcmChunk: (pcmBase64) {
         if (!mounted) return;
+        // First-starter-wins: if browser TTS already started for this turn,
+        // drop late PCM so the single started voice finishes alone.
+        if (!_ttsArbiter.tryClaimPcm()) {
+          debugPrint('[SingleVoice] dropped late PCM chunk (TTS already speaking)');
+          return;
+        }
         _receivedPcmThisTurn = true;
-        _speechTimer?.cancel();
-        _ttsArbiter.notifyPcmReceived();
+        _armWatchdog();
         if (!_isSpeaking || _spokenOutput.startsWith('Thinking...')) {
           setState(() {
             _isSpeaking = true;
@@ -104,15 +123,24 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           });
         }
         // Stream native 24kHz audio sequentially from Google AI Studio Live API!
+        // First-starter-wins is enforced by the arbiter claim above: PCM that
+        // arrives after browser TTS started is dropped, never layered on top.
         _audioEngine.playPcmAudio(pcmBase64);
       },
       onTurnComplete: (fullText, actionType) {
         if (!mounted) return;
+        final turnGen = _ttsArbiter.generation;
+        // Slot-tool protocol turns are silent: no TTS is ever scheduled for
+        // them (the follow-up answer turn carries the voice). Speaking one
+        // would layer a second voice over the answer saying the same words.
+        final bool silentProtocol =
+            AssistantCommandGateway.isSilentProtocol(actionType);
         setState(() {
           _isSpeaking = true;
           if (fullText.isNotEmpty) {
             _spokenOutput = fullText;
-          } else if (!_receivedPcmThisTurn) {
+            _liveTranscription = fullText;
+          } else if (!_receivedPcmThisTurn && !silentProtocol) {
             if (actionType != null) {
               switch (actionType) {
                 case 'track_bus':
@@ -145,29 +173,24 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
         // Safety fallback audio: when the Live API did not stream PCM, speak
         // the turn text via Web SpeechSynthesis so the response is audible.
-        _speechTimer?.cancel();
-        if (!_receivedPcmThisTurn) {
+        // Live turns get the extended grace; stale generations never speak.
+        // Silent protocol turns never schedule TTS at all.
+        if (!_receivedPcmThisTurn && !silentProtocol) {
           if (_spokenOutput.isNotEmpty) {
+            final spoken = _spokenOutput;
+            debugPrint('[SingleVoice] TTS fallback armed (live grace, gen $turnGen)');
             _ttsArbiter.scheduleFallback(() {
-              if (mounted) {
-                _speechTimer?.cancel();
-                _audioEngine.speak(_spokenOutput);
-                _endSpeakingAfterFallback();
-              }
-            });
+              if (!mounted || turnGen != _ttsArbiter.generation) return;
+              // Stop-before-speak: kill any stray audio from a prior turn
+              // before starting this turn's single TTS voice.
+              debugPrint('[SingleVoice] TTS fallback speaking now');
+              _audioEngine.stop();
+              _audioEngine.speak(spoken);
+              _armWatchdog();
+            }, isLive: true);
           }
-          final wordCount = _spokenOutput.split(' ').length;
-          final fallbackMs = (wordCount * 300).clamp(1500, 10000);
-          _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
-            if (mounted && _isSpeaking) {
-              setState(() {
-                _isSpeaking = false;
-              });
-              if (_continuousListening && !_isListening) {
-                _scheduleRestartListening(delayMs: 350, playChimeTone: true);
-              }
-            }
-          });
+        } else {
+          _armWatchdog();
         }
 
         if (actionType != null && !_actionExecutedThisTurn) {
@@ -176,12 +199,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
       onAction: (actionType, args) {
         if (!mounted) return;
-        _executeAction(actionType);
+        _executeAction(actionType, args);
       },
       onInterrupted: () {
         if (!mounted) return;
         _audioEngine.stop();
+        _ttsArbiter.cancel();
         _speechTimer?.cancel();
+        _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
@@ -193,7 +218,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       onError: (err) {
         if (!mounted) return;
         debugPrint('[GeminiLiveScreen] Session error: $err');
+        _ttsArbiter.cancel();
         _speechTimer?.cancel();
+        _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
@@ -222,6 +249,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _audioEngine.setAudioEndedCallback(() {
       if (mounted) {
         _speechTimer?.cancel();
+        _watchdogTimer?.cancel();
         setState(() {
           _isSpeaking = false;
         });
@@ -259,25 +287,31 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _continuousListening = false;
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
+    _watchdogTimer?.cancel();
     _ttsArbiter.dispose();
     FloatingAssistantController.instance.setFullScreenActive(false);
     _liveSession.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();
+    // Restore the mini window's callback on the shared bridge (this screen
+    // overwrote the single global slot in initState).
+    FloatingAssistantController.instance.rearmAudioCallback();
     _pulseController.dispose();
     _textController.dispose();
     super.dispose();
   }
 
-  /// Ends the speaking UI state after a deferred Web SpeechSynthesis fallback
-  /// actually starts, resyncing the word-count end timer from speech start.
-  void _endSpeakingAfterFallback() {
-    if (!mounted) return;
-    _speechTimer?.cancel();
-    final wordCount = _spokenOutput.split(' ').length;
-    final fallbackMs = (wordCount * 300).clamp(1500, 10000);
-    _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
-      if (mounted && _isSpeaking) {
+  /// Single-voice watchdog: the JS `__bb_on_audio_ended` callback is the sole
+  /// normal clearer of [_isSpeaking]. This 30s timer only recovers stuck
+  /// audio (e.g. a lost end event) so it can never restart the mic mid-speech
+  /// and cause echo/self-answer overlap.
+  void _armWatchdog() {
+    _watchdogTimer?.cancel();
+    final gen = _ttsArbiter.generation;
+    _watchdogTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted) return;
+      if (gen != _ttsArbiter.generation) return;
+      if (_isSpeaking) {
         setState(() {
           _isSpeaking = false;
         });
@@ -391,7 +425,33 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     }
   }
 
-  void _handleVoiceInput(String query) {
+  /// Echo-of-self guard: the mic can pick up the AI's own speaker output
+  /// (room reverb, Bluetooth tail) and transcribe it as a new query, which
+  /// would start a second voice over the first. Long transcripts that closely
+  /// match the last spoken reply are dropped. Short answers ("UPI", "yes")
+  /// always pass so genuine replies are never ignored.
+  bool _isEchoOfSelf(String transcript) {
+    final heard = _normalizeForEcho(transcript);
+    final spoken = _normalizeForEcho(_spokenOutput);
+    if (heard.length < 8 || spoken.length < 8) return false;
+    if (spoken.contains(heard) || heard.contains(spoken)) return true;
+    final heardTokens = heard.split(' ').toSet();
+    final spokenTokens = spoken.split(' ').toSet();
+    if (heardTokens.isEmpty) return false;
+    final overlap =
+        heardTokens.intersection(spokenTokens).length / heardTokens.length;
+    return overlap >= 0.6;
+  }
+
+  String _normalizeForEcho(String s) {
+    return s
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  void _handleVoiceInput(String query, {bool isUserTap = false}) {
     final clean = query.trim();
     if (clean.isEmpty) return;
 
@@ -400,6 +460,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     if (_lastVoiceInputTime != null &&
         now.difference(_lastVoiceInputTime!) < const Duration(milliseconds: 1500) &&
         _lastProcessedQuery.toLowerCase() == clean.toLowerCase()) {
+      return;
+    }
+    // Drop mic echo of our own voice (not user taps / typed text).
+    if (!isUserTap && _isEchoOfSelf(clean)) {
+      debugPrint('[GeminiLive] Dropped echo-of-self transcript: "$clean"');
+      if (_continuousListening && !_isListening && !_isSpeaking) {
+        _scheduleRestartListening(delayMs: 350, playChimeTone: false);
+      }
       return;
     }
     _lastVoiceInputTime = now;
@@ -642,7 +710,49 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     );
   }
 
-  void _executeAction(String actionType) {
+  void _executeAction(String actionType, [Map<String, dynamic>? args]) {
+    if (actionType == 'set_trip' ||
+        actionType == 'select_bus' ||
+        actionType == 'set_passenger' ||
+        actionType == 'set_payment') {
+      // Slot setters never navigate alone; they pre-fill the draft and the
+      // spoken turn tells the user what is still missing.
+      _automation.handleToolCall(actionType, args);
+      return;
+    }
+    if (actionType == 'confirm_booking') {
+      final readiness =
+          _automation.handleToolCall('confirm_booking', args);
+      if (!readiness.isComplete) {
+        if (mounted) {
+          setState(() {
+            _spokenOutput = readiness.spokenHint;
+          });
+        }
+        return;
+      }
+      if (_actionExecutedThisTurn) return;
+      _actionExecutedThisTurn = true;
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => TicketBookingSuitePage(
+            ticketController: _ticketController,
+            journeyController: widget.journeyController,
+            initialOrigin: _automation.origin,
+            initialDestination: _automation.destination,
+            initialBusId:
+                _automation.hasCustomBus ? _automation.busId : null,
+            initialPassengerType: _automation.passengerType,
+            initialPaymentMethod: _automation.paymentMethod,
+            initialPassengerName: _automation.passengerName == 'Passenger'
+                ? null
+                : _automation.passengerName,
+            autoOpenCheckout: true,
+          ),
+        ),
+      ));
+      return;
+    }
     if (_actionExecutedThisTurn) return;
     _actionExecutedThisTurn = true;
     if (actionType == 'book_ticket') {
@@ -860,12 +970,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
               ),
               const SizedBox(height: 10),
 
-              // Top Status & Spoken Output Box with TalkBack LiveRegion
+              // Top Status & Spoken Output Box with TalkBack LiveRegion.
+              // Single-voice: while our own PCM/TTS voice is speaking, the
+              // response text is NOT exposed as a live-region change —
+              // otherwise TalkBack/ChromeVox announces the same words over
+              // our voice (same-words double voice). The full text appears
+              // once speech ends for later review.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Semantics(
                   liveRegion: true,
-                  label: 'Gemini Live announcement: $_spokenOutput',
+                  label: _isSpeaking
+                      ? 'Gemini is speaking'
+                      : 'Gemini Live announcement: $_spokenOutput',
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -1206,7 +1323,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                       ),
                       onSubmitted: (val) {
                         _audioEngine.unlockAudio();
-                        _handleVoiceInput(val);
+                        _handleVoiceInput(val, isUserTap: true);
                         _textController.clear();
                       },
                     ),
@@ -1220,7 +1337,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     icon: const Icon(Icons.send, color: Colors.white),
                     onPressed: () {
                       _audioEngine.unlockAudio();
-                      _handleVoiceInput(_textController.text);
+                      _handleVoiceInput(_textController.text, isUserTap: true);
                       _textController.clear();
                     },
                   ),
@@ -1250,7 +1367,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         onPressed: () {
           _audioEngine.unlockAudio();
           _audioEngine.playChime(isListening: false);
-          _handleVoiceInput(prompt);
+          _handleVoiceInput(prompt, isUserTap: true);
         },
       ),
     );

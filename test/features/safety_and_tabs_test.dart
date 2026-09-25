@@ -47,6 +47,18 @@ void main() {
     testWidgets('SavedPage renders passbook', (tester) async {
       final ticketRepo = LocalTicketRepository();
       final ticketController = TicketController(ticketRepo);
+      // Fresh installs start ticketless: book the pass under test.
+      final dataSource = LocalTransportDataSource();
+      final route = dataSource.allRoutes.firstWhere(
+        (r) => r.id == 'vit-to-katpadi',
+        orElse: () => dataSource.allRoutes.first,
+      );
+      ticketController.bookTicket(
+        origin: dataSource.stopById('vit-main-gate')!,
+        destination: dataSource.stopById('katpadi-railway-station')!,
+        route: route,
+        passengerName: 'Pavan K',
+      );
 
       await tester.pumpWidget(
         MaterialApp(

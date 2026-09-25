@@ -39,6 +39,24 @@ Widget testApp({
   );
 }
 
+/// Fresh installs start ticketless, so tests needing an active ticket book
+/// one explicitly instead of relying on a pre-booked seed.
+TicketController bookCorridorTicketController() {
+  final dataSource = LocalTransportDataSource();
+  final route = dataSource.allRoutes.firstWhere(
+    (r) => r.id == 'vit-to-katpadi',
+    orElse: () => dataSource.allRoutes.first,
+  );
+  final ticketController = TicketController(LocalTicketRepository());
+  ticketController.bookTicket(
+    origin: dataSource.stopById('vit-main-gate')!,
+    destination: dataSource.stopById('katpadi-railway-station')!,
+    route: route,
+    passengerName: 'Pavan K',
+  );
+  return ticketController;
+}
+
 void main() {
   setUpAll(stubMapTiles);
   setUp(AppSettingsController.instance.resetHomeScreenLayout);
@@ -55,7 +73,9 @@ void main() {
     });
 
     testWidgets('displays active ticket greeting banner (Image 2)', (tester) async {
-      await tester.pumpWidget(testApp());
+      await tester.pumpWidget(
+        testApp(ticketController: bookCorridorTicketController()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Good morning, Pavan!'), findsOneWidget);
@@ -79,11 +99,16 @@ void main() {
   // ── My Journey Card ──────────────────────────────────────────────────
   group('My Journey Card', () {
     testWidgets('shows active journey details and status badge', (tester) async {
-      await tester.pumpWidget(testApp());
+      final ticketController = bookCorridorTicketController();
+      await tester.pumpWidget(testApp(ticketController: ticketController));
       await tester.pumpAndSettle();
 
+      final active = ticketController.activeTicket!;
       expect(find.text('My Journey'), findsOneWidget);
-      expect(find.text('Bus 18B → Katpadi'), findsOneWidget);
+      expect(
+        find.text('${active.busId} → ${active.destination.name}'),
+        findsOneWidget,
+      );
       expect(find.text('On Track'), findsOneWidget);
       expect(find.text('3 stops'), findsOneWidget);
       expect(find.text('6 min'), findsOneWidget);

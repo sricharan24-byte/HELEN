@@ -38,7 +38,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
       builder: (context, _) {
         final activeTicket = widget.ticketController.activeTicket;
         final allTickets = widget.ticketController.tickets;
-        final pastTickets = allTickets.where((t) => t.id != activeTicket?.id).toList();
+        final pastTickets = allTickets
+            .where((t) => t.id != activeTicket?.id)
+            .toList();
 
         return Scaffold(
           backgroundColor: colors.background,
@@ -46,7 +48,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
             backgroundColor: colors.background,
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                color: colors.textPrimary,
+                size: 20,
+              ),
               onPressed: () => Navigator.of(context).pop(),
               constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
@@ -58,13 +64,31 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-                    Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
+                    Text(
+                      'Bus',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Text(
+                      'Buddy',
+                      style: TextStyle(
+                        color: colors.actionPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
                   ],
                 ),
                 Text(
                   'My Tickets',
-                  style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -104,17 +128,25 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                   },
                                   borderRadius: BorderRadius.circular(16),
                                   child: Container(
-                                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    constraints: const BoxConstraints(
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _selectedTabIndex == 0 ? colors.actionPrimary : Colors.transparent,
+                                      color: _selectedTabIndex == 0
+                                          ? colors.actionPrimary
+                                          : Colors.transparent,
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
                                       'Current Ticket',
                                       style: TextStyle(
-                                        color: _selectedTabIndex == 0 ? colors.actionPrimaryText : colors.textSecondary,
+                                        color: _selectedTabIndex == 0
+                                            ? colors.actionPrimaryText
+                                            : colors.textSecondary,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 15,
                                       ),
@@ -139,17 +171,25 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                   },
                                   borderRadius: BorderRadius.circular(16),
                                   child: Container(
-                                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    constraints: const BoxConstraints(
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _selectedTabIndex == 1 ? colors.actionPrimary : Colors.transparent,
+                                      color: _selectedTabIndex == 1
+                                          ? colors.actionPrimary
+                                          : Colors.transparent,
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
                                       'Previous Tickets',
                                       style: TextStyle(
-                                        color: _selectedTabIndex == 1 ? colors.actionPrimaryText : colors.textSecondary,
+                                        color: _selectedTabIndex == 1
+                                            ? colors.actionPrimaryText
+                                            : colors.textSecondary,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 15,
                                       ),
@@ -186,14 +226,16 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     excludeSemantics: true,
                     child: InkWell(
                       onTap: () {
-                        unawaited(Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => GeminiLiveScreen(
-                              ticketController: widget.ticketController,
-                              repository: widget.repository,
+                        unawaited(
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => GeminiLiveScreen(
+                                ticketController: widget.ticketController,
+                                repository: widget.repository,
+                              ),
                             ),
                           ),
-                        ));
+                        );
                       },
                       borderRadius: BorderRadius.circular(24),
                       child: Container(
@@ -204,7 +246,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFDC2626).withValues(alpha: 0.4),
+                              color: const Color(
+                                0xFFDC2626,
+                              ).withValues(alpha: 0.4),
                               blurRadius: 16,
                               offset: const Offset(0, 4),
                             ),
@@ -219,7 +263,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                 color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.mic, color: Colors.white, size: 22),
+                              child: const Icon(
+                                Icons.mic,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Column(
@@ -228,13 +276,20 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                               children: [
                                 const Text(
                                   'Ask BusBuddy',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                                 Text(
                                   _selectedTabIndex == 0
                                       ? 'Show my ticket, check ticket status, etc.'
                                       : 'Get details about a previous ticket',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ],
                             ),
@@ -260,11 +315,19 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(Icons.confirmation_number_outlined, color: Color(0xFF64748B), size: 48),
+            Icon(
+              Icons.confirmation_number_outlined,
+              color: Color(0xFF64748B),
+              size: 48,
+            ),
             SizedBox(height: 16),
             Text(
               'No Active Ticket',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             SizedBox(height: 8),
             Text(
@@ -295,7 +358,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.directions_bus, color: Color(0xFF0F172A), size: 32),
+                      const Icon(
+                        Icons.directions_bus,
+                        color: Color(0xFF0F172A),
+                        size: 32,
+                      ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,7 +388,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF16A34A),
                       borderRadius: BorderRadius.circular(16),
@@ -343,13 +413,25 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
               const SizedBox(height: 16),
 
               // Detail Rows
-              _buildTicketDetailRow(Icons.calendar_today_outlined, _formatActiveDate(activeTicket.issuedAt)),
+              _buildTicketDetailRow(
+                Icons.calendar_today_outlined,
+                _formatActiveDate(activeTicket.issuedAt),
+              ),
               const SizedBox(height: 10),
-              _buildTicketDetailRow(Icons.access_time_outlined, _formatActiveTime(activeTicket.issuedAt)),
+              _buildTicketDetailRow(
+                Icons.access_time_outlined,
+                _formatActiveTime(activeTicket.issuedAt),
+              ),
               const SizedBox(height: 10),
-              _buildTicketDetailRow(Icons.currency_rupee, '₹${activeTicket.fareAmount.toStringAsFixed(0)}'),
+              _buildTicketDetailRow(
+                Icons.currency_rupee,
+                '₹${activeTicket.fareAmount.toStringAsFixed(0)}',
+              ),
               const SizedBox(height: 10),
-              _buildTicketDetailRow(Icons.confirmation_number_outlined, 'Ticket ID: ${activeTicket.id}'),
+              _buildTicketDetailRow(
+                Icons.confirmation_number_outlined,
+                'Ticket ID: ${activeTicket.id}',
+              ),
 
               const SizedBox(height: 16),
               const Divider(color: Color(0xFFCBD5E1), height: 1),
@@ -364,7 +446,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       color: Color(0xFF16A34A),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check, color: Colors.white, size: 16),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Column(
@@ -392,38 +478,133 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
               const SizedBox(height: 20),
 
               // View Ticket Action Button
+              // BUS-P1-05: minimum height (not fixed) so the label can
+              // reflow at 200-300% text scale.
               SizedBox(
                 width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    unawaited(Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => TicketDetailsPage(ticket: activeTicket),
-                      ),
-                    ));
-                  },
-                  icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 22),
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text(
-                        'View Ticket',
-                        style: TextStyle(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      unawaited(
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                TicketDetailsPage(ticket: activeTicket),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.qr_code_2,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'View Ticket',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(
+                          Icons.chevron_right,
                           color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF007AFF),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Cancel Ticket Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  child: Semantics(
+                    button: true,
+                    label:
+                        'Cancel ticket. Your active ticket will be cancelled.',
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        unawaited(
+                          showDialog<void>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Cancel this ticket?'),
+                              content: const Text(
+                                'Your active ticket will be cancelled and the trip will end. This cannot be undone.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('Keep Ticket'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    widget.ticketController
+                                        .cancelActiveTicket();
+                                    AnnouncementCoordinator.instance.announce(
+                                      'Ticket cancelled.',
+                                      priority: AnnouncementPriority.high,
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Ticket cancelled.'),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                  ),
+                                  child: const Text(
+                                    'Cancel Ticket',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.cancel_outlined,
+                        color: Color(0xFFDC2626),
+                        size: 22,
+                      ),
+                      label: const Text(
+                        'Cancel Ticket',
+                        style: TextStyle(
+                          color: Color(0xFFDC2626),
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      SizedBox(width: 6),
-                      Icon(Icons.chevron_right, color: Colors.white, size: 20),
-                    ],
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF007AFF),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Color(0xFFDC2626),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -436,7 +617,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
         // Quick Actions Section
         const Text(
           'Quick Actions',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 12),
         Row(
@@ -447,15 +632,19 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 title: 'Live Map',
                 subtitle: 'Track real bus location',
                 onTap: () {
-                  final repo = widget.repository ?? AppServiceLocator.instance.transportRepository;
-                  unawaited(Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => LiveLocationScreen(
-                        ticket: activeTicket,
-                        repository: repo,
+                  final repo =
+                      widget.repository ??
+                      AppServiceLocator.instance.transportRepository;
+                  unawaited(
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => LiveLocationScreen(
+                          ticket: activeTicket,
+                          repository: repo,
+                        ),
                       ),
                     ),
-                  ));
+                  );
                 },
               ),
             ),
@@ -467,7 +656,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 subtitle: 'Share trip details',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ticket sharing link copied to clipboard.')),
+                    const SnackBar(
+                      content: Text('Ticket sharing link copied to clipboard.'),
+                    ),
                   );
                 },
               ),
@@ -480,7 +671,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 subtitle: 'Save offline',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Digital pass saved to offline downloads.')),
+                    const SnackBar(
+                      content: Text('Digital pass saved to offline downloads.'),
+                    ),
                   );
                 },
               ),
@@ -545,12 +738,19 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -574,7 +774,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
             SizedBox(height: 16),
             Text(
               'No Previous Tickets',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             SizedBox(height: 8),
             Text(
@@ -596,15 +800,18 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Semantics(
             button: true,
-            label: '${ticket.busId}, ${ticket.routeName}, ${ticket.fareAmount} rupees.',
+            label:
+                '${ticket.busId}, ${ticket.routeName}, ${ticket.fareAmount} rupees.',
             excludeSemantics: true,
             child: InkWell(
               onTap: () {
-                unawaited(Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => TicketDetailsPage(ticket: ticket),
+                unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => TicketDetailsPage(ticket: ticket),
+                    ),
                   ),
-                ));
+                );
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
@@ -616,7 +823,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.directions_bus, color: Colors.white, size: 28),
+                    const Icon(
+                      Icons.directions_bus,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -641,18 +852,29 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.calendar_today_outlined, color: Color(0xFF64748B), size: 14),
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                color: Color(0xFF64748B),
+                                size: 14,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 _formatTimestamp(ticket.issuedAt),
-                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(Icons.currency_rupee, color: Color(0xFF64748B), size: 14),
+                              const Icon(
+                                Icons.currency_rupee,
+                                color: Color(0xFF64748B),
+                                size: 14,
+                              ),
                               Text(
                                 ticket.fareAmount.toStringAsFixed(0),
                                 style: const TextStyle(
@@ -666,7 +888,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: Color(0xFF64748B), size: 22),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFF64748B),
+                      size: 22,
+                    ),
                   ],
                 ),
               ),
@@ -682,8 +908,22 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
       return 'Today, 6 Sep 2025';
     }
     final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
     final prefix = isToday ? 'Today, ' : '';
     return '$prefix${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -699,7 +939,20 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
   }
 
   String _formatTimestamp(DateTime dt) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final day = dt.day;
     final month = months[dt.month - 1];
     final year = dt.year;

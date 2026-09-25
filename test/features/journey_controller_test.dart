@@ -38,9 +38,17 @@ class FakeTransportRepository implements TransportRepository {
   List<Route> get allRoutes => _routes;
 
   @override
-  Stream<BusLocation> streamBusLocation(String busId, String routeId) {
+  Stream<BusLocation> streamBusLocation(
+    String busId,
+    String routeId, {
+    String? originStopId,
+    String? destinationStopId,
+  }) {
     return const Stream.empty();
   }
+
+  @override
+  Future<void> stopJourney(String busId, String routeId) async {}
 
   @override
   Stream<TelemetrySnapshot> streamTelemetry(String busId, String routeId) {

@@ -15,11 +15,13 @@ import '../settings/voice_assistant_settings_page.dart';
 import '../tickets/booking_page.dart';
 import '../tickets/live_location_screen.dart';
 import '../tickets/ticket_controller.dart';
+import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
 import 'floating_chat_message.dart';
 import 'gemini_live_screen.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
+import 'tts_fallback_arbiter.dart';
 
 /// Central state controller for the floating BusBuddy AI assistant bubble and mini window.
 class FloatingAssistantController extends ChangeNotifier {
@@ -32,6 +34,8 @@ class FloatingAssistantController extends ChangeNotifier {
 
   final AudioSpeechEngine _audioEngine = const AudioSpeechEngine();
   final GeminiLiveService _liveService = const GeminiLiveService();
+  final AppAutomationController automation = AppAutomationController();
+  final TtsFallbackArbiter _ttsArbiter = TtsFallbackArbiter();
   GeminiLiveSession? _liveSession;
   String? _connectedApiKey;
   String? _connectedVoice;
@@ -59,6 +63,7 @@ class FloatingAssistantController extends ChangeNotifier {
   final List<FloatingChatMessage> _messages = [];
   Timer? _speechTimer;
   bool _receivedPcmThisTurn = false;
+  String _lastSpokenText = '';
 
   // ── Public Getters ─────────────────────────────────────────────────────────
   bool get isWindowOpen => _isWindowOpen;
@@ -84,6 +89,7 @@ class FloatingAssistantController extends ChangeNotifier {
     if (ticketCtrl != null) ticketController = ticketCtrl;
     if (repo != null) repository = repo;
     if (journeyCtrl != null) journeyController = journeyCtrl;
+    automation.attach(repo: repository, journeyCtrl: journeyController);
 
     if (_messages.isEmpty) {
       _messages.add(
@@ -110,7 +116,10 @@ class FloatingAssistantController extends ChangeNotifier {
 
   void _initAudio() {
     AnnouncementCoordinator.instance.onUrgentAlertTriggered = stopSpeaking;
+    _registerAudioEndedCallback();
+  }
 
+  void _registerAudioEndedCallback() {
     _audioEngine.setAudioEndedCallback(() {
       _setSpeaking(false);
       _speechTimer?.cancel();
@@ -119,6 +128,14 @@ class FloatingAssistantController extends ChangeNotifier {
       }
       notifyListeners();
     });
+  }
+
+  /// Re-registers this controller's audio-ended callback on the shared web
+  /// audio bridge. The fullscreen [GeminiLiveScreen] overwrites the single
+  /// global callback while open; it must call this on dispose so the mini
+  /// window's mic-restart and speaking state keep working afterwards.
+  void rearmAudioCallback() {
+    _registerAudioEndedCallback();
   }
 
   void _ensureSession() {
@@ -142,8 +159,9 @@ class FloatingAssistantController extends ChangeNotifier {
     _liveSession = GeminiLiveSession(
       onAudioPcmChunk: (pcmBase64) {
         if (_isMuted || _isFullScreenActive) return;
+        // First-starter-wins: drop late PCM once TTS has started.
+        if (!_ttsArbiter.tryClaimPcm()) return;
         _receivedPcmThisTurn = true;
-        _speechTimer?.cancel();
         if (!_isSpeaking) {
           _isSpeaking = true;
           notifyListeners();
@@ -152,8 +170,18 @@ class FloatingAssistantController extends ChangeNotifier {
       },
       onTurnComplete: (fullText, actionType) {
         if (_isFullScreenActive) return;
+        final turnGen = _ttsArbiter.generation;
         _isSpeaking = true;
         _liveStatus = 'Ready';
+
+        // Slot-tool protocol turns are silent here too: the onAction handler
+        // already posted the bubble, and the follow-up answer carries the
+        // voice. Speaking would double the voice on the same words.
+        if (AssistantCommandGateway.isSilentProtocol(actionType)) {
+          _ttsArbiter.cancel();
+          notifyListeners();
+          return;
+        }
 
         final displayText = fullText.trim().isNotEmpty
             ? fullText
@@ -177,28 +205,32 @@ class FloatingAssistantController extends ChangeNotifier {
           }
         }
 
-        _speechTimer?.cancel();
+        // Single-voice: Live turns get the extended grace; stale turns never
+        // speak. Stop-before-speak kills stray audio from a prior turn.
+        _ttsArbiter.cancel();
+        if (displayText.isNotEmpty) _lastSpokenText = displayText;
         if (!_receivedPcmThisTurn) {
           if (!_isMuted && displayText.isNotEmpty) {
-            _audioEngine.speak(displayText);
+            final spoken = displayText;
+            _ttsArbiter.scheduleFallback(() {
+              if (turnGen != _ttsArbiter.generation) return;
+              if (_isMuted || _isFullScreenActive) return;
+              _audioEngine.stop();
+              _audioEngine.speak(spoken);
+              _armSpeakingWatchdog();
+            }, isLive: true);
           }
-          final wordCount = displayText.split(' ').length;
-          final fallbackMs = (wordCount * 300).clamp(1500, 10000);
-          _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
-            if (_isSpeaking) {
-              _isSpeaking = false;
-              if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
-                _scheduleRestartListening(delayMs: 350, playChimeTone: true);
-              }
-              notifyListeners();
-            }
-          });
         }
 
         notifyListeners();
       },
+      onAction: (actionType, args) {
+        if (_isFullScreenActive) return;
+        applyLiveToolCall(actionType, args);
+      },
       onInterrupted: () {
         _audioEngine.stop();
+        _ttsArbiter.cancel();
         _speechTimer?.cancel();
         _restartListenTimer?.cancel();
         _isSpeaking = false;
@@ -385,15 +417,49 @@ class FloatingAssistantController extends ChangeNotifier {
     });
   }
 
+  bool _isEchoOfSelf(String transcript) {
+    final heard = transcript
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final spoken = _lastSpokenText
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (heard.length < 8 || spoken.length < 8) return false;
+    if (spoken.contains(heard) || heard.contains(spoken)) return true;
+    final heardTokens = heard.split(' ').toSet();
+    final spokenTokens = spoken.split(' ').toSet();
+    if (heardTokens.isEmpty) return false;
+    return heardTokens.intersection(spokenTokens).length / heardTokens.length >=
+        0.6;
+  }
+
   // ── Send Query ─────────────────────────────────────────────────────────────
-  void sendQuery(String rawQuery) {
+  void sendQuery(String rawQuery, {bool isUserTap = false}) {
     final query = rawQuery.trim();
     if (query.isEmpty) return;
+
+    // Drop mic echo of our own voice (typed/chip taps pass isUserTap: true).
+    if (!isUserTap && _isEchoOfSelf(query)) {
+      if (_continuousListening &&
+          !_isListening &&
+          !_isSpeaking &&
+          !_isFullScreenActive &&
+          !_isMuted &&
+          _isWindowOpen) {
+        _scheduleRestartListening(delayMs: 350, playChimeTone: false);
+      }
+      return;
+    }
 
     _audioEngine.unlockAudio();
     stopSpeaking();
     stopListening(disableContinuous: false);
     _audioEngine.resetTurn();
+    _ttsArbiter.beginTurn();
     _receivedPcmThisTurn = false;
 
     // Record user message
@@ -433,19 +499,15 @@ class FloatingAssistantController extends ChangeNotifier {
 
       if (!_isMuted) {
         _isSpeaking = true;
-        _audioEngine.speak(responseText);
-        final wordCount = responseText.split(' ').length;
-        final fallbackMs = (wordCount * 300).clamp(1500, 10000);
-        _speechTimer?.cancel();
-        _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
-          if (_isSpeaking) {
-            _isSpeaking = false;
-            if (_continuousListening && !_isListening && !_isFullScreenActive && !_isMuted && _isWindowOpen) {
-              _scheduleRestartListening(delayMs: 350, playChimeTone: true);
-            }
-            notifyListeners();
-          }
+        _lastSpokenText = responseText;
+        // Offline turns cannot produce PCM: speak immediately (single voice)
+        // with stop-before-speak. Completion owns mic restart; watchdog only
+        // recovers stuck audio.
+        _ttsArbiter.speakNow(() {
+          _audioEngine.stop();
+          _audioEngine.speak(responseText);
         });
+        _armSpeakingWatchdog();
       } else {
         _isSpeaking = false;
       }
@@ -458,11 +520,81 @@ class FloatingAssistantController extends ChangeNotifier {
     }
   }
 
+  /// Applies a Live Gemini function call to the booking draft and posts a
+  /// chat bubble so the user sees what the agent did. Safe to call from
+  /// [GeminiLiveSession.onAction] (no BuildContext needed for slot setters;
+  /// gateway navigation still goes through [executeAction]).
+  AutomationResult applyLiveToolCall(
+    String actionType,
+    Map<String, dynamic>? args,
+  ) {
+    automation.attach(repo: repository, journeyCtrl: journeyController);
+    const agentTools = {
+      'set_trip',
+      'select_bus',
+      'set_passenger',
+      'set_payment',
+      'confirm_booking',
+    };
+    if (!agentTools.contains(actionType)) {
+      return const AutomationResult(
+        spokenHint: '',
+        displayText: '',
+      );
+    }
+    final result = automation.handleToolCall(actionType, args);
+    if (result.displayText.isNotEmpty) {
+      _messages.add(
+        FloatingChatMessage(
+          id: 'msg-${DateTime.now().millisecondsSinceEpoch}-$actionType',
+          sender: 'ai',
+          text: result.displayText,
+          timestamp: DateTime.now(),
+          actionType: result.needsGateway
+              ? 'confirm_booking'
+              : result.actionType,
+          actionLabel: result.needsGateway
+              ? (AssistantCommandGateway.getMetadata('confirm_booking')
+                      ?.gatewayScreenPrompt ??
+                  '🎫 Review & Confirm Booking')
+              : result.actionLabel,
+        ),
+      );
+      if (!_isWindowOpen) _hasUnread = true;
+      notifyListeners();
+    }
+    return result;
+  }
+
   // ── Action Navigation Execution ────────────────────────────────────────────
   void executeAction(BuildContext context, String actionType, GlobalKey<NavigatorState>? navigatorKey) {
     final nav = navigatorKey?.currentState ?? Navigator.of(context, rootNavigator: true);
 
     switch (actionType) {
+      case 'set_trip':
+      case 'select_bus':
+      case 'set_passenger':
+      case 'set_payment':
+        // Slot already applied via applyLiveToolCall; open pre-filled booking.
+        _openPrefilledBooking(nav, autoOpenCheckout: false);
+        break;
+
+      case 'confirm_booking':
+        final readiness = automation.bookingReadiness();
+        if (!readiness.isComplete) {
+          _messages.add(
+            FloatingChatMessage(
+              id: 'msg-${DateTime.now().millisecondsSinceEpoch}-missing',
+              sender: 'ai',
+              text: readiness.displayText,
+              timestamp: DateTime.now(),
+            ),
+          );
+          notifyListeners();
+          break;
+        }
+        _openPrefilledBooking(nav, autoOpenCheckout: true);
+        break;
       case 'track_bus':
         final currentTicket = activeTicket;
         final currentRepo = repository;
@@ -569,6 +701,27 @@ class FloatingAssistantController extends ChangeNotifier {
     closeWindow();
   }
 
+  void _openPrefilledBooking(NavigatorState nav, {required bool autoOpenCheckout}) {
+    if (ticketController == null) return;
+    final auto = automation;
+    unawaited(nav.push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookingPage(
+          ticketController: ticketController!,
+          journeyController: journeyController,
+          initialOrigin: auto.origin,
+          initialDestination: auto.destination,
+          initialBusId: auto.hasCustomBus ? auto.busId : null,
+          initialPassengerType: auto.passengerType,
+          initialPaymentMethod: auto.paymentMethod,
+          initialPassengerName:
+              auto.passengerName == 'Passenger' ? null : auto.passengerName,
+          autoOpenCheckout: autoOpenCheckout,
+        ),
+      ),
+    ));
+  }
+
   void openFullScreen(NavigatorState nav) {
     closeWindow();
     setFullScreenActive(true);
@@ -662,9 +815,12 @@ class FloatingAssistantController extends ChangeNotifier {
     _continuousListening = false;
     _hasCustomPosition = false;
     _messages.clear();
+    _lastSpokenText = '';
     ticketController = null;
     repository = null;
     journeyController = null;
+    automation.resetDraft();
+    automation.attach(repo: null, journeyCtrl: null);
     notifyListeners();
   }
 
@@ -718,11 +874,34 @@ class FloatingAssistantController extends ChangeNotifier {
     }
   }
 
+  /// 30s stuck-audio watchdog. The JS audio-ended callback owns normal
+  /// completion; this only recovers lost end events so the mic can never
+  /// restart mid-speech and echo.
+  void _armSpeakingWatchdog() {
+    _speechTimer?.cancel();
+    final gen = _ttsArbiter.generation;
+    _speechTimer = Timer(const Duration(seconds: 30), () {
+      if (gen != _ttsArbiter.generation) return;
+      if (_isSpeaking) {
+        _isSpeaking = false;
+        if (_continuousListening &&
+            !_isListening &&
+            !_isFullScreenActive &&
+            !_isMuted &&
+            _isWindowOpen) {
+          _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+        }
+        notifyListeners();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _continuousListening = false;
     _restartListenTimer?.cancel();
     _speechTimer?.cancel();
+    _ttsArbiter.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();
     _liveSession?.disconnect();

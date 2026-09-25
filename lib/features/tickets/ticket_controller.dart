@@ -55,6 +55,17 @@ class TicketController extends ChangeNotifier {
     }
   }
 
+  /// Marks the active ticket as expired when the ride ends — arrival at the
+  /// destination or an explicit End Trip (including early alighting).
+  /// Terminal-state tickets are left untouched.
+  void completeActiveTrip({String reason = 'Reached destination'}) {
+    final active = activeTicket;
+    if (active != null) {
+      _repository.completeTicket(active.id, reason: reason);
+      notifyListeners();
+    }
+  }
+
   void refresh() {
     notifyListeners();
   }

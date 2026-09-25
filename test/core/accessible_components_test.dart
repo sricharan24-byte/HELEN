@@ -101,6 +101,7 @@ void main() {
         etaMinutes: 5,
         timestamp: DateTime.now(),
         progressPercentage: 0.4,
+        isSimulated: false,
       );
 
       await tester.pumpWidget(
@@ -116,9 +117,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Live Bus Status (Map Alternative)'), findsOneWidget);
+      expect(find.text('Live Bus Telemetry (Map Alternative)'), findsOneWidget);
       expect(find.text('Green Circle'), findsOneWidget);
-      expect(find.text('5 mins'), findsOneWidget);
+      expect(find.text('5 min'), findsOneWidget);
       expect(find.text('36 km/h • 2 stops remaining'), findsOneWidget);
     });
   });

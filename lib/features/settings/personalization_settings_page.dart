@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/settings/app_settings_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../adaptive_ui/adaptive_shortcuts_modal.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -21,10 +23,12 @@ class PersonalizationSettingsPage extends StatefulWidget {
   final TicketController? ticketController;
 
   @override
-  State<PersonalizationSettingsPage> createState() => _PersonalizationSettingsPageState();
+  State<PersonalizationSettingsPage> createState() =>
+      _PersonalizationSettingsPageState();
 }
 
-class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPage> {
+class _PersonalizationSettingsPageState
+    extends State<PersonalizationSettingsPage> {
   final AppSettingsController _settings = AppSettingsController.instance;
 
   bool get _adaptiveUi => _settings.adaptiveUi;
@@ -47,95 +51,136 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
   }
 
   void _showStartingScreenPicker() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Default Starting Screen',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 16),
-              ...['Home', 'Live Tracking', 'My Tickets', 'Alerts'].map((screen) {
-                final isSelected = _startingScreen == screen;
-                return ListTile(
-                  title: Text(
-                    screen,
-                    style: TextStyle(
-                      color: isSelected ? const Color(0xFF38BDF8) : Colors.white,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                    ),
+    final colors = AppTheme.colors(context);
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: colors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Default Starting Screen',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
                   ),
-                  trailing: isSelected ? const Icon(Icons.check, color: Color(0xFF38BDF8)) : null,
-                  onTap: () {
-                    setState(() => _settings.updateStartingScreen(screen));
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    ));
+                ),
+                const SizedBox(height: 16),
+                ...['Home', 'Live Tracking', 'My Tickets', 'Alerts'].map((
+                  screen,
+                ) {
+                  final isSelected = _startingScreen == screen;
+                  return ListTile(
+                    title: Text(
+                      screen,
+                      style: TextStyle(
+                        color: isSelected
+                            ? colors.actionSecondary
+                            : colors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check, color: colors.actionSecondary)
+                        : null,
+                    onTap: () {
+                      setState(() => _settings.updateStartingScreen(screen));
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _resetLayout() {
+    final colors = AppTheme.colors(context);
     setState(() {
       _settings.resetHomeScreenLayout();
       _settings.resetToDefaults();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Home layout reset to default settings.'),
-        backgroundColor: Color(0xFF15803D),
+      SnackBar(
+        content: const Text('Home layout reset to default settings.'),
+        backgroundColor: colors.statusSuccess,
       ),
     );
   }
 
   void _openAskBusBuddy() {
-    unawaited(Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => GeminiLiveScreen(
-          repository: widget.repository,
-          ticketController: widget.ticketController,
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => GeminiLiveScreen(
+            repository: widget.repository,
+            ticketController: widget.ticketController,
+          ),
         ),
       ),
-    ));
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: colors.textPrimary,
+            size: 20,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Column(
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text('Bus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 20)),
+              children: [
+                Text(
+                  'Bus',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
+                Text(
+                  'Buddy',
+                  style: TextStyle(
+                    color: colors.actionSecondary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
               ],
             ),
-            const Text(
+            Text(
               'Personalization',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -151,34 +196,45 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111C33),
+                    color: colors.surfaceSubtle,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF16A34A),
+                        decoration: BoxDecoration(
+                          color: colors.statusSuccess,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.home, color: Colors.white, size: 28),
+                        child: Icon(
+                          Icons.home,
+                          color: colors.background,
+                          size: 28,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
                               'Personalization',
-                              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'Customize your experience and choose what you see.',
-                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -190,40 +246,54 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
 
                 // ── White Card 1: Customize Home Screen ──────────────────
                 _buildWhiteCard(
+                  colors: colors,
                   icon: Icons.grid_view_rounded,
                   title: 'Customize Home Screen',
                   subtitle: 'Rearrange and choose features',
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF0F172A), size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: colors.textPrimary,
+                    size: 22,
+                  ),
                   onTap: () {
-                    unawaited(Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const HomeScreenCustomizationPage(),
+                    unawaited(
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const HomeScreenCustomizationPage(),
+                        ),
                       ),
-                    ));
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
 
                 // ── White Card 2: Adaptive UI ─────────────────────────────
                 _buildWhiteCard(
+                  colors: colors,
                   icon: Icons.star_rounded,
                   title: 'Adaptive UI',
                   subtitle: 'Shows shortcuts based on your usage',
                   trailing: Switch(
                     value: _adaptiveUi,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: const Color(0xFF22C55E),
-                    onChanged: (val) => setState(() => _settings.updateAdaptiveUi(val)),
+                    activeThumbColor: colors.onActionPrimary,
+                    activeTrackColor: colors.statusSuccess,
+                    onChanged: (val) =>
+                        setState(() => _settings.updateAdaptiveUi(val)),
                   ),
                 ),
                 if (_adaptiveUi) ...[
                   const SizedBox(height: 12),
                   _buildWhiteCard(
+                    colors: colors,
                     icon: Icons.auto_awesome,
                     title: 'Manage Adaptive Shortcuts',
                     subtitle:
                         '${AdaptiveUiService.instance.visibleShortcuts.length} active shortcuts • Review & Pin',
-                    trailing: const Icon(Icons.chevron_right, color: Color(0xFF0F172A), size: 22),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: colors.textPrimary,
+                      size: 22,
+                    ),
                     onTap: () => AdaptiveShortcutsModal.show(context),
                   ),
                 ],
@@ -233,26 +303,31 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDBEAFE),
+                    color: colors.statusInfoBg,
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2563EB),
+                        decoration: BoxDecoration(
+                          color: colors.statusInfo,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.info, color: Colors.white, size: 16),
+                        child: Icon(
+                          Icons.info,
+                          color: colors.background,
+                          size: 16,
+                        ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'BusBuddy learns your frequently used features and suggests shortcuts. You remain in control.',
                           style: TextStyle(
-                            color: Color(0xFF1E3A8A),
+                            color: colors.textPrimary,
                             fontSize: 13,
                             height: 1.4,
                             fontWeight: FontWeight.w600,
@@ -266,15 +341,27 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
 
                 // ── White Card 3: Default Starting Screen ────────────────
                 _buildWhiteCard(
+                  colors: colors,
                   icon: Icons.home_outlined,
                   title: 'Default Starting Screen',
                   subtitle: 'Choose which screen opens first',
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_startingScreen, style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700, fontSize: 15)),
+                      Text(
+                        _startingScreen,
+                        style: TextStyle(
+                          color: colors.actionPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right, color: Color(0xFF2563EB), size: 20),
+                      Icon(
+                        Icons.chevron_right,
+                        color: colors.actionPrimary,
+                        size: 20,
+                      ),
                     ],
                   ),
                   onTap: _showStartingScreenPicker,
@@ -283,10 +370,15 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
 
                 // ── White Card 4: Reset My Layout ────────────────────────
                 _buildWhiteCard(
+                  colors: colors,
                   icon: Icons.refresh_rounded,
                   title: 'Reset My Layout',
                   subtitle: 'Restore default settings',
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF0F172A), size: 22),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: colors.textPrimary,
+                    size: 22,
+                  ),
                   onTap: _resetLayout,
                 ),
               ],
@@ -308,6 +400,8 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                     height: 60,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
+                      // Brand CTA red kept constant: white text on #DC2626
+                      // measures 4.83:1 (WCAG AA) in every theme.
                       color: const Color(0xFFDC2626),
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
@@ -327,7 +421,11 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                             color: Colors.white.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.mic, color: Colors.white, size: 22),
+                          child: const Icon(
+                            Icons.mic,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Column(
@@ -336,11 +434,18 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                           children: const [
                             Text(
                               'Ask BusBuddy',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             Text(
                               'Customize my home screen.',
-                              style: TextStyle(color: Colors.white70, fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -357,6 +462,7 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
   }
 
   Widget _buildWhiteCard({
+    required AppSemanticColors colors,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -371,12 +477,13 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colors.border),
           ),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFF0F172A), size: 24),
+              Icon(icon, color: colors.textPrimary, size: 24),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -384,12 +491,20 @@ class _PersonalizationSettingsPageState extends State<PersonalizationSettingsPag
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),

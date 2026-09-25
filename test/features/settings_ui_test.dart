@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
+import 'package:busbuddy/core/theme/app_theme.dart';
+import 'package:busbuddy/core/tokens/app_semantic_colors.dart';
 import 'package:busbuddy/features/settings/accessibility_settings_page.dart';
 import 'package:busbuddy/features/settings/home_screen_customization_page.dart';
 import 'package:busbuddy/features/settings/personalization_settings_page.dart';
@@ -188,6 +190,62 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Adjust the app to make it easier to use.'), findsOneWidget);
+    });
+  });
+
+  group('Settings semantic token adoption (theme migration)', () {
+    testWidgets('VoiceAssistantSettingsPage honors high-contrast + light themes', (tester) async {
+      // High-contrast: true-black AAA background, not hardcoded dark navy.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.highContrast,
+          home: const VoiceAssistantSettingsPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        AppSemanticColors.highContrast.background,
+      );
+
+      // Light: daylight background, not dark navy.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: const VoiceAssistantSettingsPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        AppSemanticColors.light.background,
+      );
+    });
+
+    testWidgets('PersonalizationSettingsPage honors high-contrast + light themes', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.highContrast,
+          home: const PersonalizationSettingsPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        AppSemanticColors.highContrast.background,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: const PersonalizationSettingsPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        AppSemanticColors.light.background,
+      );
     });
   });
 }

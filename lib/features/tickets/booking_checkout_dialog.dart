@@ -25,6 +25,9 @@ class BookingCheckoutDialog extends StatefulWidget {
     required this.onTicketBooked,
     this.routeId = 'vit-to-katpadi',
     this.travelDate,
+    this.initialPassengerType = PassengerType.general,
+    this.initialPaymentMethod = PaymentMethod.upi,
+    this.initialPassengerName,
   });
 
   final String busId;
@@ -36,6 +39,9 @@ class BookingCheckoutDialog extends StatefulWidget {
   final void Function(Ticket ticket) onTicketBooked;
   final String routeId;
   final DateTime? travelDate;
+  final PassengerType initialPassengerType;
+  final PaymentMethod initialPaymentMethod;
+  final String? initialPassengerName;
 
   @override
   State<BookingCheckoutDialog> createState() => _BookingCheckoutDialogState();
@@ -50,7 +56,11 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   @override
   void initState() {
     super.initState();
-    _passengerNameController = TextEditingController();
+    _selectedPassengerType = widget.initialPassengerType;
+    _selectedPaymentMethod = widget.initialPaymentMethod;
+    _passengerNameController = TextEditingController(
+      text: widget.initialPassengerName ?? '',
+    );
   }
 
   @override

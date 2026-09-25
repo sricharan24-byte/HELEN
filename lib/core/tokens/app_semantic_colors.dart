@@ -47,6 +47,7 @@ class AppSemanticColors {
   Color get statusAlert => statusError;
   Color get statusAlertBg => statusError.withValues(alpha: 0.15);
   Color get statusSuccessBg => statusSuccess.withValues(alpha: 0.15);
+  Color get statusInfoBg => statusInfo.withValues(alpha: 0.15);
   Color get statusWarningBg => statusWarning.withValues(alpha: 0.15);
   Color get surfaceBackground => background;
   Color get primaryBlue => actionPrimary;
@@ -61,19 +62,33 @@ class AppSemanticColors {
     background: Color(0xFF000000), // Pure Black (21:1)
     surface: Color(0xFF121212),
     surfaceSubtle: Color(0xFF1E1E1E),
-    actionPrimary: Color(0xFFFFD700), // Vibrant Gold (13.4:1 on surface, 15.0:1 on black, AAA >= 7:1)
+    actionPrimary: Color(
+      0xFFFFD700,
+    ), // Vibrant Gold (13.4:1 on surface, 15.0:1 on black, AAA >= 7:1)
     onActionPrimary: Color(0xFF000000),
-    actionSecondary: Color(0xFF00FFFF), // Vibrant Cyan (15.0:1 on surface, 16.8:1 on black, AAA >= 7:1)
+    actionSecondary: Color(
+      0xFF00FFFF,
+    ), // Vibrant Cyan (15.0:1 on surface, 16.8:1 on black, AAA >= 7:1)
     onActionSecondary: Color(0xFF000000),
-    textPrimary: Color(0xFFFFFFFF), // 18.7:1 on surface, 21.0:1 on pure black (AAA)
+    textPrimary: Color(
+      0xFFFFFFFF,
+    ), // 18.7:1 on surface, 21.0:1 on pure black (AAA)
     textSecondary: Color(0xFFE2E8F0), // 15.2:1 on surface (AAA)
     textMuted: Color(0xFFCBD5E1), // 12.6:1 on surface (AAA)
     border: Color(0xFFFFFFFF), // High-visibility 2px white border
     borderFocus: Color(0xFFFFD700),
-    statusSuccess: Color(0xFF00FF66), // High-contrast neon green (13.8:1 on surface, AAA)
-    statusWarning: Color(0xFFFFD700), // High-contrast gold (13.4:1 on surface, AAA)
-    statusError: Color(0xFFFF7575), // High-contrast coral red (7.18:1 on surface, 8.05:1 on black, AAA >= 7:1)
-    statusInfo: Color(0xFF00FFFF), // High-contrast cyan (14.9:1 on surface, AAA)
+    statusSuccess: Color(
+      0xFF00FF66,
+    ), // High-contrast neon green (13.8:1 on surface, AAA)
+    statusWarning: Color(
+      0xFFFFD700,
+    ), // High-contrast gold (13.4:1 on surface, AAA)
+    statusError: Color(
+      0xFFFF7575,
+    ), // High-contrast coral red (7.18:1 on surface, 8.05:1 on black, AAA >= 7:1)
+    statusInfo: Color(
+      0xFF00FFFF,
+    ), // High-contrast cyan (14.9:1 on surface, AAA)
     isHighContrast: true,
   );
 
@@ -82,7 +97,9 @@ class AppSemanticColors {
     background: Color(0xFF0B101D),
     surface: Color(0xFF1E293B),
     surfaceSubtle: Color(0xFF111C33),
-    actionPrimary: Color(0xFF0369A1), // Ocean Blue (5.93:1 on white onActionPrimary, AA >= 4.5:1)
+    actionPrimary: Color(
+      0xFF0369A1,
+    ), // Ocean Blue (5.93:1 on white onActionPrimary, AA >= 4.5:1)
     onActionPrimary: Color(0xFFFFFFFF),
     actionSecondary: Color(0xFF38BDF8), // Sky Blue (6.83:1 on surface, AA)
     onActionSecondary: Color(0xFF0F172A), // (8.33:1 on actionSecondary, AAA)
@@ -103,19 +120,31 @@ class AppSemanticColors {
     background: Color(0xFFF8FAFC),
     surface: Color(0xFFFFFFFF),
     surfaceSubtle: Color(0xFFF1F5F9),
-    actionPrimary: Color(0xFF0369A1), // Accessible Ocean Blue (5.93:1 on white surface, 5.67:1 on bg, AA >= 4.5:1)
+    actionPrimary: Color(
+      0xFF0369A1,
+    ), // Accessible Ocean Blue (5.93:1 on white surface, 5.67:1 on bg, AA >= 4.5:1)
     onActionPrimary: Color(0xFFFFFFFF), // 5.93:1 against actionPrimary
-    actionSecondary: Color(0xFF025A86), // Deep Ocean Blue (7.48:1 on white surface, AAA >= 7:1)
+    actionSecondary: Color(
+      0xFF025A86,
+    ), // Deep Ocean Blue (7.48:1 on white surface, AAA >= 7:1)
     onActionSecondary: Color(0xFFFFFFFF),
     textPrimary: Color(0xFF0F172A), // 17.85:1 on surface, 17.06:1 on bg (AAA)
     textSecondary: Color(0xFF334155), // 10.35:1 on surface (AAA)
     textMuted: Color(0xFF475569), // 7.58:1 on surface (AAA >= 7:1)
     border: Color(0xFFCBD5E1),
     borderFocus: Color(0xFF0369A1), // 5.93:1 on surface
-    statusSuccess: Color(0xFF047857), // Accessible Emerald 700 (5.48:1 on surface, AA >= 4.5:1)
-    statusWarning: Color(0xFFB45309), // Accessible Amber 700 (5.02:1 on surface, AA >= 4.5:1)
-    statusError: Color(0xFFDC2626), // Accessible Red 600 (4.83:1 on surface, AA >= 4.5:1)
-    statusInfo: Color(0xFF0369A1), // Accessible Ocean Blue (5.93:1 on surface, AA >= 4.5:1)
+    statusSuccess: Color(
+      0xFF047857,
+    ), // Accessible Emerald 700 (5.48:1 on surface, AA >= 4.5:1)
+    statusWarning: Color(
+      0xFFB45309,
+    ), // Accessible Amber 700 (5.02:1 on surface, AA >= 4.5:1)
+    statusError: Color(
+      0xFFDC2626,
+    ), // Accessible Red 600 (4.83:1 on surface, AA >= 4.5:1)
+    statusInfo: Color(
+      0xFF0369A1,
+    ), // Accessible Ocean Blue (5.93:1 on surface, AA >= 4.5:1)
     isHighContrast: false,
   );
 }

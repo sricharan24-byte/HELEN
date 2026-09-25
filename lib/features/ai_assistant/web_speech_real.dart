@@ -8,8 +8,24 @@ import '../../core/settings/app_settings_controller.dart';
 bool enableSimulatedVoiceInput = false;
 bool _jsBridgeInitialized = false;
 
+/// Bump when the JS bridge below changes. Hot reload preserves Dart statics,
+/// so without a version check the page keeps running stale JS after an edit.
+/// The eval is re-run whenever the page's bridge version mismatches.
+const int kJsBridgeVersion = 4;
+
+int _pageBridgeVersion() {
+  try {
+    final w = js.context['window'];
+    final v = js_util.getProperty(w, '__bb_bridge_version');
+    if (v is num) return v.toInt();
+  } catch (_) {}
+  return -1;
+}
+
 void _ensureJsBridge() {
-  if (_jsBridgeInitialized) return;
+  if (_jsBridgeInitialized && _pageBridgeVersion() == kJsBridgeVersion) {
+    return;
+  }
   _jsBridgeInitialized = true;
 
   try {
@@ -19,10 +35,13 @@ void _ensureJsBridge() {
 
         var AudioCtx = window.AudioContext || window.webkitAudioContext;
         window.__bb_audio_ctx = window.__bb_audio_ctx || null;
-        window.__bb_pcm_next_time = 0;
+        // Preserve playback state across bridge re-eval (hot reload):
+        // resetting these orphans in-flight sources as unstoppable ghosts.
+        if (typeof window.__bb_pcm_next_time !== "number") window.__bb_pcm_next_time = 0;
         window.__bb_active_rec = null;
-        window.__bb_active_utterance = null;
+        window.__bb_active_utterance = window.__bb_active_utterance || null;
         window.__bb_active_sources = window.__bb_active_sources || [];
+        window.__bb_tts_audible = window.__bb_tts_audible || false;
 
         window.__bb_get_audio_ctx = function() {
           try {
@@ -76,12 +95,15 @@ void _ensureJsBridge() {
           } catch (_) {}
         };
 
-        // Automatically unlock audio context on user gesture and track active state
-        window.__bb_unlock_listeners_active = true;
-        ["click", "pointerdown", "touchstart", "touchend", "keydown"].forEach(function(evt) {
-          window.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
-          document.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
-        });
+        // Automatically unlock audio context on user gesture and track active state.
+        // Guarded: bridge re-eval (hot reload) must not stack duplicate listeners.
+        if (!window.__bb_unlock_listeners_active) {
+          window.__bb_unlock_listeners_active = true;
+          ["click", "pointerdown", "touchstart", "touchend", "keydown"].forEach(function(evt) {
+            window.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
+            document.addEventListener(evt, window.__bb_unlock_audio, { capture: true, passive: true });
+          });
+        }
 
         window.__bb_dispose_audio = function() {
           window.__bb_remove_unlock_listeners();
@@ -123,6 +145,7 @@ void _ensureJsBridge() {
           window.__bb_pcm_next_time = 0;
           window.__bb_is_pcm_active = false;
           window.__bb_is_speaking = false;
+          window.__bb_tts_audible = false;
           try {
             if (window.speechSynthesis) {
               window.speechSynthesis.cancel();
@@ -167,6 +190,21 @@ void _ensureJsBridge() {
 
         window.__bb_play_pcm = function(b64, rate) {
           try {
+            // Single-voice mutex, first-starter-wins (backup to the Dart
+            // arbiter): if browser TTS is audibly speaking, drop this late
+            // PCM chunk so the started voice finishes alone. Checked BEFORE
+            // the generation bump so the TTS onend handler stays valid.
+            try {
+              if (window.__bb_tts_audible && window.speechSynthesis &&
+                  window.speechSynthesis.speaking) {
+                console.log("[BusBuddy SingleVoice] dropped late PCM (TTS audible)");
+                return;
+              }
+            } catch (_) {}
+            // Otherwise PCM wins: invalidate any pending (not yet audible)
+            // browser TTS FIRST (generation bump kills the delayed speak),
+            // then stop it synchronously before touching PCM bytes.
+            window.__bb_generation = (window.__bb_generation || 0) + 1;
             if (window.__bb_speak_timer) {
               clearTimeout(window.__bb_speak_timer);
               window.__bb_speak_timer = null;
@@ -178,8 +216,10 @@ void _ensureJsBridge() {
             try {
               if (window.speechSynthesis) window.speechSynthesis.cancel();
             } catch (_) {}
+            window.__bb_active_utterance = null;
             window.__bb_is_pcm_active = true;
             window.__bb_is_speaking = true;
+            window.__bb_last_pcm_time = Date.now();
 
             var ctx = window.__bb_get_audio_ctx();
             if (!ctx) return;
@@ -290,6 +330,20 @@ void _ensureJsBridge() {
             return;
           }
           try {
+            // Single-voice mutex, first-starter-wins: if native PCM is
+            // actively streaming, the browser TTS loses — abort before
+            // bumping the generation so PCM playback is never killed by a
+            // late fallback.
+            try {
+              var pcmBusy = !!window.__bb_is_pcm_active &&
+                window.__bb_active_sources && window.__bb_active_sources.length > 0;
+              var recentPcm = window.__bb_last_pcm_time &&
+                (Date.now() - window.__bb_last_pcm_time) < 800;
+              if (pcmBusy || recentPcm) {
+                console.log("[BusBuddy SingleVoice] TTS aborted (PCM active)");
+                return;
+              }
+            } catch (_) {}
             var currentGen = (window.__bb_generation || 0) + 1;
             window.__bb_generation = currentGen;
             window.__bb_is_pcm_active = false;
@@ -317,12 +371,14 @@ void _ensureJsBridge() {
 
             utter.onstart = function() {
               window.__bb_is_speaking = true;
+              window.__bb_tts_audible = true;
             };
 
             utter.onend = function() {
               if (currentGen !== (window.__bb_generation || 0)) return;
               window.__bb_active_utterance = null;
               window.__bb_is_speaking = false;
+              window.__bb_tts_audible = false;
               if (window.__bb_on_audio_ended) {
                 try { window.__bb_on_audio_ended(); } catch (_) {}
               }
@@ -333,6 +389,7 @@ void _ensureJsBridge() {
               console.warn("[BusBuddy TTS] utterance error:", e);
               window.__bb_active_utterance = null;
               window.__bb_is_speaking = false;
+              window.__bb_tts_audible = false;
               if (window.__bb_on_audio_ended) {
                 try { window.__bb_on_audio_ended(); } catch (_) {}
               }
@@ -385,6 +442,7 @@ void _ensureJsBridge() {
             window.__bb_pcm_next_time = 0;
             window.__bb_is_pcm_active = false;
             window.__bb_is_speaking = false;
+            window.__bb_tts_audible = false;
           } catch (_) {}
           window.__bb_active_utterance = null;
         };
@@ -463,6 +521,11 @@ void _ensureJsBridge() {
         };
       })();
     ''']);
+    // Stamp the bridge version with a separate tiny eval so hot reload can
+    // detect stale page JS and re-run the big eval above.
+    js.context.callMethod(
+        'eval', ['window.__bb_bridge_version = $kJsBridgeVersion; '
+            'console.log("[BusBuddy SingleVoice] JS bridge v$kJsBridgeVersion ready");']);
   } catch (e) {
     debugPrint('[WebSpeech] JS bridge init error: $e');
   }

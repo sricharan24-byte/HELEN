@@ -23,54 +23,42 @@ abstract class TicketRepository {
 
   void addTicket(Ticket ticket);
   void cancelTicket(String ticketId);
+
+  /// Marks the active ticket as expired when the journey completes — arrival
+  /// at the destination ("Reached destination") or an explicit End Trip.
+  /// No-op for unknown ids or tickets that already left the active state.
+  void completeTicket(String ticketId, {String reason = 'Reached destination'});
 }
 
 class LocalTicketRepository implements TicketRepository {
   LocalTicketRepository() {
-    final now = DateTime.now();
-    final katpadiQuote = FareEngine.calculateByStopCount(
-      stopCount: 4,
-      passengerType: PassengerType.general,
-    );
     final extendedQuote = FareEngine.calculateByStopCount(
       stopCount: 6,
       passengerType: PassengerType.general,
     );
+    final katpadiQuote = FareEngine.calculateByStopCount(
+      stopCount: 4,
+      passengerType: PassengerType.general,
+    );
 
-    final katpadiValidUntil = now.add(const Duration(hours: 4));
-
+    // Seed history only: past (expired) demo tickets for the Previous
+    // Tickets tab. There is deliberately NO active seed — a fresh install
+    // starts with no ticket until the rider books one.
     _tickets.addAll([
-      Ticket(
-        id: 'BB-20250906-184256',
-        routeId: 'vit-to-katpadi',
-        routeName: 'VIT Main Gate → Katpadi',
-        origin: const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'VIT University'),
-        destination: const Stop(id: 'katpadi-railway-station', name: 'Katpadi', area: 'Katpadi'),
-        busId: 'Bus 18B',
-        passengerName: 'Pavan K',
-        passengerType: PassengerType.general,
-        fareQuote: katpadiQuote,
-        paymentMethod: PaymentMethod.upi,
-        issuedAt: DateTime(2025, 9, 6, 10, 30),
-        validUntil: katpadiValidUntil,
-        status: TicketStatus.active,
-        qrCodeData: Ticket.buildQrPayload(
-          ticketId: 'BB-20250906-184256',
-          originId: 'vit-main-gate',
-          destinationId: 'katpadi-railway-station',
-          busId: 'Bus 18B',
-          farePaise: katpadiQuote.finalPaise,
-          validUntil: katpadiValidUntil,
-          isDemo: true,
-        ),
-        isDemo: true,
-      ),
       Ticket(
         id: 'BB-20250902-184102',
         routeId: 'vit-to-vellore',
         routeName: 'VIT Main Gate → Vellore',
-        origin: const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'VIT University'),
-        destination: const Stop(id: 'old-bus-stand', name: 'Vellore', area: 'Vellore Central'),
+        origin: const Stop(
+          id: 'vit-main-gate',
+          name: 'VIT Main Gate',
+          area: 'VIT University',
+        ),
+        destination: const Stop(
+          id: 'old-bus-stand',
+          name: 'Vellore',
+          area: 'Vellore Central',
+        ),
         busId: 'Bus 12A',
         passengerName: 'Pavan K',
         passengerType: PassengerType.general,
@@ -94,8 +82,16 @@ class LocalTicketRepository implements TicketRepository {
         id: 'BB-20250828-183950',
         routeId: 'vit-to-katpadi',
         routeName: 'VIT Main Gate → Katpadi',
-        origin: const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'VIT University'),
-        destination: const Stop(id: 'katpadi-railway-station', name: 'Katpadi', area: 'Katpadi'),
+        origin: const Stop(
+          id: 'vit-main-gate',
+          name: 'VIT Main Gate',
+          area: 'VIT University',
+        ),
+        destination: const Stop(
+          id: 'katpadi-railway-station',
+          name: 'Katpadi',
+          area: 'Katpadi',
+        ),
         busId: 'Bus 18B',
         passengerName: 'Pavan K',
         passengerType: PassengerType.general,
@@ -119,8 +115,16 @@ class LocalTicketRepository implements TicketRepository {
         id: 'BB-20250825-183812',
         routeId: 'vit-to-arcot',
         routeName: 'VIT Main Gate → Arcot',
-        origin: const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'VIT University'),
-        destination: const Stop(id: 'arcot-bus-stand', name: 'Arcot', area: 'Arcot'),
+        origin: const Stop(
+          id: 'vit-main-gate',
+          name: 'VIT Main Gate',
+          area: 'VIT University',
+        ),
+        destination: const Stop(
+          id: 'arcot-bus-stand',
+          name: 'Arcot',
+          area: 'Arcot',
+        ),
         busId: 'Bus 20C',
         passengerName: 'Pavan K',
         passengerType: PassengerType.general,
@@ -144,8 +148,16 @@ class LocalTicketRepository implements TicketRepository {
         id: 'BB-20250820-183700',
         routeId: 'vellore-to-vit',
         routeName: 'Vellore → VIT Main Gate',
-        origin: const Stop(id: 'old-bus-stand', name: 'Vellore', area: 'Vellore Central'),
-        destination: const Stop(id: 'vit-main-gate', name: 'VIT Main Gate', area: 'VIT University'),
+        origin: const Stop(
+          id: 'old-bus-stand',
+          name: 'Vellore',
+          area: 'Vellore Central',
+        ),
+        destination: const Stop(
+          id: 'vit-main-gate',
+          name: 'VIT Main Gate',
+          area: 'VIT University',
+        ),
         busId: 'Bus 12A',
         passengerName: 'Pavan K',
         passengerType: PassengerType.general,
@@ -198,6 +210,17 @@ class LocalTicketRepository implements TicketRepository {
       ..clear()
       ..addAll(parsed);
 
+    // One-time migration: drop the legacy pre-booked demo ticket
+    // (BB-20250906-184256) if it is still sitting active in a persisted
+    // store from an older install. Fresh installs never create it.
+    final legacyIndex = _tickets.indexWhere(
+      (t) => t.id == 'BB-20250906-184256' && t.status == TicketStatus.active,
+    );
+    if (legacyIndex != -1) {
+      _tickets.removeAt(legacyIndex);
+      _persist();
+    }
+
     // Cleanly transition any expired active tickets per BUS-P1-10
     final now = DateTime.now();
     bool hadExpiredTransition = false;
@@ -231,7 +254,8 @@ class LocalTicketRepository implements TicketRepository {
   Ticket? get activeTicket {
     final now = DateTime.now();
     for (final ticket in _tickets) {
-      if (ticket.status == TicketStatus.active && ticket.validUntil.isAfter(now)) {
+      if (ticket.status == TicketStatus.active &&
+          ticket.validUntil.isAfter(now)) {
         return ticket;
       }
     }
@@ -262,10 +286,11 @@ class LocalTicketRepository implements TicketRepository {
     final stopCount = (originIdx != -1 && destIdx != -1 && destIdx > originIdx)
         ? (destIdx - originIdx)
         : (originIdx != -1 && destIdx != -1)
-            ? (originIdx - destIdx).abs()
-            : 2;
+        ? (originIdx - destIdx).abs()
+        : 2;
 
-    final quote = fareQuote ??
+    final quote =
+        fareQuote ??
         FareEngine.calculateByStopCount(
           stopCount: stopCount > 0 ? stopCount : 1,
           passengerType: passengerType,
@@ -276,10 +301,13 @@ class LocalTicketRepository implements TicketRepository {
       travelDay.year,
       travelDay.month,
       travelDay.day,
-      23, 59, 59,
+      23,
+      59,
+      59,
     );
-    final finalizedValidUntil =
-        dayEnd.isBefore(now) ? now.add(const Duration(hours: 4)) : dayEnd;
+    final finalizedValidUntil = dayEnd.isBefore(now)
+        ? now.add(const Duration(hours: 4))
+        : dayEnd;
 
     final qrPayload = Ticket.buildQrPayload(
       ticketId: ticketId,
@@ -298,7 +326,9 @@ class LocalTicketRepository implements TicketRepository {
       origin: origin,
       destination: destination,
       busId: busId,
-      passengerName: passengerName.trim().isEmpty ? 'Passholder' : passengerName,
+      passengerName: passengerName.trim().isEmpty
+          ? 'Passholder'
+          : passengerName,
       passengerType: passengerType,
       fareQuote: quote,
       paymentMethod: paymentMethod,
@@ -335,5 +365,22 @@ class LocalTicketRepository implements TicketRepository {
       }
     }
   }
-}
 
+  @override
+  void completeTicket(
+    String ticketId, {
+    String reason = 'Reached destination',
+  }) {
+    final index = _tickets.indexWhere((t) => t.id == ticketId);
+    if (index != -1) {
+      final transitionResult = _tickets[index].transitionTo(
+        TicketStatus.expired,
+        reason: reason,
+      );
+      if (transitionResult.isSuccess) {
+        _tickets[index] = transitionResult.valueOrNull!;
+        _persist();
+      }
+    }
+  }
+}

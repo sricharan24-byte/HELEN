@@ -59,7 +59,7 @@ void main() {
       expect(nextStopSemantics, findsOneWidget);
 
       final etaSemantics = find.byWidgetPredicate(
-        (w) => w is Semantics && w.excludeSemantics && w.properties.label == 'Estimated Arrival: 8 mins',
+        (w) => w is Semantics && w.excludeSemantics && w.properties.label == 'Estimated Arrival: 8 min',
       );
       expect(etaSemantics, findsOneWidget);
 

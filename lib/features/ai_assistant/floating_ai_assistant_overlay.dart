@@ -795,7 +795,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
               style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
             ),
             onPressed: () {
-              _controller.sendQuery(p);
+              _controller.sendQuery(p, isUserTap: true);
             },
           );
         },
@@ -835,7 +835,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
               ),
               onSubmitted: (val) {
                 if (val.trim().isNotEmpty) {
-                  _controller.sendQuery(val);
+                  _controller.sendQuery(val, isUserTap: true);
                   _textInputController.clear();
                 }
               },
@@ -854,7 +854,7 @@ class _FloatingAiAssistantOverlayState extends State<FloatingAiAssistantOverlay>
               onPressed: () {
                 final text = _textInputController.text;
                 if (text.trim().isNotEmpty) {
-                  _controller.sendQuery(text);
+                  _controller.sendQuery(text, isUserTap: true);
                   _textInputController.clear();
                 }
               },

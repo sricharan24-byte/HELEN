@@ -12,15 +12,32 @@ import 'local_transport_data_source.dart';
 /// Simulated live bus movement that drives along the real street path of the
 /// route (OSRM geometry when online, pre-fetched corridor geometry offline)
 /// instead of hopping in straight lines between stops.
+///
+/// The engine simulates one passenger journey: it starts at [originStopId]
+/// (default: the route's first stop) and terminates at [destinationStopId]
+/// (default: the route's last stop). On arrival it emits a terminal position
+/// (progress 1.0, ETA 0) and closes the stream — it never loops.
 class LiveBusMovementEngine implements AsyncDisposable {
   LiveBusMovementEngine({
     required this.busId,
     required this.route,
     LocalTransportDataSource? dataSource,
-  }) : _dataSource = dataSource ?? LocalTransportDataSource();
+    this.originStopId,
+    this.destinationStopId,
+    int journeyTicks = _defaultJourneyTicks,
+    this._tickInterval = _defaultTickInterval,
+  })  : _dataSource = dataSource ?? LocalTransportDataSource(),
+        _journeyTicks = journeyTicks > 0 ? journeyTicks : _defaultJourneyTicks;
 
   final String busId;
   final Route route;
+
+  /// Boarding stop: the journey starts here. Defaults to route start.
+  final String? originStopId;
+
+  /// Alighting stop: the journey terminates here. Defaults to route end.
+  final String? destinationStopId;
+
   final LocalTransportDataSource _dataSource;
   final OsrmRoutingService _routingService = const OsrmRoutingService();
 
@@ -36,18 +53,30 @@ class LiveBusMovementEngine implements AsyncDisposable {
   bool get isDisposed => _isDisposed;
   int get generation => _generation;
 
-  /// Demo loop length: the full corridor is traversed in ~2 minutes so the
-  /// prototype shows a complete end-to-end journey quickly.
-  static const int _loopTicks = 60;
-  static const Duration _tickInterval = Duration(seconds: 2);
+  /// Journey length: the passenger segment is traversed in ~2 minutes so the
+  /// prototype shows a complete start-to-destination journey quickly.
+  /// Tests may inject a smaller count to observe termination.
+  static const int _defaultJourneyTicks = 60;
+  static const Duration _defaultTickInterval = Duration(seconds: 2);
+
+  final int _journeyTicks;
+  final Duration _tickInterval;
 
   int _tick = 0;
   int _sequence = 0;
+  bool _journeyFinished = false;
+
+  /// True once the bus reached the destination and the stream was closed.
+  bool get isCompleted => _journeyFinished;
 
   List<LatLng> _roadPath = const [];
   List<double> _cumulativeDistances = const [];
   double _totalPathLength = 0;
   List<({Stop stop, double distanceAlongPath})> _stopAnchors = const [];
+
+  /// Passenger segment: boarding stop through alighting stop, in travel
+  /// order. Falls back to the full corridor when the ids are absent.
+  List<Stop> _journeyStops = const [];
 
   List<Stop> get _routeStops {
     final list = <Stop>[];
@@ -56,6 +85,24 @@ class LiveBusMovementEngine implements AsyncDisposable {
       if (s != null) list.add(s);
     }
     return list;
+  }
+
+  /// Clips the full corridor to the passenger's boarding→alighting segment.
+  static List<Stop> _clipToJourney(
+    List<Stop> stops,
+    String? originId,
+    String? destinationId,
+  ) {
+    final startIndex = originId == null
+        ? 0
+        : stops.indexWhere((s) => s.id == originId);
+    final endIndex = destinationId == null
+        ? stops.length - 1
+        : stops.indexWhere((s) => s.id == destinationId);
+    if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
+      return stops;
+    }
+    return stops.sublist(startIndex, endIndex + 1);
   }
 
   Stream<BusLocation> get locationStream {
@@ -67,14 +114,22 @@ class LiveBusMovementEngine implements AsyncDisposable {
   }
 
   void _startSimulation() {
+    if (_journeyFinished || _isDisposed) return;
     final stops = _routeStops;
     if (stops.length < 2) return;
+    _journeyStops = _clipToJourney(stops, originStopId, destinationStopId);
+    if (_journeyStops.length < 2) return;
 
     // Seed with the pre-fetched real street geometry immediately so the bus
-    // never travels in straight lines, even with no network.
+    // never travels in straight lines, even with no network. Falls back to
+    // straight lines between the journey stops when no baked corridor path
+    // matches this exact boarding→alighting pair (OSRM refines it below).
     _applyPath(
-      CorridorRoadPaths.pathForEndpoints(stops.first.id, stops.last.id) ??
-          stops
+      CorridorRoadPaths.pathForEndpoints(
+            _journeyStops.first.id,
+            _journeyStops.last.id,
+          ) ??
+          _journeyStops
               .where((s) => s.latitude != null && s.longitude != null)
               .map((s) => LatLng(s.latitude!, s.longitude!))
               .toList(),
@@ -85,7 +140,7 @@ class LiveBusMovementEngine implements AsyncDisposable {
     _timer = Timer.periodic(_tickInterval, (_) => _emitNextStep());
 
     // Refine with a live OSRM street route when the network allows it.
-    unawaited(_refreshPathFromOsrm(stops));
+    unawaited(_refreshPathFromOsrm(_journeyStops));
   }
 
   Future<void> _refreshPathFromOsrm(List<Stop> stops) async {
@@ -121,12 +176,14 @@ class LiveBusMovementEngine implements AsyncDisposable {
     _projectStopsOntoPath();
   }
 
-  /// Anchors each stop to its distance along the road path so progress, next
-  /// stop, and ETA all derive from the actual street geometry.
+  /// Anchors each journey stop to its distance along the road path so
+  /// progress, next stop, and ETA all derive from the actual street geometry.
+  /// Only the passenger's own segment is anchored: unrelated corridor stops
+  /// never influence the journey.
   void _projectStopsOntoPath() {
     final anchors = <({Stop stop, double distanceAlongPath})>[];
     var lastIndex = 0;
-    for (final stop in _routeStops) {
+    for (final stop in _journeyStops) {
       if (stop.latitude == null || stop.longitude == null) continue;
       final point = LatLng(stop.latitude!, stop.longitude!);
       var bestIndex = lastIndex;
@@ -140,29 +197,75 @@ class LiveBusMovementEngine implements AsyncDisposable {
         }
       }
       lastIndex = bestIndex;
-      anchors.add(
-        (stop: stop, distanceAlongPath: _cumulativeDistances[bestIndex]),
-      );
+      anchors.add((
+        stop: stop,
+        distanceAlongPath: _cumulativeDistances[bestIndex],
+      ));
     }
     _stopAnchors = anchors;
   }
 
   void _emitNextStep() {
-    _tick = (_tick + 1) % _loopTicks;
+    if (_journeyFinished) return;
+    if (_tick + 1 >= _journeyTicks) {
+      _finishJourney();
+      return;
+    }
+    _tick++;
     _emitCurrentPosition();
   }
+
+  /// Emits the arrival position (progress 1.0, ETA 0, bus parked at the
+  /// destination) and terminates the journey: the timer stops and the stream
+  /// closes so every listener observes the end of the ride.
+  void _finishJourney() {
+    _journeyFinished = true;
+    _timer?.cancel();
+    _timer = null;
+    _emitAt(fraction: 1.0, travelled: _journeyEndDistance, isTerminal: true);
+    final controller = _controller;
+    if (controller != null && !controller.isClosed) {
+      unawaited(controller.close());
+    }
+  }
+
+  /// Distance along the road path where the passenger boards.
+  double get _journeyStartDistance => _stopAnchors.isEmpty
+      ? 0.0
+      : _stopAnchors.first.distanceAlongPath.clamp(0.0, _totalPathLength);
+
+  /// Distance along the road path where the passenger alights.
+  double get _journeyEndDistance => _stopAnchors.isEmpty
+      ? _totalPathLength
+      : _stopAnchors.last.distanceAlongPath.clamp(0.0, _totalPathLength);
 
   void _emitCurrentPosition() {
     if (_roadPath.length < 2 || _totalPathLength <= 0) return;
     if (_controller == null || _controller!.isClosed) return;
 
-    final fraction = _tick / _loopTicks;
-    final travelled = fraction * _totalPathLength;
+    final start = _journeyStartDistance;
+    final end = _journeyEndDistance;
+    final span = (end - start) <= 0 ? _totalPathLength : (end - start);
+    final fraction = _tick / _journeyTicks;
+    final travelled = start + fraction * span;
+    _emitAt(fraction: fraction, travelled: travelled, isTerminal: false);
+  }
+
+  void _emitAt({
+    required double fraction,
+    required double travelled,
+    required bool isTerminal,
+  }) {
+    if (_roadPath.length < 2 || _totalPathLength <= 0) return;
+    if (_controller == null || _controller!.isClosed) return;
+
     final position = _pointAtDistance(travelled);
 
     Stop nextStop;
     if (_stopAnchors.isEmpty) {
-      if (_routeStops.isNotEmpty) {
+      if (_journeyStops.isNotEmpty) {
+        nextStop = _journeyStops.last;
+      } else if (_routeStops.isNotEmpty) {
         nextStop = _routeStops.last;
       } else {
         return;
@@ -177,13 +280,15 @@ class LiveBusMovementEngine implements AsyncDisposable {
       }
     }
 
-    final remainingFraction = 1 - fraction;
+    final remainingFraction = (1 - fraction).clamp(0.0, 1.0);
     const avgSpeedKmh = 28.0;
     final totalRouteMinutes = (_totalPathLength / 1000 / avgSpeedKmh * 60) + 2;
-    final etaMinutes =
-        (remainingFraction * totalRouteMinutes).clamp(1.0, 60.0).round();
-    // Smoothly varying simulated speed within the 22-36 km/h town-bus range.
-    final speed = 28 + 6 * sin(_tick * 0.7);
+    final etaMinutes = isTerminal
+        ? 0
+        : (remainingFraction * totalRouteMinutes).clamp(1.0, 60.0).round();
+    // Smoothly varying simulated speed within the 22-36 km/h town-bus range;
+    // zero once parked at the destination.
+    final speed = isTerminal ? 0.0 : 28 + 6 * sin(_tick * 0.7);
 
     _sequence++;
     final location = BusLocation(
@@ -228,8 +333,7 @@ class LiveBusMovementEngine implements AsyncDisposable {
         ? 0.0
         : (distanceMeters - _cumulativeDistances[low]) / segmentLength;
     return LatLng(
-      segmentStart.latitude +
-          (segmentEnd.latitude - segmentStart.latitude) * t,
+      segmentStart.latitude + (segmentEnd.latitude - segmentStart.latitude) * t,
       segmentStart.longitude +
           (segmentEnd.longitude - segmentStart.longitude) * t,
     );
@@ -241,7 +345,8 @@ class LiveBusMovementEngine implements AsyncDisposable {
     final lat2 = b.latitude * pi / 180;
     final dLat = (b.latitude - a.latitude) * pi / 180;
     final dLng = (b.longitude - a.longitude) * pi / 180;
-    final h = sin(dLat / 2) * sin(dLat / 2) +
+    final h =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2);
     return earthRadius * 2 * atan2(sqrt(h), sqrt(1 - h));
   }

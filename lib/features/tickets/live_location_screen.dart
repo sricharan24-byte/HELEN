@@ -25,10 +25,18 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   @override
   void initState() {
     super.initState();
-    AdaptiveUiService.instance.recordLiveTracking(
-      busId: widget.ticket.busId,
-      routeId: widget.ticket.routeId,
-    );
+    // Deferred past the first frame: recording notifies global listeners
+    // (HomePage, AdaptiveShortcutsView), which must never run synchronously
+    // inside initState while the pushed route is still mounting — that trips
+    // setState-during-build when the navigator builds the new route in a
+    // pass that is not an ancestor of the listeners.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AdaptiveUiService.instance.recordLiveTracking(
+        busId: widget.ticket.busId,
+        routeId: widget.ticket.routeId,
+      );
+    });
   }
 
   @override
@@ -59,11 +67,21 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
         elevation: 0,
       ),
       body: StreamBuilder<BusLocation>(
-        stream: repository.streamBusLocation(ticket.busId, route.id),
+        stream: repository.streamBusLocation(
+          ticket.busId,
+          route.id,
+          originStopId: ticket.origin.id,
+          destinationStopId: ticket.destination.id,
+        ),
         builder: (context, snapshot) {
           final live = snapshot.data;
+          final routeDone =
+              snapshot.connectionState == ConnectionState.done ||
+              (live != null && live.progressPercentage >= 1.0);
           final speed = live != null ? live.speedKmh.toStringAsFixed(0) : '32';
-          final nextStop = live?.nextStopName ?? (stops.length > 1 ? stops[1].name : 'Next Stop');
+          final nextStop =
+              live?.nextStopName ??
+              (stops.length > 1 ? stops[1].name : 'Next Stop');
           final eta = live != null ? '${live.etaMinutes} mins' : '4 mins';
 
           return SingleChildScrollView(
@@ -84,10 +102,16 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFF10B981,
+                          ).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.my_location, color: Color(0xFF059669), size: 24),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Color(0xFF059669),
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -104,7 +128,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                             const SizedBox(height: 2),
                             Text(
                               'Pass #${ticket.id} • ${ticket.origin.name} → ${ticket.destination.name}',
-                              style: textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
@@ -122,6 +148,39 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                   destinationStopId: ticket.destination.id,
                 ),
                 const SizedBox(height: 16),
+
+                // Route-complete state: the bus parked at the destination.
+                // Shown instead of live telemetry once the stream terminates
+                // so stale positions are never labeled live (BUS-P1-01).
+                if (routeDone)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF16A34A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF16A34A),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Route complete — Bus ${ticket.busId} has arrived at ${ticket.destination.name}.',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF14532D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (routeDone) const SizedBox(height: 16),
 
                 // Metrics Grid
                 Row(
@@ -190,7 +249,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                             const SizedBox(height: 2),
                             Text(
                               'Vellore Transit Route #23 • Verified Driver',
-                              style: textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
@@ -198,7 +259,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                       IconButton(
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Calling Driver M. Ramanathan...')),
+                            const SnackBar(
+                              content: Text('Calling Driver M. Ramanathan...'),
+                            ),
                           );
                         },
                         icon: const Icon(Icons.phone, color: Color(0xFF002B7F)),
@@ -209,24 +272,33 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                 const SizedBox(height: 16),
 
                 // Share Location Button
+                // BUS-P1-05: minimum height (not fixed) so the label can
+                // reflow to two lines at 200-300% text scale.
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _showEmergencyShareDialog(context);
-                    },
-                    icon: const Icon(Icons.share_location, color: Color(0xFFE11D48)),
-                    label: Text(
-                      'Share Live Location with Emergency Contacts',
-                      style: textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFFE11D48),
-                        fontWeight: FontWeight.w700,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 52),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _showEmergencyShareDialog(context);
+                      },
+                      icon: const Icon(
+                        Icons.share_location,
+                        color: Color(0xFFE11D48),
                       ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFFECDD3)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      label: Text(
+                        'Share Live Location with Emergency Contacts',
+                        style: textTheme.titleSmall?.copyWith(
+                          color: const Color(0xFFE11D48),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFFECDD3)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -273,8 +345,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               fontWeight: FontWeight.w800,
               color: const Color(0xFF0A2540),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            // BUS-P1-05: metric values wrap instead of truncating
+            // at large text scales.
+            softWrap: true,
           ),
         ],
       ),
@@ -286,58 +359,72 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     final shareMessage =
         '🚨 BusBuddy Safety Alert: I am riding bus ${ticket.busId} from ${ticket.origin.name} to ${ticket.destination.name}.\nTrack my live trip: https://busbuddy.app/track/${ticket.id}';
 
-    unawaited(showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.security, color: Color(0xFFE11D48)),
-            SizedBox(width: 10),
-            Text('Share Live Location'),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.security, color: Color(0xFFE11D48)),
+              SizedBox(width: 10),
+              Text('Share Live Location'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Trip safety status message to share with emergency contacts:',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  shareMessage,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'Monospace',
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Close'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Opening WhatsApp / Messages to share safety link...',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.share, size: 16),
+              label: const Text('Share Now'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Trip safety status message to share with emergency contacts:',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Text(
-                shareMessage,
-                style: const TextStyle(fontSize: 12, fontFamily: 'Monospace', color: Color(0xFF0F172A)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening WhatsApp / Messages to share safety link...')),
-              );
-            },
-            icon: const Icon(Icons.share, size: 16),
-            label: const Text('Share Now'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
-          ),
-        ],
       ),
-    ));
+    );
   }
 }

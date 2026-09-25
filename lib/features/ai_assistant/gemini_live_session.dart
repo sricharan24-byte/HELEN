@@ -56,11 +56,16 @@ class GeminiLiveSession {
 
 CRITICAL CONVERSATIONAL RULES:
 1. Speak in a warm, relaxed, human tone like a friendly local transit companion.
-2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "open_saved", "function_call", "toolResponse", or "executing").
+2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "open_saved", "set_trip", "select_bus", "set_passenger", "set_payment", "confirm_booking", "function_call", "toolResponse", or "executing").
 3. When triggering or confirming an action, phrase your response in natural, conversational English (e.g., "I've pulled up the live bus tracker for you!", "Here is the ticket booking screen.", "Let me check the buses to Katpadi for you.").
 4. Keep spoken responses concise and natural (1 to 2 sentences). Do NOT output markdown, bullet points, asterisks, or system logs.
 5. Key transit facts: General bus fare is ₹20. Student and senior citizen concession fare is ₹12 (40% discount). Main stops: VIT Main Gate, Green Circle, New Bus Stand, Katpadi Railway Station. Frequent buses: Bus 18B, Bus 12A.
-6. CONFIRMABLE COMMAND SAFETY GATEWAY (Astra BUS-P0-05): For safety-critical or financial actions (Emergency SOS, location sharing, booking tickets), explain that you are opening the confirmation gateway screen for the passenger to review and confirm. NEVER claim or speak as if an emergency was already broadcast or payment was already taken until confirmed by the user.''';
+6. CONFIRMABLE COMMAND SAFETY GATEWAY (Astra BUS-P0-05): For safety-critical or financial actions (Emergency SOS, location sharing, booking tickets), explain that you are opening the confirmation gateway screen for the passenger to review and confirm. NEVER claim or speak as if an emergency was already broadcast or payment was already taken until confirmed by the user.
+7. VOICE TASK AGENT - BOOK TICKET FLOW (Live function calling):
+   - To book, chain: set_trip(origin, destination) -> select_bus(busId) -> set_passenger(type, name?) -> set_payment(method) -> confirm_booking().
+   - Fill slots from the user's words; ask naturally for anything missing (e.g. "Which bus — 18B in 4 min or 12A in 12 min?", "Student, senior or general?", "UPI, card or wallet?").
+   - Default corridor is VIT Main Gate to Katpadi Railway Station when the user says "Katpadi" without detail.
+   - confirm_booking only OPENS the review screen; payment happens only after the passenger taps confirm.''';
 
   static String _resolveLiveModel(String requested) {
     var model = requested.trim();
@@ -222,10 +227,7 @@ CRITICAL CONVERSATIONAL RULES:
         'tools': [
           {
             'functionDeclarations': AssistantCommandGateway.registry.values
-                .map((tool) => {
-                      'name': tool.name,
-                      'description': tool.description,
-                    })
+                .map((tool) => tool.toFunctionDeclaration())
                 .toList(),
           }
         ]
@@ -386,7 +388,7 @@ CRITICAL CONVERSATIONAL RULES:
               onAction?.call(name, args);
 
               final outputContext =
-                  AssistantCommandGateway.buildToolResponseContext(name);
+                  AssistantCommandGateway.buildToolResponseContext(name, args);
 
               functionResponses.add({
                 'id': callId,
@@ -456,10 +458,7 @@ CRITICAL CONVERSATIONAL RULES:
         'tools': [
           {
             'functionDeclarations': AssistantCommandGateway.registry.values
-                .map((tool) => {
-                      'name': tool.name,
-                      'description': tool.description,
-                    })
+                .map((tool) => tool.toFunctionDeclaration())
                 .toList(),
           }
         ]

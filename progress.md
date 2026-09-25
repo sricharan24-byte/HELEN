@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 22, 2026 (CI GREEN — run 35729139948: analyze, 354/354 tests, docs gate, APK+AAB+web evidence; only device harnesses remain open)
+**Last Updated**: September 22, 2026 (Chunk 40 journey lifecycle + follow-ups: analyze clean, 368/368 tests, docs gate pass; only device harnesses remain open)
 
 ---
 
@@ -810,3 +810,43 @@ The application provides intuitive journey planning, digital ticket booking with
 ### 🔜 Next recommended step
 
 - Attach a device and run `tool/release_smoke.sh` + `tool/startup_memory_benchmark.sh` for the remaining BUS-P2-02 device numbers.
+
+### ✅ Continuation re-verification — 2026-09-22 (post-CI local pass, commit `0173aa6`)
+
+- `flutter analyze`: **No issues found!** (0 errors, 0 warnings, 0 infos).
+- `flutter test --reporter expanded`: **`+354: All tests passed!`** (~43 s) — confirms the CI 354/354 baseline still holds locally on 54 test files.
+- `tool/ci/verify_docs.sh`: **PASSED** (ADR paths, minify/shrink flags, INTERNET-only manifest, strict analysis flags, CI test gate).
+- `flutter build web --release`: **success** — `build/web/index.html` present, `web_bytes=43226252` (~43.2 MB); closes the "optional web sanity" item from the prior session.
+- `tool/release_smoke.sh`: minified APK rebuilt **55,570,388 bytes (55.6 MB)**, sha `460d667c…`, exit 2 `device_smoke=skipped_no_device` — no adb device in this environment (`adb get-state`: no devices/emulators found). Non-device evidence refreshed under `evidence/release_smoke/`.
+- **Still open (require device/emulator)**: BUS-P2-02 on-device cold/warm/PSS numbers via `tool/startup_memory_benchmark.sh`, reflection/plugin feature smoke, TalkBack semantics no-regression; BUS-P2-01 instrumented permission flows remain N/A while zero runtime permissions; optional androidx Macrobenchmark + Baseline Profile module.
+
+### ✅ Chunk 39 — Settings Theme Adoption, Stop-Name Wrapping & Min-Height Buttons (UI usability hardening)
+
+- **Trigger**: UI usability audit found the design system sound (28/28 a11y tests green, TextScaler preserved, 48dp floor, BlockSemantics/focus restoration real) but `voice_assistant_settings_page.dart` + `personalization_settings_page.dart` ignored `AppTheme.colors()` entirely — High-Contrast users got dark-navy instead of true-black/gold AAA on full settings pages.
+- **Files**: `lib/features/settings/voice_assistant_settings_page.dart`, `lib/features/settings/personalization_settings_page.dart`, `lib/core/tokens/app_semantic_colors.dart` (new `statusInfoBg` getter), `lib/features/route_details/route_details_page.dart`, `lib/features/tickets/live_location_screen.dart`, `lib/features/tickets/my_tickets_page.dart`, `test/features/settings_ui_test.dart`.
+- **Changes**:
+  - Both settings pages now resolve every surface/text/border/accent through `AppTheme.colors(context)` (light AA, dark AA, HC AAA automatically). Switches use `statusSuccess`, selected states `actionSecondary`, pills/dialogs/sheets inherit theme surfaces.
+  - Intentional brand exceptions kept constant with rationale comments: purple mic badge, red `Ask BusBuddy` CTA bar (white on `#DC2626` = 4.83:1 AA in every theme).
+  - Boarding/destination stop names (`route_details_page.dart`) + live metric values (`live_location_screen.dart`) wrap (`softWrap`) instead of single-line ellipsis — no truncated stop names at 300% text.
+  - `height: 52` fixed buttons → `ConstrainedBox(minHeight: 52)` (`live_location_screen.dart` Share, `my_tickets_page.dart` View Ticket) so labels reflow to two lines.
+  - New regression group in `settings_ui_test.dart`: both pages assert Scaffold bg equals HC (`0xFF000000`) under `AppTheme.highContrast` and daylight under `AppTheme.light`.
+- **Verification**: `flutter analyze` clean, `flutter test` **356/356 green** (354 + 2 new), docs gate pass.
+
+### ✅ Chunk 40 — Start-to-Destination Journey with Ticket Expiry (trip starts on purchase, bus terminates, ticket expires, cancellation)
+
+- **Problem**: the bus looped the full corridor forever (modulo wrap, progress capped at 0.983, ETA never 0), ignored the passenger's boarding/alighting stops, and tickets stayed `active` until wall-clock expiry (`used` had zero production callers; `completeJourney()` had zero callers).
+- **Files**: `lib/data/datasources/live_bus_movement_engine.dart`, `lib/data/repositories/transport_repository.dart`, `lib/data/repositories/ticket_repository.dart`, `lib/features/tickets/ticket_controller.dart`, `lib/features/tickets/ticket_booking_suite_page.dart`, `lib/features/tickets/live_location_screen.dart`, `lib/features/tickets/my_tickets_page.dart`, `test/data/live_bus_movement_engine_test.dart`, `test/features/trip_completion_test.dart` (new), `test/features/my_tickets_ui_test.dart`, `test/features/journey_controller_test.dart` (fake signature).
+- **Behavior**:
+  - **Trip starts on purchase**: `onTicketBooked` now drives `JourneyController` (`selectOrigin` → `selectDestination` → `selectRoute` → `startJourney`) plus a spoken trip-started announcement.
+  - **Bus runs boarding → destination, then ends**: engine clips the corridor to the passenger segment, travels a journey window along the real road path, emits a terminal position (progress 1.0, ETA 0, speed 0 parked at destination), then closes the stream — everywhere, including Live Map and route details (which keep full-corridor defaults).
+  - **Arrival → ticket used**: Active Trip latches arrival (stream done or progress ≥ 1.0, post-frame to respect build phase), shows a "You have arrived" banner + high-priority announcement, and **End Trip** (confirm dialog) marks the ticket `used`, closes the journey session, tears down the engine via new `stopJourney()`, and resets to booking. An always-visible **End Trip Early** covers mid-route alighting.
+  - **Cancellation**: **Cancel Ticket** with confirm dialog on both Active Trip and My Tickets current card → `active → cancelled`, journey reset, engine teardown, announcement + Snackbar.
+  - **Live Map end state**: route-complete banner on stream close so stale positions are never labeled live (BUS-P1-01).
+  - Wall-clock `validUntil` expiry + `hydrate()` sweep retained as backstops.
+- **Verification**: `flutter analyze` clean, `flutter test` **368/368 green** (367 + 1 marker-motion regression test), docs gate pass.
+- **Follow-up fix (same session)**: the Active Trip embedded map never received live positions (`LiveLocationMapWidget` built without `currentLocation: live`), so no bus icon ever appeared and the map looked dead. Wired `live` through; the blue bus marker now advances along the road path every 2 s tick with live speed in the `LIVE GPS` overlay. Locked by the `bus marker moves as live positions stream in` widget test (asserts marker `LatLng` changes across 5 s of ticks).
+- **Follow-up (user feedback)**:
+  - **Arrival expires the ticket**: `completeTicket`/`completeActiveTrip` now transition `active → expired` (reason `Reached destination` / `Trip ended early by rider`) instead of `used`. Active Trip banner headline reads **Reached the destination**, confirm dialogs/snackbars/announcements say the ticket will expire / has expired, and the completed pass lands under Previous Tickets.
+  - **No pre-booked ticket on fresh start**: removed the seeded active demo ticket (`BB-20250906-184256`) from `LocalTicketRepository` — only expired history seeds remain. `hydrate()` additionally drops the legacy active demo ticket from already-persisted stores (one-time migration). Home/My Tickets/Saved correctly render their empty states until the rider books.
+  - **Latent crash hardened**: `LiveLocationScreen.initState` called `recordLiveTracking` synchronously, whose global notify hit `setState`-during-build whenever the pushed route mounted outside an ancestor build pass (surfaced as 2 red tests once the seed no longer masked the timing). Recording is now deferred to a post-frame callback.
+  - Tests updated to the ticketless-start contract (`home_page_test`, `safety_and_tabs_test`, `my_tickets_ui_test` book their own tickets; `trip_completion_test` asserts `expired`).

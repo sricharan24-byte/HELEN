@@ -62,8 +62,10 @@ class RouteDetailsPage extends StatelessWidget {
           for (final stopId in route.orderedStopIds) repository.getStop(stopId),
         ];
 
-        final boardingStop = state.origin ?? (stops.isNotEmpty ? stops.first : null);
-        final destinationStop = state.destination ?? (stops.length > 1 ? stops.last : null);
+        final boardingStop =
+            state.origin ?? (stops.isNotEmpty ? stops.first : null);
+        final destinationStop =
+            state.destination ?? (stops.length > 1 ? stops.last : null);
         const busId = 'TN-23-BUS-42';
 
         return Scaffold(
@@ -87,9 +89,17 @@ class RouteDetailsPage extends StatelessWidget {
                     stream: repository.streamBusLocation(busId, route.id),
                     builder: (context, snapshot) {
                       final live = snapshot.data;
-                      final speed = live != null ? live.speedKmh.toStringAsFixed(0) : '32';
-                      final nextStop = live?.nextStopName ?? (stops.length > 1 ? stops[1]?.name ?? 'Next Stop' : 'Gandhi Nagar');
-                      final eta = live != null ? '${live.etaMinutes} mins' : '4 mins';
+                      final speed = live != null
+                          ? live.speedKmh.toStringAsFixed(0)
+                          : '32';
+                      final nextStop =
+                          live?.nextStopName ??
+                          (stops.length > 1
+                              ? stops[1]?.name ?? 'Next Stop'
+                              : 'Gandhi Nagar');
+                      final eta = live != null
+                          ? '${live.etaMinutes} mins'
+                          : '4 mins';
                       final progress = live?.progressPercentage ?? 0.25;
 
                       // Announce live telemetry via coordinator
@@ -106,14 +116,22 @@ class RouteDetailsPage extends StatelessWidget {
                       return Container(
                         padding: AppSpacing.cardPadding,
                         decoration: BoxDecoration(
-                          color: colors.isHighContrast ? colors.surface : const Color(0xFF002B7F),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                          border: colors.isHighContrast ? Border.all(color: colors.border, width: 2) : null,
+                          color: colors.isHighContrast
+                              ? colors.surface
+                              : const Color(0xFF002B7F),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusLg,
+                          ),
+                          border: colors.isHighContrast
+                              ? Border.all(color: colors.border, width: 2)
+                              : null,
                           boxShadow: colors.isHighContrast
                               ? null
                               : [
                                   BoxShadow(
-                                    color: const Color(0xFF002B7F).withValues(alpha: 0.2),
+                                    color: const Color(
+                                      0xFF002B7F,
+                                    ).withValues(alpha: 0.2),
                                     blurRadius: 16,
                                     offset: const Offset(0, 6),
                                   ),
@@ -131,15 +149,22 @@ class RouteDetailsPage extends StatelessWidget {
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.15),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.15,
+                                          ),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.directions_bus, color: Colors.white, size: 22),
+                                        child: const Icon(
+                                          Icons.directions_bus,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
                                       ),
                                       const SizedBox(width: 10),
                                       Flexible(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               busId,
@@ -151,14 +176,21 @@ class RouteDetailsPage extends StatelessWidget {
                                             ),
                                             Row(
                                               children: [
-                                                Icon(StatusLevel.info.icon, size: 13, color: const Color(0xFF38BDF8)),
+                                                Icon(
+                                                  StatusLevel.info.icon,
+                                                  size: 13,
+                                                  color: const Color(
+                                                    0xFF38BDF8,
+                                                  ),
+                                                ),
                                                 const SizedBox(width: 4),
                                                 Flexible(
                                                   child: Text(
                                                     'Speed: $speed km/h',
                                                     style: const TextStyle(
                                                       color: Color(0xFF38BDF8),
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                       fontSize: 12,
                                                     ),
                                                   ),
@@ -172,16 +204,27 @@ class RouteDetailsPage extends StatelessWidget {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                    color: const Color(
+                                      0xFF10B981,
+                                    ).withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: const Color(0xFF10B981)),
+                                    border: Border.all(
+                                      color: const Color(0xFF10B981),
+                                    ),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.fiber_manual_record, size: 8, color: Color(0xFF10B981)),
+                                      Icon(
+                                        Icons.fiber_manual_record,
+                                        size: 8,
+                                        color: Color(0xFF10B981),
+                                      ),
                                       SizedBox(width: 4),
                                       Text(
                                         'LIVE GPS',
@@ -209,7 +252,10 @@ class RouteDetailsPage extends StatelessWidget {
                                   children: [
                                     const Text(
                                       'Next Stop',
-                                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -227,7 +273,10 @@ class RouteDetailsPage extends StatelessWidget {
                                   children: [
                                     const Text(
                                       'Est. Arrival',
-                                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -249,7 +298,9 @@ class RouteDetailsPage extends StatelessWidget {
                                 value: progress,
                                 minHeight: 6,
                                 backgroundColor: Colors.white24,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF38BDF8),
+                                ),
                               ),
                             ),
                           ],
@@ -265,7 +316,10 @@ class RouteDetailsPage extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: colors.surface,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      border: Border.all(color: colors.border, width: colors.isHighContrast ? 2 : 1),
+                      border: Border.all(
+                        color: colors.border,
+                        width: colors.isHighContrast ? 2 : 1,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,7 +328,8 @@ class RouteDetailsPage extends StatelessWidget {
                           header: true,
                           child: Text(
                             route.displayName,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: colors.textPrimary,
                                 ),
@@ -283,28 +338,39 @@ class RouteDetailsPage extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           'Direction: ${route.direction.toUpperCase()} • ${stops.length} STOPS',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: colors.textSecondary,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
-                        if (boardingStop != null || destinationStop != null) ...[
+                        if (boardingStop != null ||
+                            destinationStop != null) ...[
                           const SizedBox(height: 12),
                           Divider(color: colors.border),
                           const SizedBox(height: 8),
                           if (boardingStop != null)
                             Row(
                               children: [
-                                Icon(Icons.gps_fixed, size: 18, color: colors.actionPrimary),
+                                Icon(
+                                  Icons.gps_fixed,
+                                  size: 18,
+                                  color: colors.actionPrimary,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Boarding: ${boardingStop.name}',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           fontWeight: FontWeight.w600,
                                           color: colors.textPrimary,
                                         ),
-                                    overflow: TextOverflow.ellipsis,
+                                    // BUS-P1-05: boarding stop names wrap instead
+                                    // of truncating at large text scales.
+                                    softWrap: true,
                                   ),
                                 ),
                               ],
@@ -313,16 +379,25 @@ class RouteDetailsPage extends StatelessWidget {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFFE11D48)),
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 18,
+                                  color: Color(0xFFE11D48),
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Destination: ${destinationStop.name}',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           fontWeight: FontWeight.w600,
                                           color: colors.textPrimary,
                                         ),
-                                    overflow: TextOverflow.ellipsis,
+                                    // BUS-P1-05: destination stop names wrap
+                                    // instead of truncating at large text scales.
+                                    softWrap: true,
                                   ),
                                 ),
                               ],
@@ -340,15 +415,17 @@ class RouteDetailsPage extends StatelessWidget {
                     child: Text(
                       'Stops along this route',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: colors.textPrimary,
-                          ),
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   ...List.generate(stops.length, (index) {
                     final stop = stops[index];
-                    final stopName = stop?.name ?? 'Unknown stop (${route.orderedStopIds[index]})';
+                    final stopName =
+                        stop?.name ??
+                        'Unknown stop (${route.orderedStopIds[index]})';
                     final stopArea = stop?.area ?? '';
                     final isFirst = index == 0;
                     final isLast = index == stops.length - 1;
@@ -357,31 +434,49 @@ class RouteDetailsPage extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
                         color: colors.surface,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                        border: Border.all(color: colors.border, width: colors.isHighContrast ? 2 : 1),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
+                        border: Border.all(
+                          color: colors.border,
+                          width: colors.isHighContrast ? 2 : 1,
+                        ),
                       ),
                       child: Material(
                         color: Colors.transparent,
                         child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isFirst
-                              ? colors.actionPrimary
-                              : isLast
-                                  ? const Color(0xFFE11D48)
-                                  : colors.surfaceSubtle,
-                          foregroundColor: isFirst || isLast ? colors.onActionPrimary : colors.textPrimary,
-                          child: Text('${index + 1}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          leading: CircleAvatar(
+                            backgroundColor: isFirst
+                                ? colors.actionPrimary
+                                : isLast
+                                ? const Color(0xFFE11D48)
+                                : colors.surfaceSubtle,
+                            foregroundColor: isFirst || isLast
+                                ? colors.onActionPrimary
+                                : colors.textPrimary,
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            stopName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          subtitle: stopArea.isNotEmpty
+                              ? Text(
+                                  stopArea,
+                                  style: TextStyle(color: colors.textSecondary),
+                                )
+                              : null,
                         ),
-                        title: Text(
-                          stopName,
-                          style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
-                        ),
-                        subtitle: stopArea.isNotEmpty
-                            ? Text(stopArea, style: TextStyle(color: colors.textSecondary))
-                            : null,
                       ),
-                    ),
-                  );
+                    );
                   }),
 
                   const SizedBox(height: 24),
@@ -401,23 +496,39 @@ class RouteDetailsPage extends StatelessWidget {
                             routeId: route.id,
                             priority: AnnouncementPriority.high,
                           );
-                          unawaited(Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => JourneyPage(controller: controller),
+                          unawaited(
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    JourneyPage(controller: controller),
+                              ),
                             ),
-                          ));
+                          );
                         },
                         icon: const Icon(Icons.navigation_outlined, size: 22),
                         label: const Text(
                           'Start this journey',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+                          minimumSize: const Size(
+                            AppSpacing.minTouchTarget,
+                            AppSpacing.minTouchTarget,
+                          ),
                           backgroundColor: colors.actionPrimary,
                           foregroundColor: colors.onActionPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                     ),
