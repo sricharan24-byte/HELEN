@@ -258,248 +258,11 @@ class _VoiceAssistantSettingsPageState
   }
 
   void _showApiKeyDialog() {
-    final colors = AppTheme.colors(context);
-    final textCtrl = TextEditingController(text: _settings.geminiApiKey);
-    String selectedModel = _settings.geminiModel;
-    String selectedVoice = _settings.geminiVoice;
-
-    final modelOptions = const [
-      {
-        'id': 'models/gemini-3.8-live',
-        'label': 'Gemini 3.8 Live (Official Live Audio - Recommended)',
-      },
-      {
-        'id': 'models/gemini-3.8-live-extended-thinking',
-        'label': 'Gemini 3.8 Live Extended Thinking (Complex Reasoning)',
-      },
-      {'id': 'models/gemini-2.5-flash', 'label': 'Gemini 2.5 Flash'},
-    ];
-    if (!modelOptions.any((opt) => opt['id'] == selectedModel)) {
-      selectedModel = 'models/gemini-3.8-live';
-    }
-
-    final voiceOptions = const [
-      {
-        'id': 'Aoede',
-        'label': 'Aoede (Natural & Conversational - Recommended)',
-      },
-      {'id': 'Kore', 'label': 'Kore (Clear & Confident)'},
-      {'id': 'Charon', 'label': 'Charon (Calm & Professional)'},
-      {'id': 'Puck', 'label': 'Puck (Upbeat & Energetic)'},
-      {'id': 'Fenrir', 'label': 'Fenrir (Passionate & Deep)'},
-    ];
-    if (!voiceOptions.any((opt) => opt['id'] == selectedVoice)) {
-      selectedVoice = 'Aoede';
-    }
-
     unawaited(
       showDialog<void>(
         context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDialogState) => AlertDialog(
-            backgroundColor: colors.surfaceSubtle,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome,
-                  color: colors.actionSecondary,
-                  size: 24,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Gemini Live API Setup',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice interaction.',
-                    style: TextStyle(
-                      color: colors.textSecondary,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Official Live Voice:',
-                    style: TextStyle(
-                      color: colors.actionSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: colors.actionSecondary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedVoice,
-                        isExpanded: true,
-                        dropdownColor: colors.surface,
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: colors.actionSecondary,
-                        ),
-                        items: voiceOptions.map((opt) {
-                          return DropdownMenuItem<String>(
-                            value: opt['id'],
-                            child: Text(opt['label']!),
-                          );
-                        }).toList(),
-                        onChanged: (newVal) {
-                          if (newVal != null) {
-                            setDialogState(() {
-                              selectedVoice = newVal;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Live Model:',
-                    style: TextStyle(
-                      color: colors.actionSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: colors.actionSecondary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedModel,
-                        isExpanded: true,
-                        dropdownColor: colors.surface,
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: colors.actionSecondary,
-                        ),
-                        items: modelOptions.map((opt) {
-                          return DropdownMenuItem<String>(
-                            value: opt['id'],
-                            child: Text(opt['label']!),
-                          );
-                        }).toList(),
-                        onChanged: (newVal) {
-                          if (newVal != null) {
-                            setDialogState(() {
-                              selectedModel = newVal;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: textCtrl,
-                    style: TextStyle(color: colors.textPrimary, fontSize: 14),
-                    decoration: InputDecoration(
-                      labelText: 'Google AI Studio API Key',
-                      labelStyle: TextStyle(color: colors.actionSecondary),
-                      hintText: 'Paste key from AI Studio',
-                      hintStyle: TextStyle(color: colors.textMuted),
-                      filled: true,
-                      fillColor: colors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              if (_settings.geminiApiKey.isNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    _settings.updateGeminiApiKey('');
-                    Navigator.pop(ctx);
-                  },
-                  child: Text(
-                    'Clear Key',
-                    style: TextStyle(color: colors.statusError),
-                  ),
-                ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: colors.textSecondary),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final newKey = textCtrl.text.trim();
-                  _settings.updateGeminiModel(selectedModel);
-                  _settings.updateGeminiVoice(selectedVoice);
-                  _settings.updateGeminiApiKey(newKey);
-                  Navigator.pop(ctx);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.actionPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  'Save Settings',
-                  style: TextStyle(
-                    color: colors.onActionPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ).then((_) => textCtrl.dispose()),
+        builder: (_) => const _GeminiLiveSetupDialog(),
+      ),
     );
   }
 
@@ -1043,6 +806,263 @@ class _VoiceAssistantSettingsPageState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Gemini Live setup dialog (API key, voice, model).
+///
+/// Owns its [TextEditingController] and disposes it when this State is
+/// disposed — when the dialog route actually leaves the tree. The previous
+/// function-based dialog disposed the controller via
+/// `showDialog(...).then(...)`, which fires the moment the pop begins while
+/// the dialog is still animating out; a rebuild in that window (the settings
+/// notifications fired on save) rebuilt the still-mounted TextField against
+/// the disposed controller, cascading into the framework's
+/// `_dependents.isEmpty` teardown assert.
+class _GeminiLiveSetupDialog extends StatefulWidget {
+  const _GeminiLiveSetupDialog();
+
+  @override
+  State<_GeminiLiveSetupDialog> createState() => _GeminiLiveSetupDialogState();
+}
+
+class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
+  static const List<Map<String, String>> _modelOptions = [
+    {
+      'id': 'models/gemini-3.8-live',
+      'label': 'Gemini 3.8 Live (Official Live Audio - Recommended)',
+    },
+    {
+      'id': 'models/gemini-3.8-live-extended-thinking',
+      'label': 'Gemini 3.8 Live Extended Thinking (Complex Reasoning)',
+    },
+    {'id': 'models/gemini-2.5-flash', 'label': 'Gemini 2.5 Flash'},
+  ];
+
+  static const List<Map<String, String>> _voiceOptions = [
+    {'id': 'Aoede', 'label': 'Aoede (Natural & Conversational - Recommended)'},
+    {'id': 'Kore', 'label': 'Kore (Clear & Confident)'},
+    {'id': 'Charon', 'label': 'Charon (Calm & Professional)'},
+    {'id': 'Puck', 'label': 'Puck (Upbeat & Energetic)'},
+    {'id': 'Fenrir', 'label': 'Fenrir (Passionate & Deep)'},
+  ];
+
+  static String _initialSelection(
+    List<Map<String, String>> options,
+    String current,
+    String fallback,
+  ) {
+    return options.any((opt) => opt['id'] == current) ? current : fallback;
+  }
+
+  late final TextEditingController _textCtrl = TextEditingController(
+    text: AppSettingsController.instance.geminiApiKey,
+  );
+  late String _selectedModel = _initialSelection(
+    _modelOptions,
+    AppSettingsController.instance.geminiModel,
+    'models/gemini-3.8-live',
+  );
+  late String _selectedVoice = _initialSelection(
+    _voiceOptions,
+    AppSettingsController.instance.geminiVoice,
+    'Aoede',
+  );
+
+  @override
+  void dispose() {
+    _textCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
+    return AlertDialog(
+      backgroundColor: colors.surfaceSubtle,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Row(
+        children: [
+          Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 24),
+          const SizedBox(width: 10),
+          Text(
+            'Gemini Live API Setup',
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice interaction.',
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Official Live Voice:',
+              style: TextStyle(
+                color: colors.actionSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colors.actionSecondary.withValues(alpha: 0.4),
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedVoice,
+                  isExpanded: true,
+                  dropdownColor: colors.surface,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  items: _voiceOptions.map((opt) {
+                    return DropdownMenuItem<String>(
+                      value: opt['id'],
+                      child: Text(opt['label']!),
+                    );
+                  }).toList(),
+                  onChanged: (newVal) {
+                    if (newVal != null) {
+                      setState(() {
+                        _selectedVoice = newVal;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Live Model:',
+              style: TextStyle(
+                color: colors.actionSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colors.actionSecondary.withValues(alpha: 0.4),
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedModel,
+                  isExpanded: true,
+                  dropdownColor: colors.surface,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  items: _modelOptions.map((opt) {
+                    return DropdownMenuItem<String>(
+                      value: opt['id'],
+                      child: Text(opt['label']!),
+                    );
+                  }).toList(),
+                  onChanged: (newVal) {
+                    if (newVal != null) {
+                      setState(() {
+                        _selectedModel = newVal;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _textCtrl,
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Google AI Studio API Key',
+                labelStyle: TextStyle(color: colors.actionSecondary),
+                hintText: 'Paste key from AI Studio',
+                hintStyle: TextStyle(color: colors.textMuted),
+                filled: true,
+                fillColor: colors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        if (AppSettingsController.instance.geminiApiKey.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              AppSettingsController.instance.updateGeminiApiKey('');
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Clear Key',
+              style: TextStyle(color: colors.statusError),
+            ),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: colors.textSecondary),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            AppSettingsController.instance.updateGeminiModel(_selectedModel);
+            AppSettingsController.instance.updateGeminiVoice(_selectedVoice);
+            AppSettingsController.instance.updateGeminiApiKey(
+              _textCtrl.text.trim(),
+            );
+            Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colors.actionPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            'Save Settings',
+            style: TextStyle(
+              color: colors.onActionPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

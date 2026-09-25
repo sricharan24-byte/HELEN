@@ -536,192 +536,24 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   }
 
   void _showApiKeyDialog() {
-    final textCtrl = TextEditingController(text: AppSettingsController.instance.geminiApiKey);
-    String selectedModel = AppSettingsController.instance.geminiModel;
-    String selectedVoice = AppSettingsController.instance.geminiVoice;
-    final modelOptions = const [
-      {
-        'id': 'models/gemini-3.8-live',
-        'label': 'Gemini 3.8 Live (Official Live Audio - Recommended)',
-      },
-      {
-        'id': 'models/gemini-3.8-live-extended-thinking',
-        'label': 'Gemini 3.8 Live Extended Thinking (Complex Reasoning)',
-      },
-      {
-        'id': 'models/gemini-2.5-flash',
-        'label': 'Gemini 2.5 Flash',
-      },
-    ];
-    if (!modelOptions.any((opt) => opt['id'] == selectedModel)) {
-      selectedModel = 'models/gemini-3.8-live';
-    }
-
-    final voiceOptions = const [
-      {'id': 'Aoede', 'label': 'Aoede (Natural & Conversational - Recommended)'},
-      {'id': 'Kore', 'label': 'Kore (Clear & Confident)'},
-      {'id': 'Charon', 'label': 'Charon (Calm & Professional)'},
-      {'id': 'Puck', 'label': 'Puck (Upbeat & Energetic)'},
-      {'id': 'Fenrir', 'label': 'Fenrir (Passionate & Deep)'},
-    ];
-    if (!voiceOptions.any((opt) => opt['id'] == selectedVoice)) {
-      selectedVoice = 'Aoede';
-    }
-
     unawaited(
       showDialog<void>(
         context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF111C33),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: const [
-              Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 24),
-              SizedBox(width: 10),
-              Text(
-                'Gemini Multimodal Live Setup',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice and audio streaming.',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Official Live Voice:',
-                  style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedVoice,
-                      isExpanded: true,
-                      dropdownColor: const Color(0xFF1E293B),
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                      icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
-                      items: voiceOptions.map((opt) {
-                        return DropdownMenuItem<String>(
-                          value: opt['id'],
-                          child: Text(opt['label']!),
-                        );
-                      }).toList(),
-                      onChanged: (newVal) {
-                        if (newVal != null) {
-                          setDialogState(() {
-                            selectedVoice = newVal;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Live Model:',
-                  style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedModel,
-                      isExpanded: true,
-                      dropdownColor: const Color(0xFF1E293B),
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                      icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
-                      items: modelOptions.map((opt) {
-                        return DropdownMenuItem<String>(
-                          value: opt['id'],
-                          child: Text(opt['label']!),
-                        );
-                      }).toList(),
-                      onChanged: (newVal) {
-                        if (newVal != null) {
-                          setDialogState(() {
-                            selectedModel = newVal;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: textCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: 'Google AI Studio API Key',
-                    labelStyle: const TextStyle(color: Color(0xFF38BDF8)),
-                    hintText: 'Paste key from AI Studio',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: const Color(0xFF1E293B),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            if (AppSettingsController.instance.geminiApiKey.isNotEmpty)
-              TextButton(
-                onPressed: () {
-                  AppSettingsController.instance.updateGeminiApiKey('');
-                  _liveSession.disconnect();
-                  Navigator.pop(ctx);
-                  setState(() {});
-                },
-                child: const Text('Clear Key', style: TextStyle(color: Color(0xFFEF4444))),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final newKey = textCtrl.text.trim();
-                AppSettingsController.instance.updateGeminiModel(selectedModel);
-                AppSettingsController.instance.updateGeminiVoice(selectedVoice);
-                AppSettingsController.instance.updateGeminiApiKey(newKey);
-                Navigator.pop(ctx);
-                if (newKey.isNotEmpty) {
-                  _liveSession.connect(customApiKey: newKey);
-                } else {
-                  _liveSession.disconnect();
-                }
-                setState(() {});
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF007AFF),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Save & Connect', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
-          ],
+        builder: (_) => _GeminiSetupDialog(
+          onSaved: (String newKey) {
+            // The dialog State owns its TextEditingController and disposes
+            // it only when the route leaves the tree, so rebuilding the
+            // still-animating dialog here (settings notifications fire on
+            // save) can never touch a disposed controller.
+            if (newKey.isNotEmpty) {
+              _liveSession.connect(customApiKey: newKey);
+            } else {
+              _liveSession.disconnect();
+            }
+            if (mounted) setState(() {});
+          },
         ),
       ),
-    ).then((_) => textCtrl.dispose()),
     );
   }
 
@@ -1407,5 +1239,243 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       default:
         return 'Execute Action';
     }
+  }
+}
+
+/// Gemini Live setup dialog (API key, voice, model).
+///
+/// Owns its [TextEditingController] and disposes it when this State is
+/// disposed — i.e. when the dialog route actually leaves the tree. The
+/// previous function-based dialog disposed the controller via
+/// `showDialog(...).then(...)`, which fires the moment the pop begins while
+/// the dialog is still animating out; a rebuild in that window (the settings
+/// notifications fired on save) rebuilt the still-mounted TextField against
+/// the disposed controller, cascading into the framework's
+/// `_dependents.isEmpty` teardown assert.
+class _GeminiSetupDialog extends StatefulWidget {
+  const _GeminiSetupDialog({required this.onSaved});
+
+  final void Function(String newKey) onSaved;
+
+  @override
+  State<_GeminiSetupDialog> createState() => _GeminiSetupDialogState();
+}
+
+class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
+  static const List<Map<String, String>> _modelOptions = [
+    {
+      'id': 'models/gemini-3.8-live',
+      'label': 'Gemini 3.8 Live (Official Live Audio - Recommended)',
+    },
+    {
+      'id': 'models/gemini-3.8-live-extended-thinking',
+      'label': 'Gemini 3.8 Live Extended Thinking (Complex Reasoning)',
+    },
+    {'id': 'models/gemini-2.5-flash', 'label': 'Gemini 2.5 Flash'},
+  ];
+
+  static const List<Map<String, String>> _voiceOptions = [
+    {'id': 'Aoede', 'label': 'Aoede (Natural & Conversational - Recommended)'},
+    {'id': 'Kore', 'label': 'Kore (Clear & Confident)'},
+    {'id': 'Charon', 'label': 'Charon (Calm & Professional)'},
+    {'id': 'Puck', 'label': 'Puck (Upbeat & Energetic)'},
+    {'id': 'Fenrir', 'label': 'Fenrir (Passionate & Deep)'},
+  ];
+
+  static String _initialSelection(
+    List<Map<String, String>> options,
+    String current,
+    String fallback,
+  ) {
+    return options.any((opt) => opt['id'] == current) ? current : fallback;
+  }
+
+  late final TextEditingController _textCtrl = TextEditingController(
+    text: AppSettingsController.instance.geminiApiKey,
+  );
+  late String _selectedModel = _initialSelection(
+    _modelOptions,
+    AppSettingsController.instance.geminiModel,
+    'models/gemini-3.8-live',
+  );
+  late String _selectedVoice = _initialSelection(
+    _voiceOptions,
+    AppSettingsController.instance.geminiVoice,
+    'Aoede',
+  );
+
+  @override
+  void dispose() {
+    _textCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF111C33),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Row(
+        children: const [
+          Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 24),
+          SizedBox(width: 10),
+          Text(
+            'Gemini Multimodal Live Setup',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice and audio streaming.',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Official Live Voice:',
+              style: TextStyle(
+                color: Color(0xFF38BDF8),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedVoice,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF1E293B),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
+                  items: _voiceOptions.map((opt) {
+                    return DropdownMenuItem<String>(
+                      value: opt['id'],
+                      child: Text(opt['label']!),
+                    );
+                  }).toList(),
+                  onChanged: (newVal) {
+                    if (newVal != null) {
+                      setState(() {
+                        _selectedVoice = newVal;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Live Model:',
+              style: TextStyle(
+                color: Color(0xFF38BDF8),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedModel,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF1E293B),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
+                  items: _modelOptions.map((opt) {
+                    return DropdownMenuItem<String>(
+                      value: opt['id'],
+                      child: Text(opt['label']!),
+                    );
+                  }).toList(),
+                  onChanged: (newVal) {
+                    if (newVal != null) {
+                      setState(() {
+                        _selectedModel = newVal;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _textCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Google AI Studio API Key',
+                labelStyle: const TextStyle(color: Color(0xFF38BDF8)),
+                hintText: 'Paste key from AI Studio',
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        if (AppSettingsController.instance.geminiApiKey.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              AppSettingsController.instance.updateGeminiApiKey('');
+              Navigator.pop(context);
+              widget.onSaved('');
+            },
+            child: const Text('Clear Key', style: TextStyle(color: Color(0xFFEF4444))),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final newKey = _textCtrl.text.trim();
+            AppSettingsController.instance.updateGeminiModel(_selectedModel);
+            AppSettingsController.instance.updateGeminiVoice(_selectedVoice);
+            AppSettingsController.instance.updateGeminiApiKey(newKey);
+            Navigator.pop(context);
+            widget.onSaved(newKey);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF007AFF),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text(
+            'Save & Connect',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
   }
 }

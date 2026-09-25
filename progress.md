@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 25, 2026 (Chunk 42: floating AI assistant removed completely — GeminiLiveScreen is the single voice surface; 367/367 tests, analyze clean)
+**Last Updated**: September 25, 2026 (Chunk 42: floating AI assistant removed — GeminiLiveScreen is the single voice surface; API-key dialog crash fixed; 368/368 tests, analyze clean)
 
 ---
 
@@ -886,3 +886,12 @@ The application provides intuitive journey planning, digital ticket booking with
 With the floating assistant gone there is exactly ONE session, ONE mic listener, and ONE audio-ended callback owner (`GeminiLiveScreen`). Every cross-owner race from the previous fix (separate arbiters over one global audio bridge, fullscreen handoff windows, competing audio-ended callbacks on the shared JS slot) is now structurally impossible rather than arbitrated. Within the screen, the Chunk 41 guarantees remain: `TtsFallbackArbiter.shared` first-starter-wins between native PCM and browser TTS, plus the 600 ms end-of-speech confirmation.
 
 - **Verification**: `flutter analyze` clean, `flutter test` **367/367 green**, docs gate pass. AGENTS.md updated: full-screen `GeminiLiveScreen` is the app's single voice surface.
+
+### ✅ Follow-up fix (same session): API-key dialog crash (`_dependents.isEmpty`)
+
+- **User report**: inserting the API key in the Live setup dialog crashed with the framework assert `framework.dart:6268 _dependents.isEmpty` (red screen).
+- **Reproduction**: widget test pumping the full app tree (home below the pushed screen), opening the dialog via the header `Connect` box, entering a key, tapping `Save & Connect`. Reproduced the exact cascade: `A TextEditingController was used after being disposed` → `InputDecorator` dirty-widget-out-of-scope → `_dependents.isEmpty`.
+- **Root cause**: both setup dialogs (`gemini_live_screen.dart`, `voice_assistant_settings_page.dart`) disposed their `TextEditingController` via `showDialog(...).then((_) => textCtrl.dispose())`. The dialog future completes the moment the pop *begins* while the dialog widgets stay mounted through the exit animation; the save button's three settings notifications then rebuild the still-animating dialog, and the TextField attaches to the disposed controller, corrupting subtree teardown.
+- **Fix**: converted both dialogs to private `StatefulWidget`s (`_GeminiSetupDialog`, `_GeminiLiveSetupDialog`) that own the controller and dispose it with their own State — i.e., only when the route actually leaves the tree. The screen's dialog receives an `onSaved(newKey)` callback so session reconnect/`setState` stays on the screen.
+- **Regression test**: `test/features/ai_assistant/gemini_api_key_dialog_test.dart` — full-app-tree dialog save asserts the dialog dismisses, the key persists, and the header flips to `⚡ GEMINI LIVE` with no framework asserts.
+- **Verification**: `flutter analyze` clean, `flutter test` **368/368 green**, docs gate pass.
