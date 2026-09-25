@@ -9,7 +9,6 @@ import 'data/datasources/local_json_store.dart';
 import 'data/repositories/emergency_contact_repository.dart';
 import 'data/models/transport_models.dart' as models;
 import 'data/repositories/transport_repository.dart';
-import 'features/ai_assistant/floating_ai_assistant_overlay.dart';
 import 'features/home/home_page.dart';
 import 'features/journey/journey_controller.dart';
 import 'features/route_details/route_details_page.dart';
@@ -77,23 +76,7 @@ class MyApp extends StatelessWidget {
               data: media.copyWith(
                 textScaler: effectiveScaler,
               ),
-              child: Overlay(
-                initialEntries: [
-                  OverlayEntry(
-                    builder: (context) => Stack(
-                      children: [
-                        child!,
-                        FloatingAiAssistantOverlay(
-                          navigatorKey: _navigatorKey,
-                          ticketController: ticketController,
-                          repository: repository,
-                          journeyController: journeyController,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              child: child!,
             );
           },
       home: HomePage(

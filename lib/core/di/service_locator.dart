@@ -4,7 +4,6 @@ import '../../data/datasources/local_transport_data_source.dart';
 import '../../data/repositories/emergency_contact_repository.dart';
 import '../../data/repositories/ticket_repository.dart';
 import '../../data/repositories/transport_repository.dart';
-import '../../features/ai_assistant/floating_assistant_controller.dart';
 import '../../features/journey/journey_controller.dart';
 import '../../features/tickets/ticket_controller.dart';
 import 'async_disposable.dart';
@@ -156,8 +155,6 @@ class AppServiceLocator implements AsyncDisposable {
       _defaultJourneyController = null;
 
       _customContactRepository = null;
-
-      FloatingAssistantController.instance.resetForTesting();
     } finally {
       _isResetting = false;
       _activeResetFuture = null;

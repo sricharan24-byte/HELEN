@@ -54,9 +54,7 @@ void main() {
       expect(bookingResponse.actionType, equals('book_ticket'));
     });
 
-    test('FloatingAssistantController displays truthful gateway confirmation button labels', () {
-      // FloatingAssistantController.instance carries the label lookup used by the
-      // gateway; assert against its singleton so no unused local remains.
+    test('gateway confirmation prompts use truthful button labels', () {
       final sosMeta = AssistantCommandGateway.getMetadata('emergency_sos');
       expect(sosMeta?.gatewayScreenPrompt, contains('Confirm SOS'));
 

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/core/di/service_locator.dart';
-import 'package:busbuddy/features/ai_assistant/floating_assistant_controller.dart';
 
 void main() {
   group('AppServiceLocator Lifecycle & BUS-P0-04 Teardown Tests', () {
@@ -72,19 +71,6 @@ void main() {
       // Ensure new repository created post-reset is fresh
       final freshRepo = locator.transportRepository;
       expect(identical(repo, freshRepo), isFalse);
-    });
-
-    test('resets FloatingAssistantController state and audio on teardown', () async {
-      final locator = AppServiceLocator.instance;
-      final assistant = FloatingAssistantController.instance;
-
-      assistant.openWindow();
-      expect(assistant.isWindowOpen, isTrue);
-
-      await locator.resetForTesting();
-      expect(assistant.isWindowOpen, isFalse);
-      expect(assistant.isListening, isFalse);
-      expect(assistant.isSpeaking, isFalse);
     });
 
     test('100 sequential create and reset cycles execute without leaks or errors', () async {

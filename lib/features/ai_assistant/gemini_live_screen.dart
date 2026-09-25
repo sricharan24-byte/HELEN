@@ -16,7 +16,6 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../domain/assistant/assistant_command.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
-import 'floating_assistant_controller.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
 import 'tts_fallback_arbiter.dart';
@@ -279,7 +278,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      FloatingAssistantController.instance.setFullScreenActive(true);
       if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
         _continuousListening = true;
         _handleVoiceInput(widget.initialQuery!);
@@ -309,13 +307,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _watchdogTimer?.cancel();
     _audioEndConfirmTimer?.cancel();
     _ttsArbiter.dispose();
-    FloatingAssistantController.instance.setFullScreenActive(false);
     _liveSession.dispose();
     _audioEngine.stopListening();
     _audioEngine.stop();
-    // Restore the mini window's callback on the shared bridge (this screen
-    // overwrote the single global slot in initState).
-    FloatingAssistantController.instance.rearmAudioCallback();
     _pulseController.dispose();
     _textController.dispose();
     super.dispose();

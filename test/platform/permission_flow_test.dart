@@ -156,7 +156,8 @@ void main() {
 
     test('feature fallback exists when microphone capability is unavailable', () {
       // Browser/OS mic denial must surface an accessible recovery path rather
-      // than a silent dead-end (BUS-P1-08 + BUS-P2-01 fallback).
+      // than a silent dead-end (BUS-P1-08 + BUS-P2-01 fallback). The full-screen
+      // GeminiLiveScreen is the app's sole voice surface.
       final gemini = File(
         'lib/features/ai_assistant/gemini_live_screen.dart',
       ).readAsStringSync();
@@ -164,15 +165,6 @@ void main() {
         gemini.toLowerCase(),
         contains('permission'),
         reason: 'GeminiLiveScreen must handle mic permission recovery',
-      );
-
-      final overlay = File(
-        'lib/features/ai_assistant/floating_ai_assistant_overlay.dart',
-      ).readAsStringSync();
-      expect(
-        overlay.toLowerCase(),
-        contains('permission'),
-        reason: 'floating overlay must expose mic permission recovery',
       );
     });
 

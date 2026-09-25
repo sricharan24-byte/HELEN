@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
-import 'package:busbuddy/features/ai_assistant/floating_assistant_controller.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_session.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
 
@@ -19,24 +18,6 @@ void main() {
     test('AudioSpeechEngine dispose completes cleanly without throwing', () {
       const engine = AudioSpeechEngine();
       expect(() => engine.dispose(), returnsNormally);
-    });
-
-    test('FloatingAssistantController sets isPermissionBlocked on mic permission denial', () {
-      final controller = FloatingAssistantController.instance;
-      expect(controller.isPermissionBlocked, isFalse);
-
-      // Trigger start listening with simulated mic
-      AudioSpeechEngine.enableSimulatedVoiceInput = false;
-      controller.startListening(playChimeTone: false);
-
-      // On non-web without voice simulation, it emits mic error
-      expect(controller.isListening, isFalse);
-      expect(controller.liveStatus, contains('Mic error'));
-
-      // If a permission blocked error is emitted
-      // We verify controller handles reset on startListening
-      controller.startListening(playChimeTone: false);
-      expect(controller.isPermissionBlocked, isFalse);
     });
   });
 

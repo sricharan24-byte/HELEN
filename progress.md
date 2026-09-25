@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 25, 2026 (Chunk 41 single-voice double-audio fix: app-wide TTS arbiter + deferred end-of-speech confirmation; 386/386 tests, analyze clean)
+**Last Updated**: September 25, 2026 (Chunk 42: floating AI assistant removed completely — GeminiLiveScreen is the single voice surface; 367/367 tests, analyze clean)
 
 ---
 
@@ -865,3 +865,24 @@ The application provides intuitive journey planning, digital ticket booking with
 - **Regression tests** (`test/features/ai_assistant/tts_fallback_arbiter_test.dart`, new group): shared instance identity, PCM claimed by one owner suppresses TTS armed by the other, handoff `beginTurn` drops a stale armed TTS, and late PCM is dropped after the other owner's TTS started.
 - **Verification**: `flutter analyze` clean, `flutter test` **386/386 green** (382 + 4 new), docs gate pass.
 - **Note**: the voice task-agent (`AppAutomationController`, booking-draft Live tool calling) was committed in `46e985b` with Chunks 39–40.
+
+---
+
+## 🛠️ Session Log — 2026-09-25: Chunk 42 — Floating AI Assistant Removed (Single Voice Surface)
+
+> **User report**: overlapping voices persisted after the Chunk 41 arbitration fixes. User directive: remove the floating AI assistant completely and re-verify.
+
+### ✅ What was removed
+
+- **Deleted** `lib/features/ai_assistant/floating_ai_assistant_overlay.dart` (draggable bubble + multitasking chat/voice window) and `lib/features/ai_assistant/floating_assistant_controller.dart` (the app's SECOND `GeminiLiveSession` + mic + TTS owner, with its own audio-ended callback on the shared global bridge slot).
+- **`lib/main.dart`**: removed the `FloatingAiAssistantOverlay` from the top-level `Overlay`/`Stack` in `MaterialApp.builder`; the builder now returns the plain `MediaQuery` + `child`.
+- **`gemini_live_screen.dart`**: removed the three `FloatingAssistantController` handoff calls (`setFullScreenActive(true/false)`, `rearmAudioCallback`) — the screen now fully owns its session, audio bridge callback, and speaking state for its whole lifecycle.
+- **`service_locator.dart`**: dropped the controller `resetForTesting` teardown line.
+- **All "Ask BusBuddy" entry points unaffected**: home cards, My Tickets, the booking suite's sticky bar, and settings already pushed `GeminiLiveScreen` directly.
+- **Tests**: deleted `floating_ai_assistant_test.dart` + `floating_overlay_a11y_test.dart`; trimmed the floating-controller test from `voice_session_lifecycle_test.dart` and the locator-reset test from `service_locator_lifecycle_test.dart`; re-targeted the gateway-label test in `tool_command_safety_test.dart` and the mic-fallback file assertion in `permission_flow_test.dart` to the screen (now the sole voice surface).
+
+### ✅ Why this resolves the double voice
+
+With the floating assistant gone there is exactly ONE session, ONE mic listener, and ONE audio-ended callback owner (`GeminiLiveScreen`). Every cross-owner race from the previous fix (separate arbiters over one global audio bridge, fullscreen handoff windows, competing audio-ended callbacks on the shared JS slot) is now structurally impossible rather than arbitrated. Within the screen, the Chunk 41 guarantees remain: `TtsFallbackArbiter.shared` first-starter-wins between native PCM and browser TTS, plus the 600 ms end-of-speech confirmation.
+
+- **Verification**: `flutter analyze` clean, `flutter test` **367/367 green**, docs gate pass. AGENTS.md updated: full-screen `GeminiLiveScreen` is the app's single voice surface.
