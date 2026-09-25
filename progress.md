@@ -895,3 +895,10 @@ With the floating assistant gone there is exactly ONE session, ONE mic listener,
 - **Fix**: converted both dialogs to private `StatefulWidget`s (`_GeminiSetupDialog`, `_GeminiLiveSetupDialog`) that own the controller and dispose it with their own State — i.e., only when the route actually leaves the tree. The screen's dialog receives an `onSaved(newKey)` callback so session reconnect/`setState` stays on the screen.
 - **Regression test**: `test/features/ai_assistant/gemini_api_key_dialog_test.dart` — full-app-tree dialog save asserts the dialog dismisses, the key persists, and the header flips to `⚡ GEMINI LIVE` with no framework asserts.
 - **Verification**: `flutter analyze` clean, `flutter test` **368/368 green**, docs gate pass.
+
+### ✅ Follow-up (same session, continued): double-voice report persists — live-region sentence re-read removed
+
+- **User report**: two voices still say the same sentence simultaneously after the floating assistant removal. With one session, one arbiter, and one audio owner, the app's own pipeline cannot double a reply; the only remaining component that re-speaks the reply sentence verbatim is the screen reader announcing the spoken-output live region, whose label was `'Gemini Live announcement: $_spokenOutput'` — dispatched to TalkBack/ChromeVox's voice while the app voice plays.
+- **Fix**: the live region now announces only the state transition (`Gemini is speaking` / `Gemini Live response ready`) and never interpolates the reply text; the sentence remains a regular semantics node reachable by navigation.
+- **Regression test**: `test/features/ai_assistant/live_region_single_voice_test.dart` asserts every live region on the screen uses only the stable state labels.
+- **Verification**: `flutter analyze` clean, `flutter test` **369/369 green**.

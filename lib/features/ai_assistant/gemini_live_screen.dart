@@ -818,18 +818,20 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
               const SizedBox(height: 10),
 
               // Top Status & Spoken Output Box with TalkBack LiveRegion.
-              // Single-voice: while our own PCM/TTS voice is speaking, the
-              // response text is NOT exposed as a live-region change —
-              // otherwise TalkBack/ChromeVox announces the same words over
-              // our voice (same-words double voice). The full text appears
-              // once speech ends for later review.
+              // Single-voice: the live region must NEVER carry the reply
+              // sentence. The reply is already spoken by our own PCM/TTS
+              // voice; a screen reader (TalkBack/ChromeVox) announcing the
+              // same sentence through its own voice produces exactly the
+              // "two voices saying the same words" double-audio report.
+              // Announce only the state transition; the full text stays a
+              // regular semantics node the user can navigate to on demand.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Semantics(
                   liveRegion: true,
                   label: _isSpeaking
                       ? 'Gemini is speaking'
-                      : 'Gemini Live announcement: $_spokenOutput',
+                      : 'Gemini Live response ready',
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
