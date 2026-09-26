@@ -16,8 +16,8 @@ void main() {
     });
 
     test('AudioSpeechEngine dispose completes cleanly without throwing', () {
-      const engine = AudioSpeechEngine();
-      expect(() => engine.dispose(), returnsNormally);
+      final engine = AudioSpeechEngine();
+      expect(engine.dispose, returnsNormally);
     });
   });
 

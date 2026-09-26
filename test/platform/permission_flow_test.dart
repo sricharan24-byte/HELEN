@@ -21,7 +21,7 @@ void main() {
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     });
 
-    test('main manifest declares no runtime-dangerous permissions', () {
+    test('main manifest declares only the audited permission set', () {
       final declared = RegExp(r'android:name="(android\.permission\.[A-Z_]+)"')
           .allMatches(mainManifest)
           .map((m) => m.group(1)!)
@@ -43,8 +43,19 @@ void main() {
         'android.permission.POST_NOTIFICATIONS',
       };
 
-      expect(declared.intersection(dangerous), isEmpty);
-      expect(declared, equals({'android.permission.INTERNET'}));
+      // RECORD_AUDIO is the one dangerous permission kept, and only while
+      // BusBuddyVoiceChannel.kt backs it with a working capability, a
+      // just-in-time request, and an accessible denial fallback.
+      const auditedDangerous = {'android.permission.RECORD_AUDIO'};
+      expect(declared.intersection(dangerous).difference(auditedDangerous), isEmpty);
+      expect(
+        declared,
+        equals(const {
+          'android.permission.INTERNET',
+          'android.permission.RECORD_AUDIO',
+          'android.permission.MODIFY_AUDIO_SETTINGS',
+        }),
+      );
     });
 
     test('debug and profile flavor manifests do not re-add dangerous permissions', () {
@@ -94,8 +105,14 @@ void main() {
       }
     });
 
-    test('no Android or Dart runtime permission request APIs are linked', () {
-      final androidHits = <String>[];
+    test('microphone permission request stays confined to the native voice channel', () {
+      const auditedVoiceFiles = {
+        'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
+        'android/app/src/main/kotlin/com/busbuddy/app/MainActivity.kt',
+      };
+
+      final micHits = <String>[];
+      final locationHits = <String>[];
       final androidRoot = Directory('android');
       if (androidRoot.existsSync()) {
         for (final entity in androidRoot.listSync(recursive: true)) {
@@ -109,17 +126,37 @@ void main() {
           // Skip generated/build outputs if present.
           if (path.contains('/build/')) continue;
           final content = entity.readAsStringSync();
+          if (content.contains('Manifest.permission.ACCESS_FINE_LOCATION') ||
+              content.contains('Manifest.permission.ACCESS_COARSE_LOCATION') ||
+              content.contains('registerForActivityResult')) {
+            locationHits.add(path);
+          }
           if (content.contains('ActivityCompat.requestPermissions') ||
-              content.contains('registerForActivityResult') ||
-              content.contains('RequestPermission') ||
-              content.contains('Manifest.permission.RECORD_AUDIO') ||
-              content.contains('Manifest.permission.ACCESS_FINE_LOCATION') ||
-              content.contains('Manifest.permission.ACCESS_COARSE_LOCATION')) {
-            androidHits.add(path);
+              content.contains('Manifest.permission.RECORD_AUDIO')) {
+            micHits.add(path);
           }
         }
       }
-      expect(androidHits, isEmpty, reason: androidHits.join(', '));
+
+      // Location never comes back: it is fixture-based, no runtime surface.
+      expect(locationHits, isEmpty, reason: locationHits.join(', '));
+
+      // The mic prompt may exist in exactly one place, and MainActivity must
+      // only forward the result rather than request anything itself.
+      expect(micHits.toSet().difference(auditedVoiceFiles), isEmpty,
+          reason: micHits.join(', '));
+      final voiceChannel = File(
+        'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
+      );
+      expect(voiceChannel.existsSync(), isTrue);
+      final voiceSource = voiceChannel.readAsStringSync();
+      expect(voiceSource, contains('AudioRecord'));
+      expect(voiceSource, contains('shouldShowRequestPermissionRationale'));
+      final mainActivity = File(
+        'android/app/src/main/kotlin/com/busbuddy/app/MainActivity.kt',
+      ).readAsStringSync();
+      expect(mainActivity, contains('handlePermissionResult'));
+      expect(mainActivity, isNot(contains('ActivityCompat.requestPermissions')));
 
       final dartHits = <String>[];
       final libRoot = Directory('lib');

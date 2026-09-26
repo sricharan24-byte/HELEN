@@ -13,7 +13,7 @@ void main() {
 
     test('when gate is false, startListening fails gracefully without fake query', () {
       AudioSpeechEngine.enableSimulatedVoiceInput = false;
-      const engine = AudioSpeechEngine();
+      final engine = AudioSpeechEngine();
 
       String? receivedText;
       String? receivedError;
@@ -39,7 +39,7 @@ void main() {
 
     test('when gate is explicitly true, simulated voice query is emitted', () {
       AudioSpeechEngine.enableSimulatedVoiceInput = true;
-      const engine = AudioSpeechEngine();
+      final engine = AudioSpeechEngine();
 
       String? receivedText;
       String? receivedError;

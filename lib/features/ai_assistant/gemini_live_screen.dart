@@ -41,7 +41,7 @@ class GeminiLiveScreen extends StatefulWidget {
 class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     with SingleTickerProviderStateMixin {
   final GeminiLiveService _liveService = const GeminiLiveService();
-  final AudioSpeechEngine _audioEngine = const AudioSpeechEngine();
+  final AudioSpeechEngine _audioEngine = AudioSpeechEngine();
   final AppAutomationController _automation = AppAutomationController();
 
   late final TicketController _ticketController;

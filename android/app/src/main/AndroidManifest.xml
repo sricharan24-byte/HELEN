@@ -13,6 +13,19 @@
          accessible denial fallback (see docs/audit BUS-P2-01). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- BUS-P2-01 update (native full-duplex voice): RECORD_AUDIO is now backed by
+         a real capability — android.media.AudioRecord in BusBuddyVoiceChannel feeds
+         the Gemini Live WebSocket. It is requested just-in-time (only when the
+         passenger taps the mic orb), preceded by an announced contextual rationale,
+         and denial keeps the text-only journey and device-TTS output working.
+         MODIFY_AUDIO_SETTINGS (normal level) lets playback use the voice-communication
+         route so hardware echo cancellation suppresses self-listen. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+
     <application
         android:label="BusBuddy"
         android:name="${applicationName}"

@@ -54,18 +54,35 @@ void main() {
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     });
 
-    test('declares only INTERNET as a uses-permission', () {
+    test('declares INTERNET plus the audited voice permissions', () {
       final declared = RegExp(r'android:name="(android\.permission\.[A-Z_]+)"')
           .allMatches(manifest)
           .map((m) => m.group(1)!)
           .toSet();
-      expect(declared, equals({'android.permission.INTERNET'}));
+      expect(
+        declared,
+        equals(const {
+          'android.permission.INTERNET',
+          'android.permission.RECORD_AUDIO',
+          'android.permission.MODIFY_AUDIO_SETTINGS',
+        }),
+      );
     });
 
-    test('does not declare location or microphone permissions', () {
+    test('location stays absent and microphone is capability-backed', () {
       expect(manifest, isNot(contains('android.permission.ACCESS_FINE_LOCATION')));
       expect(manifest, isNot(contains('android.permission.ACCESS_COARSE_LOCATION')));
-      expect(manifest, isNot(contains('android.permission.RECORD_AUDIO')));
+      // RECORD_AUDIO is allowed only while a real native capability exists:
+      // AudioRecord capture plus a just-in-time runtime request (BUS-P2-01).
+      final voice = File(
+        'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
+      );
+      expect(voice.existsSync(), isTrue);
+      final voiceSource = voice.readAsStringSync();
+      expect(voiceSource, contains('AudioRecord'));
+      expect(voiceSource, contains('Manifest.permission.RECORD_AUDIO'));
+      expect(voiceSource, contains('ActivityCompat.requestPermissions'));
+      expect(manifest, contains('just-in-time'));
     });
 
     test('documents re-add rationale for removed permissions', () {

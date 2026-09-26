@@ -91,7 +91,14 @@ void main() {
           .allMatches(manifest)
           .map((m) => m.group(1)!)
           .toSet();
-      expect(declared, equals({'android.permission.INTERNET'}));
+      expect(
+        declared,
+        equals(const {
+          'android.permission.INTERNET',
+          'android.permission.RECORD_AUDIO',
+          'android.permission.MODIFY_AUDIO_SETTINGS',
+        }),
+      );
     });
 
     test('device release-smoke tooling is present for P2 exit criteria', () {
