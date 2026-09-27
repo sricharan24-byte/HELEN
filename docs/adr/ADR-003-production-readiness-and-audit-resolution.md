@@ -33,6 +33,7 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 
 ### `BUS-P0-04`: Resource Lifecycle Disposals & Coroutine Leaks
 - **Implementation**: Added comprehensive lifecycle disposals in `LiveLocationScreen`, `TicketController`, and speech sessions. Active `StreamSubscription` and `Timer` instances are cancelled in `dispose()`.
+- **Android update (2026-09-26)**: The native voice bridge is released on teardown — `MainActivity.onDestroy`/`configureFlutterEngine` dispose the retired `BusBuddyVoiceChannel` (`AudioRecord`, `AudioTrack`, `TextToSpeech`, executors), `NativeAudioChannel.dispose()` marks the singleton spent so a later start cannot add to a closed controller, and `GeminiLiveScreen.dispose()` cancels the open spoken turn so no microphone handle survives the screen. See ADR-004.
 - Implemented `AsyncDisposable` on `LocalTransportRepository` and `LocalTransportDataSource`.
 - **Verification**: `test/data/telemetry_lifecycle_leak_test.dart`.
 
@@ -43,7 +44,8 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 
 ### `BUS-P0-06`: Production Gating for Simulated Voice Input
 - **Implementation**: Feature-gated `enableSimulatedVoiceInput` to `false` by default across `audio_speech_engine.dart` and web speech adapters, preventing mock voice queries from firing in production web builds.
-- **Verification**: `test/features/voice_simulation_gate_test.dart`.
+- **Android update (2026-09-26)**: Android now answers spoken questions for real by streaming microphone PCM into the Gemini Live session, so the platform no longer depends on the fallback message for input. The no-fabrication rule still holds: a transcript is never invented, `inputTranscription` text is display-only, and every failure states its reason. See ADR-004.
+- **Verification**: `test/features/voice_simulation_gate_test.dart`, `test/features/ai_assistant/android_voice_turn_test.dart`.
 
 ### `BUS-P0-07`: Text Scaling & Overflow Elimination
 - **Implementation**: Replaced rigid height constraints with responsive sizing and wrapped scrolling views to support large text scales up to 300% without layout overflow exceptions.
@@ -109,6 +111,7 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 ### 5.2 `BUS-P2-01`: minimize Android permissions (code-complete)
 
 - **Decision**: `android/app/src/main/AndroidManifest.xml` declares only `INTERNET`. `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, and `RECORD_AUDIO` were removed because no native capability consumes them (no location/audio plugins in the dependency closure; location is fixture-backed, voice is web speech on Chrome).
+- **Superseded in part (2026-09-26, ADR-004)**: `RECORD_AUDIO` is legitimately back — `BusBuddyVoiceChannel` now captures microphone PCM with `android.media.AudioRecord` and streams it to the Gemini Live session, so the permission finally has a real consumer. It ships with the three conditions this section demanded: a just-in-time runtime request, an announced contextual rationale before the system prompt, and an accessible denial fallback (text box kept). `MODIFY_AUDIO_SETTINGS` (normal level) was added alongside it to hold the voice-communication route so hardware echo cancellation suppresses self-listen. `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` remain removed — location is still fixture-backed. The audited set is now exactly `INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, enforced by both `tool/ci/verify_docs.sh` and `test/platform/docs_verification_test.dart`.
 - **Rationale note**: re-introducing a permission requires a just-in-time runtime request, a contextual rationale before the system prompt, and an accessible denial fallback (Astra Gate 12).
 - **Open**: ~~flavor-scoped manifest-merge tests and runtime permission-flow tests~~ — **closed 2026-09-22**: `test/platform/permission_flow_test.dart` locks INTERNET-only main + flavor manifests, asserts no request APIs/plugins, documents re-add rationale (JIT + rationale + denial fallback), and verifies browser-mic / offline-map feature fallbacks. Instrumented deny/revoke flows remain N/A until a runtime permission is reintroduced.
 

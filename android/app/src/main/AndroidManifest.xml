@@ -1,25 +1,29 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- BUS-P2-01 (Astra Gate 12, privacy minimization): INTERNET is the only
-         permission justified by a working capability. It backs OpenStreetMap
-         tile loading, OSRM route requests, and the Gemini Live WebSocket.
+    <!-- BUS-P2-01 (Astra Gate 12, privacy minimization): every permission below is
+         justified by a working capability, and nothing else is declared.
 
-         Deliberately removed (no matching native capability in the dependency
-         tree — no geolocator/permission_handler/record plugins; location is
-         fixture-based and voice input runs through web speech APIs on Chrome):
+         INTERNET backs OpenStreetMap tile loading, OSRM route requests, and the
+         Gemini Live WebSocket.
+
+         Deliberately removed (no matching native capability consumes them — the
+         dependency tree has no geolocator/permission_handler plugin, and location
+         is fixture-based):
            - ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
-           - RECORD_AUDIO
-         Re-add a permission only together with a just-in-time runtime request,
-         a contextual purpose rationale shown before the system prompt, and an
-         accessible denial fallback (see docs/audit BUS-P2-01). -->
+
+         Re-add a permission only together with a just-in-time runtime request, a
+         contextual purpose rationale shown before the system prompt, and an
+         accessible denial fallback (see docs/audit BUS-P2-01, docs/adr/ADR-004). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- BUS-P2-01 update (native full-duplex voice): RECORD_AUDIO is now backed by
-         a real capability — android.media.AudioRecord in BusBuddyVoiceChannel feeds
-         the Gemini Live WebSocket. It is requested just-in-time (only when the
-         passenger taps the mic orb), preceded by an announced contextual rationale,
-         and denial keeps the text-only journey and device-TTS output working.
-         MODIFY_AUDIO_SETTINGS (normal level) lets playback use the voice-communication
-         route so hardware echo cancellation suppresses self-listen. -->
+    <!-- BUS-P2-01 update (ADR-004, native full-duplex voice): RECORD_AUDIO is now
+         backed by a real capability — android.media.AudioRecord in
+         BusBuddyVoiceChannel streams 16 kHz mono PCM to the Gemini Live WebSocket.
+         It is requested just-in-time (only when the passenger taps the mic orb),
+         preceded by an announced contextual rationale, and denial keeps the
+         text-only journey and device-TTS output working.
+         MODIFY_AUDIO_SETTINGS (normal level) lets playback use the
+         voice-communication route so hardware echo cancellation suppresses
+         self-listen. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature

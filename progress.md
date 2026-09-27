@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 25, 2026 (Chunk 43: voice-reply feature rebuilt as single-speaker TTS — Gemini PCM path + TTS arbiter removed; 349/349 tests, analyze clean)
+**Last Updated**: September 26, 2026 (Chunk 44: Android spoken questions reach Gemini Live — microphone PCM streamed via `realtimeInput`, owned by `AndroidVoiceTurn`; ADR-004 recorded; permission contract re-audited; 365/365 tests, analyze clean, docs gate pass)
 
 ---
 
@@ -923,3 +923,41 @@ With the floating assistant gone there is exactly ONE session, ONE mic listener,
 - **Trade-off (accepted by rebuild directive)**: replies are spoken in the browser's SpeechSynthesis voice instead of Gemini's native audio persona. Voice/model settings still govern recognition language, rate, and the Live session model.
 
 - **Verification**: `flutter analyze` clean, `flutter test` **349/349 green**, docs gate pass. AGENTS.md rewritten (Single-Speaker Audio Architecture).
+
+---
+
+## 🛠️ Session Log — 2026-09-26: Chunk 44 — Android Spoken Questions Reach Gemini Live (Audio-In)
+
+> **Context**: ADR-004's native bridge landed in `75c13ab`, but Android still could only *speak*. `GeminiLiveSession` only ever sent `clientContent` text turns, and `AudioSpeechEngine.startListening` on Android reported the honest fallback ("cannot understand a spoken question yet"). For a blind passenger on a moving bus, "please type your question" is not hands-free transit assistance. This chunk closes that gap.
+
+### ✅ Audio reaches the model
+
+- **`gemini_live_session.dart`** — `sendRealtimeAudio(base64Pcm)` packs each microphone chunk into `realtimeInput.mediaChunks` with `mimeType: audio/pcm; rate=16000` (capture format == wire format, so nothing is resampled). Gated on the new `isReady` getter = socket open **and** `setupComplete` received; a frame sent before the handshake would be dropped. No `audioEnd`/`turnComplete` control frame is sent — server-side VAD ends the question, and an unrecognised control frame risks tearing down the session. `onUserTranscription` surfaces `inputTranscription` as **display-only** text (`🗣️ "…"`): the audio it describes already reached the model, so re-submitting it would double the question. The transport is now injectable (`transportFactory`) so the protocol can be tested without a socket.
+
+### ✅ One spoken turn, as an explicit object
+
+- **`android_voice_turn.dart`** (new, 127 L) — `AndroidVoiceTurn` owns a single spoken turn: it subscribes to PCM **and** error streams, forwards base64 frames, and reports **every** failure exactly once via `onTurnLost(reason, microphoneUnavailable)`. `microphoneUnavailable: true` is reserved for permission/device faults the passenger can actually fix; a socket that cannot take audio reports `false` so the UI does not raise a microphone warning for a connection problem. The error stream is subscribed *before* the mic opens, so an immediate `AudioRecord` failure cannot land in a stream nobody is listening to. Plain Dart with injected streams, so the whole state machine is unit-testable without a device.
+
+### ✅ Screen integration
+
+- **`gemini_live_screen.dart`** — `_startAndroidVoiceTurn()` waits up to 4 s (`_awaitLiveReady`) before opening the microphone, so a spoken question is never lost to a still-connecting socket, and capture is never opened on a dead one. `pause()`/`resume()` bracket the single-speaker reply path, so the assistant's own voice can never be re-heard as the next question while the stream stays open for genuine interruptions (`onInterrupted` resumes feeding). The turn is released on text turns, mic-off taps, and `dispose()`.
+- **`audio_speech_engine.dart`** — new `supportsLiveAudioInput` / `openLiveMicrophone` / `closeLiveMicrophone` / `liveMicrophonePcm` / `liveMicrophoneErrors`. `startListening` on Android is now a thin honest fallback over the same permission flow, and it no longer leaves the recording indicator lit while the assistant cannot hear (BUS-P1-08).
+- **`native_audio_channel.dart`** — `AudioRecord` stream errors are republished on `microphoneErrors` instead of only being logged, so a "Listening…" promise can never be left unfulfillable. `dispose()` sets `_disposed`, making `isSupported` false so a reused singleton degrades quietly instead of adding to a closed controller.
+
+### ✅ Docs gate repaired (the real gap in this chunk)
+
+`tool/ci/verify_docs.sh` still enforced the pre-ADR-004 **INTERNET-only** contract, so the gate was **failing** even though every Dart test had been updated — the shell check and `docs_verification_test.dart` disagreed about which permissions are legal. Fixed by:
+
+- Asserting the exact audited set (`INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`) rather than INTERNET-only, with a comment stating that adding a permission is a deliberate contract change requiring ADR + manifest rationale + test updates in the same change.
+- Adding two checks that were missing entirely: `RECORD_AUDIO` must be requested at runtime by a real `AudioRecord` consumer (so the permission can never be declared without a capability), and `docs_verification_test.dart` must stay in sync with the shell gate.
+- Adding `ADR-004` to the gate's required-file list.
+- Rewriting the manifest's self-contradicting comment (it still claimed `RECORD_AUDIO` was "deliberately removed" directly above the line declaring it) and marking the ADR-003 §5.2 permission decision as superseded in part.
+
+Verified the repaired gate is not vacuous: injecting a `ACCESS_FINE_LOCATION` declaration makes it fail, and restoring the manifest makes it pass.
+
+### ✅ Files
+
+`lib/features/ai_assistant/android_voice_turn.dart` (new) · `gemini_live_session.dart` · `gemini_live_screen.dart` · `audio_speech_engine.dart` · `native_audio_channel.dart` · `test/features/ai_assistant/android_voice_turn_test.dart` (new, 8 tests) · `docs/adr/ADR-004-android-native-voice-io.md` (new) · `docs/adr/ADR-003-...md` · `android/app/src/main/AndroidManifest.xml` · `tool/ci/verify_docs.sh` · `progress.md` · `README.md` · `AGENTS.md`
+
+- **Verification**: `flutter analyze` clean, `flutter test` **365/365 green**, `tool/ci/verify_docs.sh` **PASSED**.
+- **⚠️ Not verified on hardware** — no Android SDK/emulator in this environment. Device checklist (ADR-004 §3): permission dialog wording, no echo/feedback loop on speakerphone, `adb logcat -s BusBuddyVoiceChannel:V` channel activity, TalkBack announcements for the listening and permission-blocked states. Do not report this chunk as device-verified until `flutter run -d android` has been done.

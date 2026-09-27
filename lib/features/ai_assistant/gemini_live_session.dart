@@ -19,7 +19,9 @@ class GeminiLiveSession {
     this.onError,
     this.onStatusChanged,
     this.onInterrupted,
-  });
+    this.onUserTranscription,
+    GeminiLiveTransport Function()? transportFactory,
+  }) : _transportFactory = transportFactory ?? createGeminiLiveTransport;
 
   final void Function(String text)? onTextChunk;
   final void Function(String pcmBase64)? onAudioPcmChunk;
@@ -28,6 +30,14 @@ class GeminiLiveSession {
   final void Function(String error)? onError;
   final void Function(String status, bool isConnected)? onStatusChanged;
   final VoidCallback? onInterrupted;
+
+  /// Partial transcript of what the *passenger* said, when the session reports
+  /// one. Display-only: the audio turn already reached the model, so this text
+  /// must never be re-sent as a new turn.
+  final void Function(String text)? onUserTranscription;
+
+  /// Injectable for tests; production always uses the platform WebSocket.
+  final GeminiLiveTransport Function() _transportFactory;
 
   GeminiLiveTransport? _transport;
   bool _isConnected = false;
@@ -45,6 +55,37 @@ class GeminiLiveSession {
   int get reconnectAttempts => _reconnectAttempts;
 
   bool get isConnected => _isConnected && (_transport?.isConnected ?? false);
+
+  /// True once the setup handshake is acknowledged: the only moment microphone
+  /// audio may be streamed ([sendRealtimeAudio] drops frames otherwise).
+  bool get isReady => isConnected && _isSetupDone;
+
+  /// Live API wire format for streamed microphone audio: 16 kHz mono PCM16,
+  /// which is exactly what `BusBuddyVoiceChannel` captures.
+  static const String inputAudioMime = 'audio/pcm; rate=16000';
+
+  /// Streams one microphone chunk into the live turn (`realtimeInput`).
+  ///
+  /// Server-side voice activity detection closes the turn when the passenger
+  /// stops talking, so no explicit "end of turn" frame is sent — an unknown
+  /// control frame would risk tearing down the whole session.
+  ///
+  /// Returns false when the session cannot accept audio; callers must fall back
+  /// to text input rather than silently dropping what the passenger said.
+  bool sendRealtimeAudio(String base64Pcm) {
+    if (base64Pcm.isEmpty) return false;
+    if (!isReady) return false;
+    _transport?.send(
+      jsonEncode({
+        'realtimeInput': {
+          'mediaChunks': [
+            {'mimeType': inputAudioMime, 'data': base64Pcm},
+          ],
+        },
+      }),
+    );
+    return true;
+  }
 
   String get effectiveApiKey => AppSettingsController.instance.geminiApiKey;
   String get effectiveModel => AppSettingsController.instance.geminiModel;
@@ -110,7 +151,7 @@ CRITICAL CONVERSATIONAL RULES:
     final url =
         'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=$apiKey';
 
-    _transport = createGeminiLiveTransport();
+    _transport = _transportFactory();
 
     _transport!.connect(
       url,
@@ -318,6 +359,17 @@ CRITICAL CONVERSATIONAL RULES:
         if (serverContent['interrupted'] == true) {
           debugPrint('[GeminiLive] Model audio playback interrupted by user');
           onInterrupted?.call();
+        }
+
+        // Input transcription: what the passenger just said. Parsed only when
+        // the session reports it (it is requested on audio-in sessions), and
+        // used purely for the on-screen "I heard you say" line.
+        final userTrans = serverContent['inputTranscription'];
+        if (userTrans is Map<String, dynamic>) {
+          final text = userTrans['text'];
+          if (text is String && text.isNotEmpty) {
+            onUserTranscription?.call(text);
+          }
         }
 
         // Output transcription (text stream of spoken response)

@@ -146,6 +146,47 @@ class AudioSpeechEngine {
     if (fireEnded) _onEnded?.call();
   }
 
+  /// True when this platform can stream microphone PCM into the live session:
+  /// Android with `BusBuddyVoiceChannel` registered. Web uses the Web Speech
+  /// API path, and desktop/tests use neither.
+  bool get supportsLiveAudioInput => !kIsWeb && _native.isSupported;
+
+  /// Microphone PCM for a voice turn; subscribe after [openLiveMicrophone]
+  /// returns null.
+  Stream<Uint8List> get liveMicrophonePcm => _native.microphone;
+
+  /// Reasons the native capture thread gave for going quiet mid-turn (device
+  /// input unusable, access revoked). A turn must be released on any event.
+  Stream<String> get liveMicrophoneErrors => _native.microphoneErrors;
+
+  /// Opens native microphone capture for a voice turn, asking `RECORD_AUDIO`
+  /// just in time (the screen has already announced the purpose).
+  ///
+  /// Returns `null` on success, otherwise a passenger-facing reason that already
+  /// tells them to fall back to the text box (BUS-P0-06 / BUS-P1-08).
+  Future<String?> openLiveMicrophone() async {
+    if (!supportsLiveAudioInput) return noRecognitionFallbackMessage;
+    if (!await _native.isChannelAvailable()) {
+      // Desktop runs or a build without the native plugin: no mic at all.
+      return noRecognitionFallbackMessage;
+    }
+    if (!await _native.hasMicrophonePermission()) {
+      final reply = await _native.requestMicrophonePermission();
+      if (!reply.granted) {
+        return reply.permanentlyDenied
+            ? 'Microphone access is turned off for BusBuddy in Android settings. Please type your question.'
+            : 'Microphone permission was not granted. Please type your question.';
+      }
+    }
+    if (!await _native.startMicrophone()) {
+      return 'The microphone could not be opened on this device. Please type your question.';
+    }
+    return null;
+  }
+
+  /// Releases microphone capture taken by [openLiveMicrophone].
+  Future<void> closeLiveMicrophone() => _native.stopMicrophone();
+
   /// Starts listening to the user's microphone for live voice speech recognition.
   void startListening({
     required void Function(String text, bool isFinal) onResult,
@@ -171,41 +212,27 @@ class AudioSpeechEngine {
     }
   }
 
-  /// Android microphone entry point: runs the just-in-time `RECORD_AUDIO`
-  /// request (the screen has already announced why) and then reports the honest
-  /// capability state.
+  /// Transcript-free Android path for callers that cannot stream microphone
+  /// audio into a live session: it still runs the honest permission flow, then
+  /// says plainly that a spoken question is not understood yet.
   ///
-  /// Spoken question recognition still needs the Gemini Live audio-in protocol
-  /// (microphone PCM → `BidiGenerateContent`), which is not wired up yet, so the
-  /// passenger is told plainly and keeps the text box. No transcript is ever
-  /// invented here: BUS-P0-06 keeps [enableSimulatedVoiceInput] off in
-  /// production, and this path never fabricates one either.
+  /// No transcript is invented here: BUS-P0-06 keeps [enableSimulatedVoiceInput]
+  /// off in production, and this path never fabricates one either. Passengers
+  /// keep the text box, and the microphone is not left open doing nothing —
+  /// lighting the recording indicator while the assistant cannot hear would
+  /// mislead a TalkBack user (BUS-P1-08).
   Future<void> _startAndroidListening({
     required void Function(String text, bool isFinal) onResult,
     required void Function(String error) onError,
     required VoidCallback onEnd,
   }) async {
-    if (!await _native.isChannelAvailable()) {
-      // Desktop runs or a build without the native plugin: no mic at all.
-      onError(noRecognitionFallbackMessage);
-      onEnd();
-      return;
-    }
-    if (!await _native.hasMicrophonePermission()) {
-      final reply = await _native.requestMicrophonePermission();
-      if (!reply.granted) {
-        onError(reply.permanentlyDenied
-            ? 'Microphone access is turned off for BusBuddy in Android settings. Please type your question.'
-            : 'Microphone permission was not granted. Please type your question.');
-        onEnd();
-        return;
-      }
-    }
-    // Capture is deliberately not opened yet: nothing consumes the PCM until
-    // the Live audio-in protocol is wired, and lighting the recording indicator
-    // while the assistant cannot hear would mislead a TalkBack user (BUS-P1-08).
-    onError('BusBuddy can speak to you on this device, but it cannot understand a '
-        'spoken question yet. Please type your question.');
+    final reason = await openLiveMicrophone();
+    if (reason == null) await closeLiveMicrophone();
+    onError(
+      reason ??
+          'BusBuddy can speak to you on this device, but this screen cannot turn '
+              'a spoken question into a request yet. Please type your question.',
+    );
     onEnd();
   }
 

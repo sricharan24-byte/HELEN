@@ -17,6 +17,7 @@ required_files=(
   docs/adr/ADR-001-phase1-domain-and-a11y-contracts.md
   docs/adr/ADR-002-phase2-accessibility-and-safety-architecture.md
   docs/adr/ADR-003-production-readiness-and-audit-resolution.md
+  docs/adr/ADR-004-android-native-voice-io.md
   docs/audit/gpt6_astra_feedback_phase2.txt
   docs/audit/gpt6_astra_paper.txt
   .github/workflows/ci.yml
@@ -60,16 +61,44 @@ else
   err "release build missing minify/shrink flags"
 fi
 
-# BUS-P2-01: main manifest must remain INTERNET-only.
-# Match only real <uses-permission> tags (not comments that mention removed
-# permissions as rationale).
+# BUS-P2-01: the main manifest must declare exactly the audited permission set —
+# no more, no less. Match only real <uses-permission> tags (not comments that
+# mention removed permissions as rationale).
+#   INTERNET              — OSM tiles, OSRM routing, Gemini Live WebSocket
+#   RECORD_AUDIO          — AudioRecord capture streamed to the live session
+#                           (ADR-004); requested just-in-time behind an announced
+#                           rationale, with a text-only denial fallback
+#   MODIFY_AUDIO_SETTINGS — normal level; keeps the voice-communication route so
+#                           hardware echo cancellation suppresses self-listen
+# Adding a permission here is a deliberate contract change, not a convenience:
+# update ADR-004, the manifest rationale comment, and
+# test/platform/docs_verification_test.dart in the same change.
 manifest=android/app/src/main/AndroidManifest.xml
+expected_perms=$'android.permission.INTERNET\nandroid.permission.MODIFY_AUDIO_SETTINGS\nandroid.permission.RECORD_AUDIO'
 declared_perms="$(grep -oE 'android:name="android\.permission\.[A-Z_]+"' "$manifest" \
   | sed 's/android:name="//;s/"//' | sort -u || true)"
-if [[ "$declared_perms" == "android.permission.INTERNET" ]]; then
-  note "manifest permission minimization holds (INTERNET only)"
+if [[ "$declared_perms" == "$expected_perms" ]]; then
+  note "manifest permission minimization holds (audited set: INTERNET, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)"
 else
-  err "manifest permission set drifted from BUS-P2-01 contract: got [$declared_perms]"
+  err "manifest permission set drifted from the BUS-P2-01/ADR-004 contract: got [$declared_perms]"
+fi
+
+# The dangerous permission must stay behind a just-in-time runtime request with
+# an accessible denial fallback (BUS-P0-01 privacy / BUS-P1-08 honesty).
+channel=android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt
+if [[ -f "$channel" ]] && grep -q 'Manifest.permission.RECORD_AUDIO' "$channel" \
+  && grep -q 'AudioRecord' "$channel"; then
+  note "RECORD_AUDIO is requested at runtime by a real capture capability"
+else
+  err "RECORD_AUDIO declared without a runtime request and AudioRecord consumer"
+fi
+
+# The Dart-side contract check must agree with the shell gate, or CI enforces two
+# different permission contracts.
+if grep -q 'MODIFY_AUDIO_SETTINGS' test/platform/docs_verification_test.dart; then
+  note "docs_verification_test.dart permission contract matches the gate"
+else
+  err "docs_verification_test.dart is out of sync with the verify_docs.sh permission contract"
 fi
 
 # Flavor manifests must not reintroduce removed permissions.

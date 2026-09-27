@@ -14,6 +14,7 @@ import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../domain/assistant/assistant_command.dart';
+import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
 import 'gemini_live_service.dart';
@@ -52,6 +53,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _isListening = true;
   bool _isSpeaking = false;
   bool _isPermissionBlocked = false;
+
+  /// Open Android spoken turn, if any. Android has no on-device speech-to-text,
+  /// so a turn is an open microphone stream rather than a pending transcript.
+  AndroidVoiceTurn? _voiceTurn;
   int _turnCounter = 0;
   Timer? _watchdogTimer;
   String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
@@ -144,6 +149,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         if (!silentProtocol && _spokenOutput.isNotEmpty) {
           final spoken = _spokenOutput;
           debugPrint('[SingleVoice] speaking turn via TTS (turn $_turnCounter)');
+          // Android keeps one microphone stream across turns: withhold its frames
+          // while the assistant talks so the reply is never heard as a question.
+          _pauseVoiceTurn();
           _audioEngine.stop();
           _audioEngine.speak(spoken);
           _armWatchdog();
@@ -157,6 +165,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         if (!mounted) return;
         _executeAction(actionType, args);
       },
+      onUserTranscription: (text) {
+        if (!mounted) return;
+        // Display only. The microphone audio already reached the model, so this
+        // text must never be re-submitted as a new text turn.
+        setState(() {
+          _liveTranscription = '🗣️ "$text"';
+        });
+      },
       onInterrupted: () {
         if (!mounted) return;
         _audioEngine.stop();
@@ -166,6 +182,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         setState(() {
           _isSpeaking = false;
         });
+        // The passenger talked over the assistant: keep their microphone stream
+        // feeding the session so the interruption is understood as a question.
+        _resumeVoiceTurn();
         if (_continuousListening && !_isListening) {
           _scheduleRestartListening(delayMs: 300, playChimeTone: true);
         }
@@ -209,6 +228,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       setState(() {
         _isSpeaking = false;
       });
+      // Android never restarts a stream that stayed open: it just resumes
+      // feeding frames, which is why the pause happens in the speak path.
+      _resumeVoiceTurn();
       if (_continuousListening && !_isListening) {
         _scheduleRestartListening(delayMs: 350, playChimeTone: true);
       }
@@ -243,6 +265,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _speechTimer?.cancel();
     _watchdogTimer?.cancel();
     _liveSession.dispose();
+    unawaited(_releaseAndroidVoiceTurn());
     _audioEngine.stopListening();
     _audioEngine.stop();
     _pulseController.dispose();
@@ -290,6 +313,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isSpeaking = false;
       _liveTranscription = 'Listening... Speak into your microphone.';
     });
+
+    if (_audioEngine.supportsLiveAudioInput) {
+      // Android has no on-device speech-to-text, so the microphone PCM itself is
+      // streamed into the live session instead of a locally recognised string.
+      unawaited(_startAndroidVoiceTurn());
+      return;
+    }
 
     _audioEngine.startListening(
       onResult: (text, isFinal) {
@@ -365,6 +395,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   void _stopMicrophoneListening() {
     _continuousListening = false;
     _restartListenTimer?.cancel();
+    unawaited(_releaseAndroidVoiceTurn());
     _audioEngine.stopListening();
     if (mounted) {
       setState(() {
@@ -373,6 +404,87 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       });
     }
   }
+
+  /// Android spoken turn: streams microphone PCM into the live session for as
+  /// long as the turn is open, and hands the passenger back to the text box on
+  /// any failure.
+  ///
+  /// Nothing is transcribed locally and nothing is submitted as a text turn: the
+  /// session's voice-activity detection decides when the question ended, and the
+  /// reply arrives through the normal speak-exactly-once path.
+  Future<void> _startAndroidVoiceTurn() async {
+    await _releaseAndroidVoiceTurn();
+    if (!mounted) return;
+
+    // Never open the microphone on a socket that is still handshaking: its first
+    // frames would be dropped and the turn would end the moment it started.
+    if (!await _awaitLiveReady()) {
+      _releaseAndroidVoiceTurnUi(
+        'BusBuddy is still connecting, so the microphone stayed off. Please type '
+        'your question, or tap the microphone orb again in a moment.',
+        false,
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final turn = AndroidVoiceTurn(
+      openMicrophone: _audioEngine.openLiveMicrophone,
+      closeMicrophone: _audioEngine.closeLiveMicrophone,
+      microphonePcm: () => _audioEngine.liveMicrophonePcm,
+      microphoneErrors: () => _audioEngine.liveMicrophoneErrors,
+      sendAudio: _liveSession.sendRealtimeAudio,
+      onTurnLost: _releaseAndroidVoiceTurnUi,
+    );
+    _voiceTurn = turn;
+    await turn.start();
+    if (mounted && identical(_voiceTurn, turn) && !turn.isActive) {
+      // start() failed and the loss was already reported through onTurnLost.
+      _voiceTurn = null;
+    }
+  }
+
+  /// Waits briefly for the Live handshake so a spoken question is never lost to a
+  /// connecting socket.
+  Future<bool> _awaitLiveReady({int timeoutMs = 4000}) async {
+    final deadline = DateTime.now().add(Duration(milliseconds: timeoutMs));
+    while (mounted) {
+      if (_liveSession.isReady) return true;
+      if (AppSettingsController.instance.geminiApiKey.isEmpty) return false;
+      if (!DateTime.now().isBefore(deadline)) break;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    return mounted && _liveSession.isReady;
+  }
+
+  /// Speaks failure honestly and in proportion: a microphone the passenger has to
+  /// fix (permission, device) raises the blocking panel with its Try Again
+  /// control, while a connection problem only shows the reason next to the text
+  /// box that still works.
+  void _releaseAndroidVoiceTurnUi(String reason, bool microphoneUnavailable) {
+    if (!mounted) return;
+    unawaited(_releaseAndroidVoiceTurn());
+    _restartListenTimer?.cancel();
+    if (microphoneUnavailable) _continuousListening = false;
+    setState(() {
+      _isListening = false;
+      _isPermissionBlocked = microphoneUnavailable;
+      _liveTranscription = reason;
+    });
+  }
+
+  /// Closes the open spoken turn and releases the microphone handle.
+  Future<void> _releaseAndroidVoiceTurn() async {
+    final turn = _voiceTurn;
+    _voiceTurn = null;
+    await turn?.stop();
+  }
+
+  /// Stops feeding the microphone while the assistant speaks, so its own voice
+  /// can never be picked up as the next question.
+  void _pauseVoiceTurn() => _voiceTurn?.pause();
+
+  void _resumeVoiceTurn() => _voiceTurn?.resume();
 
   /// Echo-of-self guard: the mic can pick up the AI's own speaker output
   /// (room reverb, Bluetooth tail) and transcribe it as a new query, which
@@ -426,6 +538,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _actionExecutedThisTurn = false;
     _speechTimer?.cancel();
     _restartListenTimer?.cancel();
+    // A typed/tapped question replaces the spoken one: close the Android
+    // microphone turn so it cannot race this text turn as a second request.
+    unawaited(_releaseAndroidVoiceTurn());
     _audioEngine.stop();
     _audioEngine.stopListening();
     _audioEngine.resetTurn();

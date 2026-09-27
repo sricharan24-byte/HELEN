@@ -104,7 +104,7 @@ BusBuddy follows strict **Clean Architecture** principles separating pure busine
 
 ---
 
-## 🛡️ Production Readiness & Audit Resolutions (ADR-001, ADR-002, ADR-003)
+## 🛡️ Production Readiness & Audit Resolutions (ADR-001, ADR-002, ADR-003, ADR-004)
 
 The system resolves all **7 P0 Release Blockers** and **10 P1 Critical Tasks** audited by **GPT-6 Astra** and **Claude Opus 5**:
 
@@ -173,7 +173,7 @@ BusBuddy/
 │   ├── features/                             # Voice assistant, booking checkout dialog, home customization
 │   └── integration/                          # Process death restoration, DI lifecycle, ticket replay
 ├── docs/
-│   ├── adr/                                  # ADR-001 (Phase 1), ADR-002 (Phase 2), ADR-003 (Production Readiness)
+│   ├── adr/                                  # ADR-001 (Phase 1), ADR-002 (Phase 2), ADR-003 (Production Readiness), ADR-004 (Android native voice I/O)
 │   └── audit/                                # GPT-6 Astra & Claude Opus 5 audit specifications and feedback
 ├── .github/workflows/ci.yml                  # BUS-P2-03 CI: analyze, tests, docs, release builds, evidence
 ├── tool/
@@ -194,7 +194,7 @@ Run the complete Flutter automated test suite:
 flutter test
 ```
 
-> **Test Suite Quality**: **CI is the source of truth (BUS-P2-03)** — `.github/workflows/ci.yml` runs `flutter analyze --fatal-infos --fatal-warnings`, the full `flutter test` suite, `tool/ci/verify_docs.sh`, minified release APK + web builds, and uploads an evidence artifact stamped with the audited commit SHA and derived test count. Local `flutter test` remains green for domain contracts, integer paise precision, OSRM failure resilience, monotonic telemetry reducers, Gemini Live WebSocket handshake & exponential backoff, announcement queue preemption, floating overlay `BlockSemantics`, WCAG contrast verification, TTS fallback arbitration, Android permission minimization + runtime permission-flow contract (BUS-P2-01), release shrink config (BUS-P2-02), documentation/ADR claim checks (BUS-P2-03), and process death state restoration.
+> **Test Suite Quality**: **CI is the source of truth (BUS-P2-03)** — `.github/workflows/ci.yml` runs `flutter analyze --fatal-infos --fatal-warnings`, the full `flutter test` suite, `tool/ci/verify_docs.sh`, minified release APK + web builds, and uploads an evidence artifact stamped with the audited commit SHA and derived test count. Local `flutter test` remains green for domain contracts, integer paise precision, OSRM failure resilience, monotonic telemetry reducers, Gemini Live WebSocket handshake & exponential backoff, announcement queue preemption, single-speaker reply enforcement, WCAG contrast verification, Android spoken-turn state machine & native audio-channel degradation (ADR-004), Android permission minimization + runtime permission-flow contract (BUS-P2-01), release shrink config (BUS-P2-02), documentation/ADR claim checks (BUS-P2-03), and process death state restoration.
 
 ---
 

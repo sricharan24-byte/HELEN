@@ -48,18 +48,27 @@ class NativeAudioChannel {
 
   final StreamController<String> _nativeEvents = StreamController<String>.broadcast();
   final StreamController<Uint8List> _micChunks = StreamController<Uint8List>.broadcast();
+  final StreamController<String> _micErrors = StreamController<String>.broadcast();
   // Cancelled by stopMicrophone(), which is the documented stop call.
   // ignore: cancel_subscriptions
   StreamSubscription<dynamic>? _micSub;
   bool _handlerInstalled = false;
+  bool _disposed = false;
 
   /// True when native audio is wired up on this platform (Android today).
-  bool get isSupported => _isPlatformSupported();
+  /// False after [dispose], because the broadcast controllers are closed and a
+  /// reused singleton would throw instead of degrading quietly.
+  bool get isSupported => !_disposed && _isPlatformSupported();
 
   static bool _defaultPlatformSupported() => platformHasNativeAudio;
 
   /// Engine → app signals: `onSpeakDone`, `onPlaybackDrained`.
   Stream<String> get nativeEvents => _nativeEvents.stream;
+
+  /// Capture failures reported by `AudioRecord` (device has no usable input,
+  /// permission revoked mid-recording). Subscribers must treat any event as
+  /// "microphone is gone" and release the passenger back to text input.
+  Stream<String> get microphoneErrors => _micErrors.stream;
 
   /// Fires once the device TTS engine finishes an utterance.
   Stream<String> get onSpeakDone =>
@@ -159,7 +168,17 @@ class NativeAudioChannel {
         (chunk) {
           if (chunk is String) _micChunks.add(base64Decode(chunk));
         },
-        onError: (Object error) => debugPrint('[NativeAudio] mic stream error: $error'),
+        // `AudioRecord` reports failures (no usable input, revoked access) as a
+        // stream error. Keep the subscription alive but publish the reason so
+        // the caller can release the passenger to text input instead of leaving
+        // a "Listening..." promise that can never be fulfilled.
+        onError: (Object error) {
+          final reason = error is PlatformException
+              ? (error.message ?? error.code)
+              : error.toString();
+          debugPrint('[NativeAudio] mic stream error: $error');
+          if (!_micErrors.isClosed) _micErrors.add(reason);
+        },
       );
       return true;
     } on MissingPluginException {
@@ -176,7 +195,11 @@ class NativeAudioChannel {
   /// Live microphone PCM; subscribe after [startMicrophone] succeeds.
   Stream<Uint8List> get microphone => _micChunks.stream;
 
-  // ── Model audio playback (Gemini Live 24 kHz PCM16) ─────────────────────
+  // ── Model audio playback (Gemini Live 24 kHz PCM16) ──────────────────────
+  // NOT wired to a reply producer today, on purpose. Chunk 43's single-voice
+  // contract makes AudioSpeechEngine.speak (device TTS here) the only speech
+  // producer in the app. These calls exist for the day streamed model audio
+  // replaces TTS; wiring them alongside speak() would reintroduce two voices.
   Future<bool> startPlayback() => _invoke('startPlayback');
 
   Future<bool> writePlaybackChunk(String base64Pcm16) =>
@@ -212,8 +235,14 @@ class NativeAudioChannel {
       _handlerInstalled = false;
       _methods.setMethodCallHandler(null);
     }
+    // Marks the process-wide singleton as spent only after the native teardown
+    // call above has gone out: isSupported() reports false from here on, so a
+    // later startMicrophone() degrades quietly instead of adding to a closed
+    // broadcast controller.
+    _disposed = true;
     if (!_nativeEvents.isClosed) await _nativeEvents.close();
     if (!_micChunks.isClosed) await _micChunks.close();
+    if (!_micErrors.isClosed) await _micErrors.close();
   }
 }
 
