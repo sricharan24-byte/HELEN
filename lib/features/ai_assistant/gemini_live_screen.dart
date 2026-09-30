@@ -50,7 +50,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   late AnimationController _pulseController;
   late final GeminiLiveSession _liveSession;
 
-  bool _isListening = true;
+  /// Nothing is listening until a start actually succeeds. This used to default
+  /// to `true`, which made the screen advertise "Continuous Mic Active" and
+  /// "Listening…" before any microphone was open — and worse, made
+  /// [_startMicrophoneListening] early-return on its own `_isListening` guard, so
+  /// the first open never started capture at all. Honesty and correctness in one:
+  /// the flag now tracks a real open microphone (BUS-P1-08).
+  bool _isListening = false;
   bool _isSpeaking = false;
   bool _isPermissionBlocked = false;
 
@@ -59,7 +65,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   AndroidVoiceTurn? _voiceTurn;
   int _turnCounter = 0;
   Timer? _watchdogTimer;
-  String _liveTranscription = 'Listening... Speak into microphone or tap chips below.';
+  /// Starts neutral rather than claiming to listen: capture is opened by the
+  /// post-frame start, which replaces this with the real state.
+  String _liveTranscription =
+      'Tap the microphone or a chip below to ask BusBuddy something.';
   String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
   GeminiLiveResponse? _lastResponse;
   String _liveStatus = 'Ready';
@@ -97,6 +106,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         setState(() {
           if (_liveTranscription.startsWith('Listening') ||
               _liveTranscription.startsWith('Recognized') ||
+              _liveTranscription.startsWith('Preparing') ||
+              _liveTranscription.startsWith('Tap the microphone') ||
               _spokenOutput.startsWith('Thinking...')) {
             _liveTranscription = text;
           } else {
@@ -303,6 +314,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _lastInterimTranscript = '';
     _processedFinal = false;
 
+    if (_audioEngine.supportsLiveAudioInput) {
+      // Android has no on-device speech-to-text, so the microphone PCM itself is
+      // streamed into the live session instead of a locally recognised string.
+      //
+      // `_isListening` deliberately stays false here: this path awaits a
+      // permission dialog and up to 4 s of Live handshake, and promising
+      // "Listening…" / "Continuous Mic Active" across that window would tell a
+      // TalkBack user the microphone is live while it is not. The turn sets the
+      // flag only once capture is genuinely open.
+      unawaited(_startAndroidVoiceTurn(playChimeTone: playChimeTone));
+      return;
+    }
+
     if (playChimeTone) {
       _audioEngine.playChime(isListening: true);
     }
@@ -313,13 +337,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isSpeaking = false;
       _liveTranscription = 'Listening... Speak into your microphone.';
     });
-
-    if (_audioEngine.supportsLiveAudioInput) {
-      // Android has no on-device speech-to-text, so the microphone PCM itself is
-      // streamed into the live session instead of a locally recognised string.
-      unawaited(_startAndroidVoiceTurn());
-      return;
-    }
 
     _audioEngine.startListening(
       onResult: (text, isFinal) {
@@ -412,16 +429,33 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   /// Nothing is transcribed locally and nothing is submitted as a text turn: the
   /// session's voice-activity detection decides when the question ended, and the
   /// reply arrives through the normal speak-exactly-once path.
-  Future<void> _startAndroidVoiceTurn() async {
+  Future<void> _startAndroidVoiceTurn({bool playChimeTone = false}) async {
     await _releaseAndroidVoiceTurn();
     if (!mounted) return;
+
+    if (mounted) {
+      setState(() {
+        _isPermissionBlocked = false;
+        _isListening = false;
+        _isSpeaking = false;
+        _liveTranscription = 'Preparing the microphone...';
+      });
+    }
 
     // Never open the microphone on a socket that is still handshaking: its first
     // frames would be dropped and the turn would end the moment it started.
     if (!await _awaitLiveReady()) {
+      // Name the real reason. "Still connecting" is a guess, and a wrong one when
+      // no key is configured at all — which is the common first-run case, and the
+      // passenger can fix it in seconds from the banner above.
+      final noKey = AppSettingsController.instance.geminiApiKey.isEmpty;
       _releaseAndroidVoiceTurnUi(
-        'BusBuddy is still connecting, so the microphone stayed off. Please type '
-        'your question, or tap the microphone orb again in a moment.',
+        noKey
+            ? 'BusBuddy needs a Gemini Live key before it can listen, so the '
+                'microphone stayed off. Please type your question, or tap Connect '
+                'to add your key.'
+            : 'BusBuddy is still connecting, so the microphone stayed off. Please '
+                'type your question, or tap the microphone orb again in a moment.',
         false,
       );
       return;
@@ -438,10 +472,22 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     );
     _voiceTurn = turn;
     await turn.start();
-    if (mounted && identical(_voiceTurn, turn) && !turn.isActive) {
+    if (!mounted || !identical(_voiceTurn, turn)) return;
+    if (!turn.isActive) {
       // start() failed and the loss was already reported through onTurnLost.
       _voiceTurn = null;
+      return;
     }
+
+    // Capture is genuinely open now, so only now may the UI say so — the chime
+    // that marks the passenger's turn comes here too, not at the request.
+    if (playChimeTone) _audioEngine.playChime(isListening: true);
+    setState(() {
+      _isPermissionBlocked = false;
+      _isListening = true;
+      _isSpeaking = false;
+      _liveTranscription = 'Listening... speak your question.';
+    });
   }
 
   /// Waits briefly for the Live handshake so a spoken question is never lost to a

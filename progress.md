@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 26, 2026 (Chunk 44: Android spoken questions reach Gemini Live — microphone PCM streamed via `realtimeInput`, owned by `AndroidVoiceTurn`; ADR-004 recorded; permission contract re-audited; 365/365 tests, analyze clean, docs gate pass)
+**Last Updated**: September 30, 2026 (Chunk 45: Android emulator run found and fixed a UI lie — the voice screen claimed an active microphone it never opened, and the first open never started capture at all; 367/367 tests, analyze clean, docs gate pass)
 
 ---
 
@@ -961,3 +961,50 @@ Verified the repaired gate is not vacuous: injecting a `ACCESS_FINE_LOCATION` de
 
 - **Verification**: `flutter analyze` clean, `flutter test` **365/365 green**, `tool/ci/verify_docs.sh` **PASSED**.
 - **⚠️ Not verified on hardware** — no Android SDK/emulator in this environment. Device checklist (ADR-004 §3): permission dialog wording, no echo/feedback loop on speakerphone, `adb logcat -s BusBuddyVoiceChannel:V` channel activity, TalkBack announcements for the listening and permission-blocked states. Do not report this chunk as device-verified until `flutter run -d android` has been done.
+
+---
+
+## 🛠️ Session Log — 2026-09-30: Chunk 45 — Android Runtime Run Found a Lie in the Voice UI
+
+> **Trigger**: Chunk 44 closed with "not verified on hardware". This session built an AVD (API 34 x86_64, KVM) and actually ran the app. It found a real bug within minutes.
+
+### 🐛 The bug: the screen advertised listening it never had
+
+Opening the voice surface showed a green **"Continuous Mic Active"** chip and **"Listening… Speak into microphone or tap chips below."** — while `RECORD_AUDIO` was revoked and the Live session was `NOT CONNECTED`. No native channel call was ever logged.
+
+Root cause was one character-level decision: `bool _isListening = true;`
+
+1. **It lied (BUS-P1-08).** The chip and transcript rendered from a flag that was never reconciled with a real open microphone.
+2. **It broke capture entirely.** `_startMicrophoneListening` early-returns on `if (_isListening && !isRestart) return;`. Since the flag started `true`, the post-frame start on open was swallowed — so **the first open never started the microphone on any platform**, Android *and* web. Introduced with the continuous-listening guard in `64ee2f5`; latent ever since, and invisible to 365 unit tests because none of them opened the screen and looked.
+
+### ✅ The fix
+
+- `_isListening` now starts `false`: nothing is listening until a start actually succeeds.
+- The Android path no longer sets it optimistically. It shows **"Preparing the microphone…"** across the permission dialog and the up-to-4 s Live handshake, and flips the flag *inside* `_startAndroidVoiceTurn` only once `turn.isActive` — so the promise is made when the microphone is genuinely open.
+- The listening chime moved to the same success point, so it marks a real start rather than a request.
+- The initial transcript is now neutral ("Tap the microphone or a chip below…") instead of asserting it was already listening, and is registered in the `onTextChunk` replace-list so the assistant's first chunk still replaces rather than appends.
+- **Regression tests** (2, in `voice_session_lifecycle_test.dart`, group *BUS-P1-08 Microphone State Honesty*): the first frame must not claim to be listening, and the first open must actually start capture. Both were verified to **fail against the old default** (`_isListening = true`) and pass after — the second one fails because "Listening… Speak into your microphone." never appeared, which is the capture-never-started bug in one assertion.
+- **Message accuracy**: the failure said "BusBuddy is still connecting" even with no API key configured — the common first-run case. It now distinguishes missing-key from slow-connect and points at the Connect banner.
+
+### ✅ Verified on the emulator (before and after)
+
+- `flutter build apk --debug` succeeds — the native `BusBuddyVoiceChannel` Kotlin compiles and packages.
+- Install, launch, and navigation to the voice surface work; no crash, no app ANR.
+- Installed permission set is exactly the audited contract: `INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` (+ Flutter's injected `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`).
+- With no Live connection the mic stays off, the reason is named accurately, and the text box remains usable.
+- The app's TTS path reaches Android's `TextToSpeech` (logcat shows the GSA TTS engine contacted, then failing — the AVD's engine is broken).
+
+### ⚠️ Still NOT verified — do not claim it
+
+| Check | Blocked by |
+| --- | --- |
+| Spoken question → `realtimeInput` → spoken reply | No valid Gemini API key here; `_awaitLiveReady` correctly refuses to open the mic without one, so the audio-in path is unreachable |
+| Permission dialog wording | Reached only after Live readiness — same blocker |
+| `AudioRecord` PCM on `busbuddy/voice/mic` | Same |
+| Audible TTS and echo/AEC behaviour | AVD TTS engine broken (`errorCode 65561/401`), host has no audio backend (`Could not init 'pa' audio driver`), and an AVD has no hardware AEC |
+| TalkBack announcements | TalkBack absent from the AVD; its spoken output is not observable via `adb` |
+
+An emulator validates platform wiring, the permission contract and honest-failure paths. It is **not** hardware verification: the audio-in round trip, echo cancellation and TalkBack still need a physical device and a valid API key.
+
+- **Files**: `lib/features/ai_assistant/gemini_live_screen.dart` · `test/features/ai_assistant/voice_session_lifecycle_test.dart` · `docs/adr/ADR-004-android-native-voice-io.md` (§3.1, §3.2) · `progress.md`
+- **Verification**: `flutter analyze` clean, `flutter test` **367/367 green**, `tool/ci/verify_docs.sh` PASSED.

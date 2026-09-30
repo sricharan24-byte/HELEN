@@ -47,4 +47,35 @@ void main() {
       expect(orbSize.height, greaterThanOrEqualTo(48.0));
     });
   });
+
+  group('BUS-P1-08 Microphone State Honesty', () {
+    // Found on an Android emulator run (2026-09-30): the screen opened showing
+    // "Continuous Mic Active" and "Listening…" with no microphone open, because
+    // `_isListening` defaulted to `true`. That also made
+    // `_startMicrophoneListening` early-return on its own `_isListening` guard,
+    // so the very first open never started capture at all — on any platform.
+    // Found only by running the app: no unit test reached this state.
+    const neutral = 'Tap the microphone or a chip below to ask BusBuddy something.';
+    const active = 'Listening... Speak into your microphone.';
+
+    testWidgets('first frame does not claim to be listening', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: GeminiLiveScreen()));
+
+      // Nothing is capturing yet, so the screen must not imply that it is.
+      expect(find.text(neutral), findsOneWidget);
+      expect(find.text('Continuous Mic Active'), findsNothing);
+    });
+
+    testWidgets('first open actually starts capture', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: GeminiLiveScreen()));
+
+      // The post-frame start must run: previously the `_isListening` guard
+      // swallowed it and the neutral text stayed on screen forever.
+      await tester.pump();
+      expect(find.text(active), findsOneWidget);
+
+      // Unmount so the continuous-restart timer is cancelled.
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+  });
 }
