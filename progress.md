@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: September 30, 2026 (Chunk 45: Android emulator run found and fixed a UI lie — the voice screen claimed an active microphone it never opened, and the first open never started capture at all; 367/367 tests, analyze clean, docs gate pass)
+**Last Updated**: October 2, 2026 (Chunk 47: usability audit items 1–6 — home repaint + SOS 2nd, SavedPage push, checkout reflow, live timestamps; 370/370 tests, analyze clean, docs gate pass)
 
 ---
 
@@ -1008,3 +1008,25 @@ An emulator validates platform wiring, the permission contract and honest-failur
 
 - **Files**: `lib/features/ai_assistant/gemini_live_screen.dart` · `test/features/ai_assistant/voice_session_lifecycle_test.dart` · `docs/adr/ADR-004-android-native-voice-io.md` (§3.1, §3.2) · `progress.md`
 - **Verification**: `flutter analyze` clean, `flutter test` **367/367 green**, `tool/ci/verify_docs.sh` PASSED.
+
+## 🛠️ Session Log — 2026-10-02: Chunk 46 — Native Transport Dropped Every Server Frame (P0)
+
+> **Trigger**: With a valid API key on the API 34 emulator, the screen reported "Live Connected" for 7 minutes while the handshake could never complete — zero frames ever received.
+
+- **Root cause**: `IoGeminiLiveTransport` handled only `String` frames (`socket.listen((data) { if (data is String) … })`), but the native `dart:io` socket delivers the same JSON control frames as **binary** (`Uint8Array`). `setupComplete` never parsed, `isReady` stayed `false` forever, `sendRealtimeAudio` rejected every mic frame, and every turn silently fell back to REST.
+- **Fix**: `_decodeFrame` normalises `String` and `List<int>` (UTF-8) to JSON text; undecodable/unsupported frames log instead of vanishing, and `send` logs dropped frames rather than discarding silently.
+- **Regression test**: `test/features/ai_assistant/gemini_live_transport_frames_test.dart` — loopback server replies with **binary** `setupComplete`; verified to fail on old code (`Actual: []`) and pass after.
+- **Verified after fix**: `setupComplete received: session ready`, "Live Ready" banner, mic opens, 691 `realtimeInput.mediaChunks` PCM frames on the wire over ~3 min.
+- **Still NOT proven**: a *spoken* question producing a reply — the AVD mic yields silence (no host audio backend), so server-side VAD never ends a turn. Needs real microphone audio.
+- **Files**: `lib/features/ai_assistant/gemini_live_transport_io.dart` · `test/features/ai_assistant/gemini_live_transport_frames_test.dart` · `docs/adr/ADR-004-android-native-voice-io.md` (§3.3)
+- **Verification**: `flutter analyze` clean, `flutter test` green, pushed as `6f1df89`.
+
+## 🛠️ Session Log — 2026-10-02: Chunk 47 — Usability Audit Items 1–6 Fixed
+
+> **Trigger**: External heuristic evaluation (2 Oct 2026) rated seven issues; code review confirmed 4.5 of 7 and refuted the rest.
+
+- **Verification verdicts**: H1 (fare overlap) and H2 (dead first tap) did not reproduce — checkout already used `Wrap`, search taps are sync Material buttons; hardened anyway. H3 overstated (cards already had distinct icons + labels + semantics). M1 off-by-one (SOS was 8th, not 9th). M2 false (Pin/Dismiss already labeled). M3, L1, L2 confirmed.
+- **Fixes**: (1) checkout fare/pay stacks below 360 dp, wraps above — 300% scale clean; (2) `Close`/`User Profile` tooltips on unlabeled icon buttons; (3) 500 ms double-tap navigation guard on home/search; (4) neutral cards + single `#007AFF` accent bar, red reserved for SOS, SOS moved 8th → 2nd; (5) Saved Places pushes full `SavedPage` (sheet deleted) with TalkBack focus return; (6) `Updated HH:MM:SS` telemetry timestamps on both live GPS screens as plain text, refresh button + polite announce on Live Location. Journey page deliberately got no fake refresh — it has no live source.
+- **Collateral repairs**: non-uniform `Border` + `borderRadius` crash at 300% scale (accent is now a separate bar widget); `home_screen_customization_test` order expectations updated to SOS-2nd.
+- **Files**: `lib/features/home/home_page.dart` · `lib/data/models/home_screen_item.dart` · `lib/features/tickets/booking_checkout_dialog.dart` · `lib/features/tickets/live_location_screen.dart` · `lib/features/route_details/route_details_page.dart` · `lib/features/adaptive_ui/adaptive_shortcuts_modal.dart` · `test/features/home_screen_customization_test.dart` · `test/features/live_location_screen_test.dart`
+- **Verification**: `flutter analyze` clean, `flutter test` **370/370 green**, pushed as `82ae52a`.

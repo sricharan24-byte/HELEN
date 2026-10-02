@@ -165,7 +165,7 @@ BusBuddy/
 │       ├── saved/                            # Saved places & digital passbook tab
 │       ├── settings/                         # Accessibility, Personalization & Voice Assistant settings
 │       └── tickets/                          # BookingCheckoutDialog (concession modal), 3-step suite & passbook
-├── test/                                     # Automated test suite (54 test files, 354 tests, CI-verified green)
+├── test/                                     # Automated test suite (58 test files, 370 tests, CI-verified green)
 │   ├── a11y/                                 # Announcement arbiter, contrast verification, reflow, semantics
 │   ├── core/                                 # Accessible components, theme tokens, service locator tests
 │   ├── data/                                 # Live telemetry ordering, OSRM failure states, persistence tests
