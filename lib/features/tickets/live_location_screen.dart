@@ -5,6 +5,7 @@ import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
+import '../../core/a11y/announcement_coordinator.dart';
 import '../journey/live_location_map_widget.dart';
 
 class LiveLocationScreen extends StatefulWidget {
@@ -22,6 +23,21 @@ class LiveLocationScreen extends StatefulWidget {
 }
 
 class _LiveLocationScreenState extends State<LiveLocationScreen> {
+  /// Bumped by the AppBar refresh action to re-subscribe the live GPS stream.
+  int _streamKey = 0;
+
+  void _refreshLiveLocation() {
+    setState(() => _streamKey++);
+    AnnouncementCoordinator.instance.announce(
+      'Live location refresh requested. The latest bus position will appear below.',
+    );
+  }
+
+  /// Formats a telemetry timestamp as HH:MM:SS for the "Updated" label.
+  static String _formatUpdatedAt(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+  }
   @override
   void initState() {
     super.initState();
@@ -65,8 +81,16 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
         backgroundColor: const Color(0xFFF4F6F8),
         foregroundColor: const Color(0xFF002B7F),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh live location',
+            onPressed: _refreshLiveLocation,
+          ),
+        ],
       ),
       body: StreamBuilder<BusLocation>(
+        key: ValueKey<int>(_streamKey),
         stream: repository.streamBusLocation(
           ticket.busId,
           route.id,
@@ -215,6 +239,31 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+
+                // Last-updated timestamp from live telemetry (plain text, not
+                // a live region: the stream ticks often and must not flood
+                // TalkBack. Manual refresh announces politely on demand.)
+                Semantics(
+                  label: live != null
+                      ? 'Live data updated at ${_formatUpdatedAt(live.receivedTimestamp ?? live.timestamp)}'
+                      : 'Waiting for live data',
+                  excludeSemantics: true,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.update, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Text(
+                        live != null
+                            ? 'Updated ${_formatUpdatedAt(live.receivedTimestamp ?? live.timestamp)}'
+                            : 'Waiting for live data…',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 

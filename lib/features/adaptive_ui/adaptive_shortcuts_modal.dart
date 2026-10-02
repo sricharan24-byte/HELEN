@@ -166,6 +166,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white70),
+                  tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],

@@ -18,6 +18,7 @@ import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
+import '../saved/saved_page.dart';
 import '../settings/settings_page.dart';
 import '../alerts/alerts_page.dart';
 import '../tickets/live_location_screen.dart';
@@ -169,7 +170,7 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case AdaptiveShortcutType.savedPlace:
-        _openSavedPlacesModal();
+        _openSavedPlaces();
         break;
 
       case AdaptiveShortcutType.corridorAlerts:
@@ -211,7 +212,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  DateTime? _lastNavigationAt;
+
+  /// Debounce: ignore a second navigation start within 500 ms of the previous
+  /// accepted one (rapid double-tap on search or a home card).
+  bool _shouldNavigate() {
+    final now = DateTime.now();
+    final last = _lastNavigationAt;
+    if (last != null && now.difference(last) < const Duration(milliseconds: 500)) {
+      return false;
+    }
+    _lastNavigationAt = now;
+    return true;
+  }
+
   void _openRouteSearch() {
+    if (!_shouldNavigate()) return;
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -226,80 +242,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _openSavedPlacesModal() {
+  void _openSavedPlaces() {
+    if (!_shouldNavigate()) return;
+    // Remember the currently focused widget so focus can be returned to it
+    // once the pushed SavedPage route is popped (TalkBack focus return).
+    final previouslyFocused = FocusManager.instance.primaryFocus;
     unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: const Color(0xFF1E293B),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Saved Places',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white70),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => SavedPage(
+                ticketController: widget.ticketController,
               ),
-              const SizedBox(height: 16),
-              _buildSavedPlaceTile(Icons.home, 'Home', 'Gandhi Nagar, Vellore'),
-              _buildSavedPlaceTile(Icons.school, 'VIT Campus', 'VIT Main Gate'),
-              _buildSavedPlaceTile(
-                Icons.train,
-                'Katpadi Junction',
-                'Katpadi Railway Station',
-              ),
-              _buildSavedPlaceTile(
-                Icons.local_hospital,
-                'CMC Hospital',
-                'Vellore Town',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSavedPlaceTile(IconData icon, String title, String subtitle) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFF334155),
-        foregroundColor: const Color(0xFF38BDF8),
-        child: Icon(icon),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(color: Color(0xFF94A3B8)),
-      ),
-      trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-      onTap: () {
-        Navigator.of(context).pop();
-        _openRouteSearch();
-      },
+            ),
+          )
+          .whenComplete(() {
+            previouslyFocused?.requestFocus();
+          }),
     );
   }
 
@@ -419,13 +378,16 @@ class _HomePageState extends State<HomePage> {
                             button: true,
                             label: 'User Profile',
                             excludeSemantics: true,
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: colors.surface,
-                              child: Icon(
-                                Icons.person,
-                                color: colors.textPrimary,
-                                size: 24,
+                            child: Tooltip(
+                              message: 'User Profile',
+                              child: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: colors.surface,
+                                child: Icon(
+                                  Icons.person,
+                                  color: colors.textPrimary,
+                                  size: 24,
+                                ),
                               ),
                             ),
                           ),
@@ -944,7 +906,7 @@ class _HomePageState extends State<HomePage> {
           title: item.title,
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
-          onTap: _openSavedPlacesModal,
+          onTap: _openSavedPlaces,
         );
 
       case HomeScreenItem.idVoiceAssistant:
@@ -1101,12 +1063,13 @@ class _HomePageState extends State<HomePage> {
     IconData? trailingIcon,
     Color? borderColor,
   }) {
+    final colors = AppTheme.colors(context);
     return Semantics(
       button: true,
       label: semanticLabel,
       excludeSemantics: true,
       child: Material(
-        color: color,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(22),
         child: InkWell(
           onTap: onTap,
@@ -1117,19 +1080,27 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
-                border: borderColor != null
-                    ? Border.all(color: borderColor)
-                    : null,
+                border: Border.all(color: borderColor ?? colors.border),
               ),
               child: Row(
                 children: [
+                  // Single-accent indicator bar; red reserved for SOS.
+                  Container(
+                    width: 4,
+                    constraints: const BoxConstraints(minHeight: 56),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: color,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, color: color, size: 24),
+                    child: Icon(icon, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1138,8 +1109,8 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1150,7 +1121,7 @@ class _HomePageState extends State<HomePage> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: colors.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1160,7 +1131,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   Icon(
                     trailingIcon ?? Icons.chevron_right,
-                    color: Colors.white,
+                    color: colors.textSecondary,
                     size: 24,
                   ),
                 ],

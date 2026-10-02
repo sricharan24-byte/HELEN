@@ -422,35 +422,36 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 border: Border.all(color: colors.border),
               ),
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                runSpacing: 12,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TOTAL FARE',
-                        style: TextStyle(
-                          color: colors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final fareColumn = Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'TOTAL FARE',
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _currentFareQuote.formattedAmount,
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
+                        const SizedBox(height: 2),
+                        Text(
+                          _currentFareQuote.formattedAmount,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+                      ],
+                    ),
+                  );
+
+                  final payButton = ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
                     child: ElevatedButton.icon(
                       onPressed: _isIssuing ? null : _issueTicket,
                       icon: _isIssuing
@@ -476,11 +477,60 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 2,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        minimumSize: const Size(120, AppSpacing.minTouchTarget),
+                        minimumSize: const Size(120, 48),
                       ),
                     ),
-                  ),
-                ],
+                  );
+
+                  // Narrow widths (e.g. 320dp phones, 300% text scale): stack
+                  // the pay button under the fare so nothing overlaps.
+                  // Wide layouts use Wrap (not Row) so a 300%-scaled fare
+                  // drops the button to the next run instead of overflowing.
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        fareColumn,
+                        const SizedBox(height: 12),
+                        SizedBox(width: double.infinity, child: payButton),
+                      ],
+                    );
+                  }
+
+                  return Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'TOTAL FARE',
+                            style: TextStyle(
+                              color: colors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _currentFareQuote.formattedAmount,
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      payButton,
+                    ],
+                  );
+                },
               ),
             ),
           ],

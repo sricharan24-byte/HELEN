@@ -67,30 +67,15 @@ class HomeScreenItem {
     }
   }
 
-  /// Visual theme color for the component card and icon bubble.
+  /// Visual theme accent color for the component card border and icon bubble.
+  /// All cards use a single neutral accent; red is reserved for Emergency SOS.
   Color get color {
     if (customColor != null) return customColor!;
     switch (id) {
-      case idRouteSearch:
-        return const Color(0xFF0284C7); // Sky Blue
-      case idMyJourney:
-        return const Color(0xFF16A34A); // Emerald Green
-      case idMyTickets:
-        return const Color(0xFF7C3AED); // Vibrant Purple
-      case idSavedPlaces:
-        return const Color(0xFFEA580C); // Orange
-      case idVoiceAssistant:
-        return const Color(0xFFDC2626); // Crimson Red
-      case idLiveTracking:
-        return const Color(0xFF059669); // Teal Green
-      case idAlerts:
-        return const Color(0xFFD97706); // Amber
       case idSafety:
-        return const Color(0xFFE11D48); // Rose
-      case idSettings:
-        return const Color(0xFF475569); // Slate — visible on dark midnight bg
+        return const Color(0xFFE11D48); // Rose — reserved for Emergency SOS
       default:
-        return const Color(0xFF334155);
+        return const Color(0xFF007AFF); // Single accent for all other cards
     }
   }
 
@@ -143,6 +128,12 @@ class HomeScreenItem {
           isVisible: true,
         ),
         const HomeScreenItem(
+          id: idSafety,
+          title: 'Emergency SOS',
+          subtitle: 'Share location with trusted contacts',
+          isVisible: true,
+        ),
+        const HomeScreenItem(
           id: idMyJourney,
           title: 'My Journey',
           subtitle: 'Active trip & stop progress',
@@ -176,12 +167,6 @@ class HomeScreenItem {
           id: idAlerts,
           title: 'Corridor Alerts',
           subtitle: 'Delay & schedule updates',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idSafety,
-          title: 'Emergency SOS',
-          subtitle: 'Share location with trusted contacts',
           isVisible: true,
         ),
         const HomeScreenItem(

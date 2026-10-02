@@ -79,7 +79,7 @@ void main() {
 
       final itemsBefore = AppSettingsController.instance.homeScreenItems;
       expect(itemsBefore[0].id, HomeScreenItem.idRouteSearch);
-      expect(itemsBefore[1].id, HomeScreenItem.idMyJourney);
+      expect(itemsBefore[1].id, HomeScreenItem.idSafety);
 
       // Tap the Move Down button for the first item
       final moveDownButtons = find.byTooltip('Move Down');
@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final itemsAfter = AppSettingsController.instance.homeScreenItems;
-      expect(itemsAfter[0].id, HomeScreenItem.idMyJourney);
+      expect(itemsAfter[0].id, HomeScreenItem.idSafety);
       expect(itemsAfter[1].id, HomeScreenItem.idRouteSearch);
 
       // Now tap Move Up on the second card to restore. The first card's
@@ -103,7 +103,7 @@ void main() {
 
       final itemsRestored = AppSettingsController.instance.homeScreenItems;
       expect(itemsRestored[0].id, HomeScreenItem.idRouteSearch);
-      expect(itemsRestored[1].id, HomeScreenItem.idMyJourney);
+      expect(itemsRestored[1].id, HomeScreenItem.idSafety);
     });
 
     testWidgets('reset layout button restores default order and visibility', (tester) async {

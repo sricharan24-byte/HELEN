@@ -292,6 +292,31 @@ class RouteDetailsPage extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 14),
+                            // Last-updated timestamp from telemetry (plain text:
+                            // the stream ticks often and must not flood TalkBack).
+                            Builder(
+                              builder: (_) {
+                                final ts = live?.receivedTimestamp ?? live?.timestamp;
+                                String two(int n) => n.toString().padLeft(2, '0');
+                                final label = ts != null
+                                    ? 'Updated ${two(ts.hour)}:${two(ts.minute)}:${two(ts.second)}'
+                                    : 'Waiting for live data…';
+                                return Semantics(
+                                  label: label == 'Waiting for live data…'
+                                      ? label
+                                      : 'Live data $label',
+                                  excludeSemantics: true,
+                                  child: Text(
+                                    label,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(6),
                               child: LinearProgressIndicator(
