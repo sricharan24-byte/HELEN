@@ -93,13 +93,58 @@ Run on an API 34 x86_64 emulator (`system-images;android-34;google_apis;x86_64`,
 
 | Check | Blocked by |
 | --- | --- |
-| Spoken question → `realtimeInput` → reply | No valid Gemini API key in this environment; `_awaitLiveReady` correctly refuses to open the mic without one, so the audio-in path is unreachable here |
-| Permission dialog wording | Reached only after Live readiness, so it is blocked by the same missing key |
-| `AudioRecord` PCM on `busbuddy/voice/mic` | Same |
+| Spoken question → `realtimeInput` → reply | **Superseded by §3.3** — with a valid key the handshake completes and PCM frames are confirmed on the wire; only the *final turn* is unreachable, because the AVD microphone produces silence (see §3.3) so server-side VAD never fires |
 | Audible TTS / echo behaviour | The AVD's TTS engine is broken (`errorCode 65561/401`) and the host has no audio backend (`Could not init 'pa' audio driver`); hardware AEC does not exist on an AVD |
 | TalkBack announcements | TalkBack is not installed on the AVD, and its spoken output is not observable from `adb` |
 
-An emulator is not a substitute for hardware: it validates the platform wiring, the permission contract and the honest-failure paths, but **the audio-in round trip, echo cancellation and TalkBack still require a physical device with a valid API key.** Do not report this ADR as device-verified until then.
+An emulator is not a substitute for hardware: it validates the platform wiring, the permission contract and the honest-failure paths, but **echo cancellation, audible replies and TalkBack still require a physical device.** Do not report this ADR as device-verified until then.
+
+### 3.3 Bug found by the device run: the native transport dropped every server frame (P0)
+
+The Chunk 44 audio-in feature **could never have worked on Android or desktop**, and 365 passing tests could not see it.
+
+`IoGeminiLiveTransport` delivered frames like this:
+
+```dart
+socket.listen((data) {
+  if (data is String) { onMessage(data); }   // everything else silently dropped
+});
+```
+
+The Gemini Live service frames inconsistently by client: the browser
+(`WebGeminiLiveTransport`) receives JSON control frames as **text**, but the native `dart:io`
+socket receives the *same* frames as **binary** (`_Uint8ArrayView`). Confirmed on the emulator —
+`RX type=_Uint8ArrayView` — and reproduced Dart-to-Dart with a loopback server, so it is a
+client-side contract error, not an emulator artefact.
+
+Consequences, all silent:
+
+1. `setupComplete` was never parsed, so `_isSetupDone` stayed `false` **forever**.
+2. `GeminiLiveSession.isReady` was therefore permanently `false`.
+3. `sendRealtimeAudio` rejected **every** microphone frame — the audio-in path was dead.
+4. Every turn silently degraded to the REST fallback (`Live session not ready
+   (_isConnected=true, _isSetupDone=false); falling back to REST`), while the UI still showed
+   "Live Connected" and a green GEMINI LIVE badge.
+
+A 7-minute session log showed exactly this: connected, setup sent once, zero frames ever received.
+
+**Fix**: `_decodeFrame` normalises `String` and `List<int>` (UTF-8) to JSON text, and undecodable or
+unsupported frames now log instead of vanishing. `send` also logs a dropped frame rather than
+discarding it silently.
+
+**Regression test**: `test/features/ai_assistant/gemini_live_transport_frames_test.dart` stands up a
+real loopback WebSocket server that replies with a **binary** `setupComplete`, exactly as the
+service frames it, and asserts the transport surfaces it. Verified to fail against the old
+String-only code (`Actual: []`) and pass after.
+
+**Verified on the emulator after the fix**: `setupComplete received: session ready`, the banner
+reads "Gemini Live Active · Live Ready", the microphone opens, and 691 `realtimeInput.mediaChunks`
+PCM frames were observed on the wire over ~3 minutes.
+
+**Still not proven**: that a *spoken* question produces a spoken reply. The AVD microphone yields
+silence (no host audio backend), so server-side VAD never ends a turn. That last link needs real
+microphone audio — emulator or hardware.
+
 
 ### 3.2 Bug found by the device run: the screen lied about listening
 
