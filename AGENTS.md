@@ -11,7 +11,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 ## Build / Test / Development Commands
 - `flutter pub get` — resolve dependencies
 - `flutter analyze` — static analysis (0 errors)
-- `flutter test` — run all widget/unit tests (370 tests, 100% green)
+- `flutter test` — run all widget/unit tests (375 tests, 100% green)
 - `flutter run -d chrome` — run on Chrome web (required for Gemini Live voice features)
 - `flutter run -d linux` — run on Linux desktop
 - `python create_research_doc.py` — generates `BusBuddy_Implementation_Research_and_UI_Design.docx` using `python-docx`
@@ -54,6 +54,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 - **Resource Lifecycle Disposals**: `LiveLocationScreen`, `TicketController`, and speech sessions cancel active `StreamSubscription` and `Timer` instances in `dispose()` to eliminate memory leaks and background CPU cycles.
 - Web speech features use conditional imports (`dart:html`, `dart:js`, `dart:js_util`) — only compile on web target.
 - **Single Voice Surface (floating assistant removed)**: The floating BusBuddy AI bubble and multitasking window were removed (Chunk 42, double-voice fix). Full-screen `GeminiLiveScreen` is the app's sole voice/chat assistant surface and its sole audio session owner; all "Ask BusBuddy" entry points (home cards, ticket pages, settings) push it directly via `Navigator.push`. Do not reintroduce a second audio/TTS owner without redesigning the single-speaker contract (the old `TtsFallbackArbiter` was deleted in Chunk 43 and must not be resurrected as a second voice path).
+- **AI Control Edge Glow (Chunk 48)**: `AiGlowFrame` (`lib/features/ai_assistant/ai_control_glow.dart`) paints the pulsing glow on the top/bottom bars and side rails whenever `AiControlGlow.instance.mode != idle` (blue=listening, violet=speaking, amber=acting). It is stacked above the navigator in `MaterialApp.builder`, so it follows the assistant across every screen the AI opens. Driven solely by the `setState` override in `GeminiLiveScreen`. Decorative by contract — `IgnorePointer` + `ExcludeSemantics`, no audio, no live region; the pulse only runs while active so `pumpAndSettle` still settles. Never add semantics, hit-testing, or a second animation owner to it.
 - **Integer Paise Monetary Invariant**: All currency calculations are strictly represented in integer paise (`1 INR = 100 paise`) in `FareEngine` and `FareQuote`. Zero floating-point arithmetic is permitted for financial logic.
 - **Composition Root**: `AppServiceLocator` (`lib/core/di/service_locator.dart`) is the sole dependency injection root. Subscriptions and resources implement `AsyncDisposable`.
 - **Lexical Scope & Models**: Pure-Dart entities reside in `lib/domain/`. `lib/data/models/transport_models.dart` imports and exports `Stop` (`import '../../domain/transit/entities/stop.dart'`).

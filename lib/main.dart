@@ -9,6 +9,7 @@ import 'data/datasources/local_json_store.dart';
 import 'data/repositories/emergency_contact_repository.dart';
 import 'data/models/transport_models.dart' as models;
 import 'data/repositories/transport_repository.dart';
+import 'features/ai_assistant/ai_control_glow.dart';
 import 'features/home/home_page.dart';
 import 'features/journey/journey_controller.dart';
 import 'features/route_details/route_details_page.dart';
@@ -76,7 +77,15 @@ class MyApp extends StatelessWidget {
               data: media.copyWith(
                 textScaler: effectiveScaler,
               ),
-              child: child!,
+              // The AI glow frame sits above the navigator so it follows the
+              // assistant across every screen it opens — top bar, bottom bar
+              // and side rails glow with its current activity.
+              child: Stack(
+                children: [
+                  child!,
+                  const AiGlowFrame(),
+                ],
+              ),
             );
           },
       home: HomePage(

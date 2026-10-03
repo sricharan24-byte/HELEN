@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:busbuddy/features/ai_assistant/ai_control_glow.dart';
+import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
+
+void main() {
+  tearDown(AiControlGlow.instance.idle);
+
+  group('AiControlGlow', () {
+    test('notifies once per real mode change', () {
+      final glow = AiControlGlow.instance;
+      glow.idle();
+      var notifications = 0;
+      void count() => notifications++;
+      glow.addListener(count);
+      glow.listening();
+      glow.listening(); // duplicate mode is suppressed
+      glow.speaking();
+      glow.acting();
+      glow.idle();
+      expect(notifications, 4);
+      expect(glow.mode, AiGlowMode.idle);
+    });
+  });
+
+  group('AiGlowFrame', () {
+    testWidgets('paints top bar, bottom bar and both side rails while active',
+        (tester) async {
+      AiControlGlow.instance.listening();
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Stack(children: [SizedBox.expand(), AiGlowFrame()]),
+          ),
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(DecoratedBox),
+        ),
+        findsNWidgets(4),
+      );
+      // Decorative only: never hittable, never a semantics node.
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(IgnorePointer),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('renders nothing when the AI is idle', (tester) async {
+      AiControlGlow.instance.idle();
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Stack(children: [SizedBox.expand(), AiGlowFrame()]),
+          ),
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(DecoratedBox),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('repaints when the mode changes', (tester) async {
+      AiControlGlow.instance.idle();
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Stack(children: [SizedBox.expand(), AiGlowFrame()]),
+          ),
+        ),
+      );
+      expect(find.byType(DecoratedBox), findsNothing);
+      AiControlGlow.instance.acting();
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(DecoratedBox),
+        ),
+        findsNWidgets(4),
+      );
+    });
+
+    testWidgets('GeminiLiveScreen drives the glow while it owns the mic',
+        (tester) async {
+      AiControlGlow.instance.idle();
+      await tester.pumpWidget(const MaterialApp(home: GeminiLiveScreen()));
+      // The post-frame mic start flips the screen (and the glow) to
+      // listening — the glow can only advertise what the screen owns.
+      await tester.pump();
+      expect(AiControlGlow.instance.mode, AiGlowMode.listening);
+      // Leaving the screen releases the app from AI control.
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      expect(AiControlGlow.instance.mode, AiGlowMode.idle);
+    });
+  });
+}

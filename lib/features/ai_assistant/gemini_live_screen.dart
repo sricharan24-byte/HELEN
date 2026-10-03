@@ -17,6 +17,7 @@ import '../../domain/assistant/assistant_command.dart';
 import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
+import 'ai_control_glow.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
 
@@ -281,7 +282,30 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _audioEngine.stop();
     _pulseController.dispose();
     _textController.dispose();
+    // Screen gone: the AI is no longer controlling the app.
+    AiControlGlow.instance.idle();
     super.dispose();
+  }
+
+  /// Every state change in this screen flows through [setState], so
+  /// the AI glow mode is derived here once — mic open (blue), reply
+  /// playing (violet), or a tool/screen action in flight (amber).
+  /// Mirrors the visible [_isListening]/[_isSpeaking] flags exactly,
+  /// so the glow can never advertise a state the screen itself
+  /// denies (BUS-P1-08).
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    final glow = AiControlGlow.instance;
+    if (_isSpeaking) {
+      glow.speaking();
+    } else if (_isListening) {
+      glow.listening();
+    } else if (_actionExecutedThisTurn) {
+      glow.acting();
+    } else {
+      glow.idle();
+    }
   }
 
   /// Single-voice watchdog: the JS `__bb_on_audio_ended` callback is the sole

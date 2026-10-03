@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 2, 2026 (Chunk 47: usability audit items 1–6 — home repaint + SOS 2nd, SavedPage push, checkout reflow, live timestamps; 370/370 tests, analyze clean, docs gate pass)
+**Last Updated**: October 3, 2026 (Chunk 48: AI control edge glow — pulsing top/bottom bar + side rail glow driven by the Gemini Live screen; 375/375 tests, analyze clean)
 
 ---
 
@@ -1030,3 +1030,13 @@ An emulator validates platform wiring, the permission contract and honest-failur
 - **Collateral repairs**: non-uniform `Border` + `borderRadius` crash at 300% scale (accent is now a separate bar widget); `home_screen_customization_test` order expectations updated to SOS-2nd.
 - **Files**: `lib/features/home/home_page.dart` · `lib/data/models/home_screen_item.dart` · `lib/features/tickets/booking_checkout_dialog.dart` · `lib/features/tickets/live_location_screen.dart` · `lib/features/route_details/route_details_page.dart` · `lib/features/adaptive_ui/adaptive_shortcuts_modal.dart` · `test/features/home_screen_customization_test.dart` · `test/features/live_location_screen_test.dart`
 - **Verification**: `flutter analyze` clean, `flutter test` **370/370 green**, pushed as `82ae52a`.
+
+## 🛠️ Session Log — 2026-10-03: Chunk 48 — AI Control Edge Glow
+
+> **User request**: when the AI is controlling the app, the top bar, bottom bar and side rails should glow with color to indicate AI control, changing with what the AI is doing.
+
+- **`lib/features/ai_assistant/ai_control_glow.dart`** (new): `AiControlGlow` singleton (`idle` / `listening` / `speaking` / `acting`) + `AiGlowFrame` — decorative pulsing gradient glow on the top/bottom bars (72 dp) and side rails (28 dp). Blue = microphone open, violet = assistant replying, amber = driving a screen/booking flow. Purely decorative by contract: `IgnorePointer` + `ExcludeSemantics` (never hit-tests, never a semantics node, no live region — the single-speaker audio contract is untouched), and the pulse `AnimationController` only runs while a mode is active, so `pumpAndSettle` and idle batteries are never held by a decorative loop.
+- **`lib/main.dart`**: the frame is stacked above the navigator in `MaterialApp.builder`, so the glow follows the assistant across every screen it opens (booking suite, live map, saved places, …) — not just the voice screen.
+- **`gemini_live_screen.dart`**: a `setState` override derives the glow mode from the screen's own `_isListening` / `_isSpeaking` / `_actionExecutedThisTurn` flags — one hook at the single choke point every state change already flows through, so the glow can never advertise a state the screen denies (BUS-P1-08 honesty); `dispose()` releases it to `idle` when the voice surface closes.
+- **Tests** (`test/features/ai_assistant/ai_control_glow_test.dart`, 5): mode-change notifications, exactly 4 edge glows while active, nothing when idle, repaint on mode change, and the end-to-end screen→glow integration (listening while the mic is open, idle on exit).
+- **Verification**: `flutter analyze` clean, `flutter test` **375/375 green** (370 + 5).
