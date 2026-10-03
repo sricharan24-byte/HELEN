@@ -66,6 +66,12 @@ class _AiGlowFrameState extends State<AiGlowFrame>
 
   late final AnimationController _pulse;
 
+  // Created once: a fresh merge per build would force the
+  // ListenableBuilder below to swap subscriptions on every
+  // pulse tick.
+  late final Listenable _listeners =
+      Listenable.merge([AiControlGlow.instance, _pulse]);
+
   @override
   void initState() {
     super.initState();
@@ -102,7 +108,7 @@ class _AiGlowFrameState extends State<AiGlowFrame>
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([AiControlGlow.instance, _pulse]),
+      listenable: _listeners,
       builder: (context, _) {
         final mode = AiControlGlow.instance.mode;
         if (mode == AiGlowMode.idle) return const SizedBox.shrink();

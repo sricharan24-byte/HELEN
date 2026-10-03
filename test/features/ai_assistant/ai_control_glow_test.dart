@@ -56,6 +56,17 @@ void main() {
         ),
         findsOneWidget,
       );
+      // The glow must actually fill the screen (a Stack whose only
+      // children are Positioned expands to its biggest constraints).
+      // Guards against a future refactor shrinking the frame to
+      // nothing, which would render the glow invisible.
+      final topBar = find.descendant(
+        of: find.byType(AiGlowFrame),
+        matching: find.byType(DecoratedBox),
+      ).first;
+      final topBarSize = tester.getSize(topBar);
+      expect(topBarSize.width, 800);
+      expect(topBarSize.height, 72);
     });
 
     testWidgets('renders nothing when the AI is idle', (tester) async {
@@ -85,7 +96,13 @@ void main() {
           ),
         ),
       );
-      expect(find.byType(DecoratedBox), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(AiGlowFrame),
+          matching: find.byType(DecoratedBox),
+        ),
+        findsNothing,
+      );
       AiControlGlow.instance.acting();
       await tester.pump();
       expect(
