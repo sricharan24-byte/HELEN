@@ -95,7 +95,7 @@ Run on an API 34 x86_64 emulator (`system-images;android-34;google_apis;x86_64`,
 | --- | --- |
 | Spoken question → `realtimeInput` → reply | **Superseded by §3.3** — with a valid key the handshake completes and PCM frames are confirmed on the wire; only the *final turn* is unreachable, because the AVD microphone produces silence (see §3.3) so server-side VAD never fires |
 | Audible TTS / echo behaviour | The AVD's TTS engine is broken (`errorCode 65561/401`) and the host has no audio backend (`Could not init 'pa' audio driver`); hardware AEC does not exist on an AVD |
-| TalkBack announcements | TalkBack is not installed on the AVD, and its spoken output is not observable from `adb` |
+| TalkBack announcements | **Corrected 2026-10-04 — see §3.4.** The earlier claim "TalkBack is not installed on the AVD" was **wrong**: `com.google.android.marvin.talkback` ships in the `google_apis` API 34 system image and runs once enabled. What is still unobservable is the *sound*: the emulator cannot open an audio output on this host, so announcements are synthesised (`GoogleTTSServiceImpl: Synthesis request for locale eng-USA`) but never audible. The accessible **node tree** TalkBack reads *is* observable via `adb shell uiautomator dump`. |
 
 An emulator is not a substitute for hardware: it validates the platform wiring, the permission contract and the honest-failure paths, but **echo cancellation, audible replies and TalkBack still require a physical device.** Do not report this ADR as device-verified until then.
 

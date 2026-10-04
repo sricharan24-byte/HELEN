@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/dispose_guard.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -20,6 +21,7 @@ import 'audio_speech_engine.dart';
 import 'ai_control_glow.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
+import 'model_voice_player.dart';
 
 /// Full-Screen & Modal Interactive Gemini Live Conversational Overlay Screen.
 class GeminiLiveScreen extends StatefulWidget {
@@ -44,6 +46,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     with SingleTickerProviderStateMixin {
   final GeminiLiveService _liveService = const GeminiLiveService();
   final AudioSpeechEngine _audioEngine = AudioSpeechEngine();
+
+  /// Gemini's own streamed audio (Android `AudioTrack`). This is the natural
+  /// voice; `_audioEngine` stays as the fallback for turns that carry no audio.
+  final ModelVoicePlayer _modelVoice = ModelVoicePlayer();
   final AppAutomationController _automation = AppAutomationController();
 
   late final TicketController _ticketController;
@@ -160,13 +166,31 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         // duplicated call can never layer a second voice.
         if (!silentProtocol && _spokenOutput.isNotEmpty) {
           final spoken = _spokenOutput;
-          debugPrint('[SingleVoice] speaking turn via TTS (turn $_turnCounter)');
-          // Android keeps one microphone stream across turns: withhold its frames
-          // while the assistant talks so the reply is never heard as a question.
-          _pauseVoiceTurn();
-          _audioEngine.stop();
-          _audioEngine.speak(spoken);
-          _armWatchdog();
+          // Single speaker, part 2: if Gemini streamed its own audio for this
+          // turn, that audio IS the reply — speaking the same words again
+          // through TTS would be the double-voice bug Chunks 41-43 chased.
+          // TTS speaks only when the turn carried no model audio (plain text
+          // turn, REST fallback, socket without audio).
+          if (_modelVoice.hasModelAudioThisTurn) {
+            debugPrint(
+              '[SingleVoice] turn $_turnCounter played model audio; '
+              'skipping TTS',
+            );
+            // Keep holding the microphone: the AudioTrack is still draining,
+            // and onPlaybackDrained releases it. Do NOT return here — the tool
+            // call below must still run (a reply can be both spoken and acted).
+            _pauseVoiceTurn();
+          } else {
+            debugPrint(
+              '[SingleVoice] speaking turn via TTS (turn $_turnCounter)',
+            );
+            // Android keeps one microphone stream across turns: withhold its frames
+            // while the assistant talks so the reply is never heard as a question.
+            _pauseVoiceTurn();
+            _audioEngine.stop();
+            _audioEngine.speak(spoken);
+            _armWatchdog();
+          }
         }
 
         if (actionType != null && !_actionExecutedThisTurn) {
@@ -185,9 +209,30 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _liveTranscription = '🗣️ "$text"';
         });
       },
+      onAudioPcmChunk: (base64Pcm) {
+        if (!mounted) return;
+        // The model's own voice, straight into the native AudioTrack. This is
+        // the natural voice the passenger hears; TTS is not involved here.
+        if (!_modelVoice.isSupported) return;
+        if (!_modelVoice.isPlaying) {
+          // First audio of the turn: the assistant has started talking, so hold
+          // the microphone frames or the reply is heard as the next question.
+          _speechTimer?.cancel();
+          _pauseVoiceTurn();
+          setState(() {
+            _isSpeaking = true;
+          });
+        }
+        // ignore: discarded_futures
+        _modelVoice.addChunk(base64Pcm);
+      },
       onInterrupted: () {
         if (!mounted) return;
         _audioEngine.stop();
+        // Barge-in: the passenger talked over the assistant, so drop the
+        // queued model audio instead of letting it finish over them.
+        // ignore: discarded_futures
+        _modelVoice.stop();
         _speechTimer?.cancel();
         _watchdogTimer?.cancel();
         _restartListenTimer?.cancel();
@@ -248,6 +293,26 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       }
     });
 
+    // The real end of a model-audio turn. When Gemini streamed its own voice,
+    // no TTS utterance ever ran, so the TTS ended-callback above never fires —
+    // the native AudioTrack drain is what releases the turn and reopens the
+    // microphone. Without this the mic would stay paused forever after the
+    // first spoken reply.
+    // Cancelled by dispose().
+    // ignore: cancel_subscriptions
+    _modelDrainSub = _modelVoice.onDrained.listen((_) {
+      if (!mounted) return;
+      _speechTimer?.cancel();
+      _watchdogTimer?.cancel();
+      setState(() {
+        _isSpeaking = false;
+      });
+      _resumeVoiceTurn();
+      if (_continuousListening && !_isListening) {
+        _scheduleRestartListening(delayMs: 350, playChimeTone: true);
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
@@ -269,21 +334,56 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _continuousListening = true;
   Timer? _restartListenTimer;
   Timer? _speechTimer;
+  StreamSubscription<void>? _modelDrainSub;
 
   @override
   void dispose() {
-    _continuousListening = false;
-    _restartListenTimer?.cancel();
-    _speechTimer?.cancel();
-    _watchdogTimer?.cancel();
-    _liveSession.dispose();
-    unawaited(_releaseAndroidVoiceTurn());
-    _audioEngine.stopListening();
-    _audioEngine.stop();
-    _pulseController.dispose();
-    _textController.dispose();
-    // Screen gone: the AI is no longer controlling the app.
-    AiControlGlow.instance.idle();
+    // Every step is isolated and the process-wide reset comes FIRST.
+    //
+    // [AiControlGlow.instance] is a singleton painted by the frame in
+    // `MaterialApp.builder`, so it outlives this screen. When the glow reset
+    // sat below `_liveSession.dispose()`, a throw in that live-socket teardown
+    // — which only happens on a real device with a live session, so the
+    // faked-transport widget tests never saw it — skipped every step below it
+    // and left the glow in `listening` over Home for the rest of the process.
+    // The microphone release matters for the same reason: leaving it armed is
+    // the same class of lie as advertising a mic that is not open (BUS-P1-08).
+    runDisposeSteps([
+      (name: 'aiControlGlow', run: AiControlGlow.instance.idle),
+      (
+        name: 'continuousListening',
+        run: () => _continuousListening = false,
+      ),
+      (
+        name: 'timers',
+        run: () {
+          _restartListenTimer?.cancel();
+          _speechTimer?.cancel();
+          _watchdogTimer?.cancel();
+        },
+      ),
+      (name: 'liveSession', run: _liveSession.dispose),
+      (name: 'androidVoiceTurn', run: () => unawaited(_releaseAndroidVoiceTurn())),
+      (
+        name: 'audioEngine',
+        run: () {
+          _audioEngine.stopListening();
+          _audioEngine.stop();
+        },
+      ),
+      (name: 'pulseController', run: _pulseController.dispose),
+      (name: 'textController', run: _textController.dispose),
+      // Model audio is process-wide too: a playing AudioTrack would outlive
+      // the screen and keep talking over whatever the passenger opened next.
+      (
+        name: 'modelVoice',
+        run: () {
+          unawaited(_modelDrainSub?.cancel());
+          _modelDrainSub = null;
+          unawaited(_modelVoice.dispose());
+        },
+      ),
+    ]);
     super.dispose();
   }
 
@@ -650,6 +750,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isSpeaking = true;
       _spokenOutput = 'Thinking... (streaming from Google AI Studio Live API)';
     });
+    // New turn: clear the previous turn's "the model spoke" marker so TTS is
+    // only skipped when THIS turn actually carried model audio.
+    _modelVoice.beginTurn();
     unawaited(_liveSession.sendQuery(clean));
   }
 
