@@ -34,6 +34,44 @@ int _pageBridgeVersion() {
   return -1;
 }
 
+/// Resolves one bridge function by name.
+///
+/// Called through the function reference rather than `js.context.callMethod`
+/// so a missing install is an observable `null` this file can report, instead
+/// of a `NoSuchMethodError` thrown at the call site with no explanation of why
+/// the page JS was not there.
+Object? _bridgeFn(String name) {
+  try {
+    final direct = js_util.getProperty(js.context, name);
+    if (direct != null) return direct;
+    // js.context is the global scope on every target today; the extra hop
+    // covers a page where the bridge landed on `window` proper.
+    final window = js_util.getProperty(js.context, 'window');
+    if (window != null) return js_util.getProperty(window, name);
+  } catch (_) {}
+  return null;
+}
+
+/// Runs a bridge function with `this` unbound — the bridge only ever reads
+/// globals, so the receiver is irrelevant.
+Object? _callBridgeFn(String name, List<Object?> args) {
+  final fn = _bridgeFn(name);
+  if (fn == null) return null;
+  return js_util.callMethod(fn, 'call', <Object?>[null, ...args]);
+}
+
+/// The bridge entry points this file depends on. Verified after install, so a
+/// partial or stale page reports the real reason instead of failing later at
+/// the first spoken reply.
+const List<String> _requiredBridgeFns = <String>[
+  '__bb_speak_text',
+  '__bb_stop_speech',
+  '__bb_play_tone',
+  '__bb_play_model_audio',
+  '__bb_stop_model_audio',
+  '__bb_get_audio_ctx',
+];
+
 void _ensureJsBridge() {
   if (_jsBridgeInitialized && _pageBridgeVersion() == kJsBridgeVersion) {
     return;
@@ -420,7 +458,24 @@ void _ensureJsBridge() {
     js.context.callMethod(
         'eval', ['window.__bb_bridge_version = $kJsBridgeVersion; '
             'console.log("[BusBuddy SingleVoice] JS bridge v$kJsBridgeVersion ready (TTS-only)");']);
+
+    // The version stamp is written even when the eval above did nothing, so
+    // the next call would happily believe the bridge is installed. Verify the
+    // entry points instead, and force a reinstall if any is missing.
+    final missing =
+        _requiredBridgeFns.where((name) => _bridgeFn(name) == null).toList();
+    if (missing.isNotEmpty) {
+      _jsBridgeInitialized = false;
+      debugPrint(
+        '[WebSpeech] JS bridge v$kJsBridgeVersion installed but missing '
+        '${missing.join(', ')} — audio cannot play until the page JS is '
+        'reinstalled (hot restart, or reload the page).',
+      );
+    }
   } catch (e) {
+    // Leave the bridge "not initialized" so the next call retries instead of
+    // trusting a version stamp written by a failed eval.
+    _jsBridgeInitialized = false;
     debugPrint('[WebSpeech] JS bridge init error: $e');
   }
 }
@@ -442,7 +497,10 @@ void speakText(String text) {
     _ensureJsBridge();
     final langCode = AppSettingsController.instance.speechLanguageCode;
     final speechRate = AppSettingsController.instance.speechRate;
-    js.context.callMethod('__bb_speak_text', [text, langCode, speechRate]);
+    if (_callBridgeFn('__bb_speak_text', <Object?>[text, langCode, speechRate]) ==
+        null) {
+      _reportMissingBridge('__bb_speak_text');
+    }
   } catch (e) {
     debugPrint('[WebSpeech] speakText error: $e');
   }
@@ -458,20 +516,37 @@ bool playModelAudio(String base64Pcm16) {
   try {
     _ensureJsBridge();
     if (base64Pcm16.isEmpty) return false;
-    return js_util.callMethod<bool>(js.context, '__bb_play_model_audio',
-            [base64Pcm16]) ??
-        false;
+    final played =
+        _callBridgeFn('__bb_play_model_audio', <Object?>[base64Pcm16]);
+    if (played == null) {
+      _reportMissingBridge('__bb_play_model_audio');
+      return false;
+    }
+    return played == true;
   } catch (e) {
     debugPrint('[WebModelAudio] playModelAudio error: $e');
     return false;
   }
 }
 
+/// One line per missing entry point, so a silent reply always comes with the
+/// reason it was silent.
+void _reportMissingBridge(String name) {
+  if (_missingBridgeReported.contains(name)) return;
+  _missingBridgeReported.add(name);
+  debugPrint(
+    '[WebSpeech] page bridge has no $name — the JS bridge was not installed in '
+    'this page. Hot restart the app (R) or reload the browser page.',
+  );
+}
+
+final Set<String> _missingBridgeReported = <String>{};
+
 /// Drops model audio that is still queued or playing (barge-in, teardown).
 void stopModelAudio() {
   try {
     _ensureJsBridge();
-    js.context.callMethod('__bb_stop_model_audio');
+    _callBridgeFn('__bb_stop_model_audio', const <Object?>[]);
   } catch (_) {}
 }
 
@@ -480,6 +555,12 @@ void stopModelAudio() {
 void setModelAudioDrainedCallback(VoidCallback onDrained) {
   try {
     _ensureJsBridge();
+    if (_bridgeFn('__bb_on_model_audio_drained') == null &&
+        _bridgeFn('__bb_play_model_audio') == null) {
+      // The drain callback is a plain global assignment, so it only fails when
+      // the whole bridge is absent — the same case playModelAudio reports.
+      _reportMissingBridge('__bb_play_model_audio');
+    }
     js.context['__bb_on_model_audio_drained'] =
         js_util.allowInterop(([dynamic _]) {
       onDrained();

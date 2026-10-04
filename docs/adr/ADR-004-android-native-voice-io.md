@@ -167,7 +167,31 @@ The web half now schedules the same 24 kHz mono PCM16 through the Web Audio cont
 
 **Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js.
 
-**Not proven:** that it is audible, and that it sounds natural — it has never been run against a live Gemini session. Diagnose from the browser console: `[ModelVoice] turn N: playing Gemini's own voice` means chunks are arriving and being scheduled; `[BusBuddy ModelAudio]` warnings mean the failure is the AudioContext (no context, resume failed, decode failed) and not the session. If chunks arrive but nothing is audible, click the page once to unlock audio and ask again.
+### 3.5 Bug found by the browser run: the page bridge was never installed
+
+The first Chrome run of §3.4 produced chunks but no sound, and one error per chunk:
+
+```
+[WebModelAudio] playModelAudio error: NoSuchMethodError: tried to call a
+non-function, such as null: 'js.context.__bb_play_model_audio'
+```
+
+The audio logic was never reached: the JS bridge was not present in the page. `__bb_speak_text` was equally absent, which is why there had been no voice at all — the web build had never actually been able to speak, it had only ever appeared to.
+
+Two defects, both invisible to `flutter analyze`, `flutter test` and `flutter build web`, none of which execute the page:
+
+1. **Silent failure at the call site.** Installation was tracked by two pieces of state — a Dart flag and a version stamp the page writes for itself — and nothing verified the eval had actually installed anything. A bridge that was never installed produced a bare `NoSuchMethodError` at the first `playModelAudio` call and nothing else.
+2. **A failed install could still look successful.** The version stamp is a separate eval written *after* the big one, so it survives an eval that threw or was a no-op. The next call then saw the flag set and a matching version, skipped the install, and the bridge stayed missing for the life of the page — exactly the state observed.
+
+The fix keeps the eval but stops trusting it:
+
+- Calls resolve the entry point first and invoke the **function reference** via `Function.prototype.call`, so a missing bridge is an observable `null` rather than a throw at the call site.
+- After every install the required entry points are verified; anything missing resets the flag so the next call retries rather than trusting a stamp written by a failed eval. A throwing install resets it too.
+- A missing entry point is reported once, by name, naming the fix ("hot restart, or reload the page") instead of repeating a `NoSuchMethodError` per chunk.
+
+**Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js. The bridge JS is additionally extracted from the Dart source and executed in Node against stubbed browser globals: all six entry points install, `__bb_play_model_audio` returns true for a real 24 kHz PCM16 base64 chunk, the queue cursor advances so consecutive chunks schedule back to back, `__bb_stop_model_audio` clears the queue, and the drain callback fires once playback completes.
+
+**Still not proven:** that it is audible in a real browser, and that it sounds natural. The diagnostic split is now explicit — `[ModelVoice] turn N: playing Gemini's own voice` means chunks are arriving and being scheduled, `[WebSpeech] page bridge has no …` means the page JS is missing (hot restart), and `[BusBuddy ModelAudio]` warnings mean the AudioContext itself failed.
 
 ---
 
