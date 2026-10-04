@@ -10,6 +10,14 @@ void speakText(String text) {
   debugPrint('[TTS Stub] $text');
 }
 
+/// Web-only model-audio playback. Inert everywhere else, so a desktop run or a
+/// unit test can never reach Web Audio.
+bool playModelAudio(String base64Pcm16) => false;
+
+void stopModelAudio() {}
+
+void setModelAudioDrainedCallback(VoidCallback onDrained) {}
+
 void stopSpeech() {}
 
 void stopSpeechRecognition() {}

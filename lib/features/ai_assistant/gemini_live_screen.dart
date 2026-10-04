@@ -176,10 +176,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
               '[SingleVoice] turn $_turnCounter played model audio; '
               'skipping TTS',
             );
-            // Keep holding the microphone: the AudioTrack is still draining,
-            // and onPlaybackDrained releases it. Do NOT return here — the tool
+            // Keep holding the microphone: playback is still draining, and the
+            // drain notification releases it. Do NOT return here — the tool
             // call below must still run (a reply can be both spoken and acted).
             _pauseVoiceTurn();
+            // Safety net only: the drain is the normal end-of-turn signal, but
+            // a stalled AudioContext must never strand the UI on "Speaking".
+            _armWatchdog();
           } else {
             debugPrint(
               '[SingleVoice] speaking turn via TTS (turn $_turnCounter)',
@@ -211,12 +214,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
       onAudioPcmChunk: (base64Pcm) {
         if (!mounted) return;
-        // The model's own voice, straight into the native AudioTrack. This is
-        // the natural voice the passenger hears; TTS is not involved here.
+        // The model's own voice, straight into the active playback backend
+        // (Android AudioTrack, Web Audio on the browser). This is the natural
+        // voice the passenger hears; TTS is not involved here.
         if (!_modelVoice.isSupported) return;
         if (!_modelVoice.isPlaying) {
           // First audio of the turn: the assistant has started talking, so hold
           // the microphone frames or the reply is heard as the next question.
+          debugPrint(
+            '[ModelVoice] turn $_turnCounter: playing Gemini\'s own voice '
+            '(model audio, TTS will be skipped)',
+          );
           _speechTimer?.cancel();
           _pauseVoiceTurn();
           setState(() {
@@ -295,9 +303,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
     // The real end of a model-audio turn. When Gemini streamed its own voice,
     // no TTS utterance ever ran, so the TTS ended-callback above never fires —
-    // the native AudioTrack drain is what releases the turn and reopens the
-    // microphone. Without this the mic would stay paused forever after the
-    // first spoken reply.
+    // the playback drain is what releases the turn and reopens the microphone
+    // (Android posts it from the AudioTrack, web from the AudioContext queue).
+    // Without this the mic would stay paused forever after the first spoken
+    // reply.
     // Cancelled by dispose().
     // ignore: cancel_subscriptions
     _modelDrainSub = _modelVoice.onDrained.listen((_) {

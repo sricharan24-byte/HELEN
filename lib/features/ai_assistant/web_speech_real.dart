@@ -16,7 +16,14 @@ bool _jsBridgeInitialized = false;
 /// removed entirely; [speakText] is the ONLY function in the entire app that
 /// can produce speech. One speaker means a double voice is impossible by
 /// construction.
-const int kJsBridgeVersion = 5;
+///
+/// v6: the web half of the Chunk 49 contract. Gemini's own 24 kHz PCM16 is now
+/// played here through the Web Audio context this bridge already owns, so the
+/// natural model voice finally reaches the browser. The single-speaker rule is
+/// unchanged and simply moves with the voice: when model chunks play for a
+/// turn, [speakText] is not called for that turn, and the TTS remains the
+/// fallback for turns that carry no audio at all.
+const int kJsBridgeVersion = 6;
 
 int _pageBridgeVersion() {
   try {
@@ -41,6 +48,9 @@ void _ensureJsBridge() {
         var AudioCtx = window.AudioContext || window.webkitAudioContext;
         window.__bb_audio_ctx = window.__bb_audio_ctx || null;
         window.__bb_active_rec = null;
+        window.__bb_model_audio_next = 0;
+        window.__bb_model_audio_sources = [];
+        window.__bb_model_audio_drain_timer = null;
         window.__bb_active_utterance = window.__bb_active_utterance || null;
 
         window.__bb_get_audio_ctx = function() {
@@ -107,6 +117,9 @@ void _ensureJsBridge() {
 
         window.__bb_dispose_audio = function() {
           window.__bb_remove_unlock_listeners();
+          if (window.__bb_stop_model_audio) {
+            window.__bb_stop_model_audio();
+          }
           if (window.__bb_stop_recognition) {
             window.__bb_stop_recognition();
           }
@@ -166,6 +179,96 @@ void _ensureJsBridge() {
           } catch (e) {
             console.warn("[BusBuddy Audio] Tone playback error:", e);
           }
+        };
+
+        // ── Gemini's own voice on web (24 kHz mono PCM16) ──────────────────
+        // The web half of the Chunk 49 contract. Android plays these chunks
+        // through a native AudioTrack; here they go through the same Web Audio
+        // context the chime uses, so the existing gesture unlock primes it and
+        // there is no second audio stack to keep alive. Chunks are scheduled
+        // back to back (start times chained off __bb_model_audio_next) so a
+        // streamed reply plays as one continuous utterance, not as gaps.
+        window.__bb_model_audio_rate = 24000;
+
+        window.__bb_schedule_model_audio_drain = function() {
+          var ctx = window.__bb_get_audio_ctx();
+          if (!ctx) return;
+          if (window.__bb_model_audio_drain_timer) {
+            clearTimeout(window.__bb_model_audio_drain_timer);
+          }
+          // Every chunk reschedules this, so it only fires once the queue has
+          // really played out. That is the web equivalent of Android's
+          // onPlaybackDrained, and what releases the turn.
+          var remainingMs =
+            Math.max(0, window.__bb_model_audio_next - ctx.currentTime) * 1000 + 60;
+          window.__bb_model_audio_drain_timer = setTimeout(function() {
+            window.__bb_model_audio_drain_timer = null;
+            if (window.__bb_on_model_audio_drained) {
+              try { window.__bb_on_model_audio_drained(); } catch (e) {}
+            }
+          }, remainingMs);
+        };
+
+        window.__bb_play_model_audio = function(b64) {
+          try {
+            var ctx = window.__bb_get_audio_ctx();
+            if (!ctx) {
+              console.warn("[BusBuddy ModelAudio] no AudioContext yet; reply stays silent");
+              return false;
+            }
+            // A context created before the first gesture stays suspended and
+            // would queue audio that never plays.
+            if (ctx.state === "suspended") {
+              ctx.resume().catch(function(e) {
+                console.warn("[BusBuddy ModelAudio] resume failed:", e);
+              });
+            }
+            var bin = window.atob(b64);
+            var frames = Math.floor(bin.length / 2);
+            if (frames <= 0) return false;
+
+            // base64 → little-endian PCM16 → normalized Float32 for Web Audio.
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            var view = new DataView(bytes.buffer);
+            var samples = new Float32Array(frames);
+            for (var f = 0; f < frames; f++) {
+              samples[f] = view.getInt16(f * 2, true) / 32768.0;
+            }
+
+            var buffer = ctx.createBuffer(1, frames, window.__bb_model_audio_rate);
+            buffer.copyToChannel(samples, 0);
+            var source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+            // Catch up when scheduling fell behind (tab throttling, a late
+            // gesture unlock) instead of replaying a backlog out of order.
+            var startAt = Math.max(window.__bb_model_audio_next, ctx.currentTime);
+            source.start(startAt);
+            window.__bb_model_audio_next = startAt + buffer.duration;
+            window.__bb_model_audio_sources.push(source);
+            window.__bb_schedule_model_audio_drain();
+            return true;
+          } catch (e) {
+            console.warn("[BusBuddy ModelAudio] play failed:", e);
+            return false;
+          }
+        };
+
+        // Barge-in and teardown: drop everything still queued or playing.
+        window.__bb_stop_model_audio = function() {
+          try {
+            if (window.__bb_model_audio_drain_timer) {
+              clearTimeout(window.__bb_model_audio_drain_timer);
+              window.__bb_model_audio_drain_timer = null;
+            }
+            var sources = window.__bb_model_audio_sources || [];
+            for (var i = 0; i < sources.length; i++) {
+              try { sources[i].stop(); } catch (e) {}
+            }
+            window.__bb_model_audio_sources = [];
+            window.__bb_model_audio_next = 0;
+          } catch (e) {}
         };
 
         // THE single speaker in the entire app. Stop-before-speak: any prior
@@ -343,6 +446,45 @@ void speakText(String text) {
   } catch (e) {
     debugPrint('[WebSpeech] speakText error: $e');
   }
+}
+
+/// Plays one chunk of Gemini's own 24 kHz PCM16 voice through Web Audio.
+///
+/// Returns false when the chunk could not be scheduled (no AudioContext, an
+/// undecodable payload). That is deliberately the caller's signal to fall back
+/// to device TTS for the turn: the flag [ModelVoicePlayer.hasModelAudioThisTurn]
+/// stays clear, so the reply is spoken rather than silently dropped.
+bool playModelAudio(String base64Pcm16) {
+  try {
+    _ensureJsBridge();
+    if (base64Pcm16.isEmpty) return false;
+    return js_util.callMethod<bool>(js.context, '__bb_play_model_audio',
+            [base64Pcm16]) ??
+        false;
+  } catch (e) {
+    debugPrint('[WebModelAudio] playModelAudio error: $e');
+    return false;
+  }
+}
+
+/// Drops model audio that is still queued or playing (barge-in, teardown).
+void stopModelAudio() {
+  try {
+    _ensureJsBridge();
+    js.context.callMethod('__bb_stop_model_audio');
+  } catch (_) {}
+}
+
+/// Registers the one callback that fires when the scheduled model audio has
+/// played out, which is the real end of a model-audio turn on web.
+void setModelAudioDrainedCallback(VoidCallback onDrained) {
+  try {
+    _ensureJsBridge();
+    js.context['__bb_on_model_audio_drained'] =
+        js_util.allowInterop(([dynamic _]) {
+      onDrained();
+    });
+  } catch (_) {}
 }
 
 /// Stops any ongoing Web Speech synthesis audio.

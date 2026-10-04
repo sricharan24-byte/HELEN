@@ -59,7 +59,9 @@ It is a plain Dart class with injected streams so the whole state machine is uni
 
 ### 2.5 Replies stay on the single voice
 
-`responseModalities: ['AUDIO']` is still requested, but `AudioSpeechEngine.speak` (web SpeechSynthesis / Android `TextToSpeech`) remains the **only** speech producer, and the reply text arrives through the transcript. The bridge's `AudioTrack` path (`startPlayback`/`writePlayback`/`stopPlayback`) and `GeminiLiveSession.onAudioPcmChunk` are therefore intentionally unwired: feeding model PCM *and* TTS would produce two voices. Both are built, documented and tested, ready for the day streamed model audio replaces TTS.
+`responseModalities: ['AUDIO']` is requested, and the model's own audio **is** the reply. `ModelVoicePlayer` (`lib/features/ai_assistant/model_voice_player.dart`) is the only model-audio producer and `AudioSpeechEngine` is the only TTS producer, and exactly one of them speaks per turn: when Gemini streamed audio, `hasModelAudioThisTurn` makes the screen skip TTS entirely; TTS speaks only the turns that carried no audio (plain text turn, REST fallback, socket without audio). The turn ends on the playback drain — `onPlaybackDrained` from the Android `AudioTrack`, or the Web Audio queue drain in the browser — because with no TTS utterance running the TTS ended-callback would never fire.
+
+The single-speaker rule moved with the voice rather than being duplicated, so this is still exactly one voice: the natural one. What stays forbidden is speaking a reply through both paths in one turn, and adding a second audio owner (`TtsFallbackArbiter`-style) — deleted in Chunk 43, must not return.
 
 ### 2.6 Echo control
 
@@ -157,6 +159,16 @@ The flag now starts `false` and is set only once capture is genuinely open; the 
 
 The failure message was also corrected: it claimed "BusBuddy is still connecting" even when no API key was configured, which is the common first-run case. It now distinguishes the two and points at the Connect banner.
 
+### 3.4 Web model-audio playback (2026-10-04)
+
+Until this, Chrome threw every model-audio chunk away (`ModelVoicePlayer.isSupported` was Android-only) and spoke replies through `speechSynthesis`. On a host with no system TTS engine — a bare Linux Chrome install, for instance — that engine is silent, so the browser build could show a flawless text transcript with no voice at all. That is the report this section answers.
+
+The web half now schedules the same 24 kHz mono PCM16 through the Web Audio context the listening chime already uses, so the existing gesture unlock primes it and there is no second audio stack to keep alive: `__bb_play_model_audio` / `__bb_stop_model_audio` in `web_speech_real.dart`, start times chained off a queue cursor for gapless playback, and a queue-drain timer as the end-of-turn signal. A chunk that will not schedule (no AudioContext, undecodable payload) returns false, which leaves `hasModelAudioThisTurn` clear and hands that turn back to TTS rather than dropping the reply.
+
+**Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js.
+
+**Not proven:** that it is audible, and that it sounds natural — it has never been run against a live Gemini session. Diagnose from the browser console: `[ModelVoice] turn N: playing Gemini's own voice` means chunks are arriving and being scheduled; `[BusBuddy ModelAudio]` warnings mean the failure is the AudioContext (no context, resume failed, decode failed) and not the session. If chunks arrive but nothing is audible, click the page once to unlock audio and ask again.
+
 ---
 
 ## 4. Consequences
@@ -165,5 +177,5 @@ The failure message was also corrected: it claimed "BusBuddy is still connecting
 
 **Negative / accepted risks**: spoken turns are half-duplex by design (frames pause during replies); echo is mitigated by AEC plus pausing rather than by a strict duplex protocol; the Live API audio-in path is exercised only by unit tests until a device run confirms it end-to-end.
 
-**Follow-ups**: device verification; optionally request `inputAudioTranscription` explicitly once confirmed against the live service; and — only with a redesigned single-voice contract — switch replies to streamed model audio.
+**Follow-ups**: confirm the natural voice with a live session on web and on an Android device; optionally request `inputAudioTranscription` explicitly once confirmed against the live service.
 
