@@ -4,7 +4,40 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 6, 2026 (Chunk 51: home options trimmed — "My Journey" + "Live Bus Map" cards removed, bus logo moved to "Find a Place"; Chrome voice silence fixed — web bridge v7 gates model audio on a running AudioContext and defers TTS past the cancel-race; AI glow hard to kill on Home fixed; stale `build/web` identified as the reason fixes weren't heard; per-agent runs 390/390 tests, analyze clean)
+**Last Updated**: October 6, 2026 (Key-connect repair: validate-before-connect gate, settings-change reconnect, honest statuses; 399/399 green, analyze clean)
+
+---
+
+## 🛠️ Session Log — 2026-10-06: Key-Connect Repair (validate, reconnect, honest statuses)
+
+> **Trigger**: Owner reported "the api key is not connecting" and suggested reimplementing Gemini Live. Tracing the key path showed the protocol was not the suspect (the `v1beta BidiGenerateContent` endpoint matches Google's docs), so the repair keeps the protocol and fixes the lifecycle instead.
+
+### What was actually broken (three defects, one design trap)
+
+* **A key saved from the settings page never reached the open screen.** The Live-screen dialog reconnects via `onSaved`, but the settings-page dialog only saves and pops. The socket sat "not connected" with a valid key stored.
+* **No validation anywhere.** The dialog opened the socket on an unchecked key, and the screen announced `Live Connected` on socket open — before `setupComplete`. A bad key, a rejected model and a dead network all looked identical: silence.
+* **Close reasons stayed in `debugPrint`.** The code/reason that distinguishes those three failures never reached the UI.
+* **Design trap avoided**: persisting the key would have fixed restart loss, but `test/data/persistence_test.dart` explicitly pins no-persist (`leak-attempt` ignored on hydrate, key absent from snapshots). Key loss on restart is a deliberate security contract, not a bug — the durable path is `--dart-define=GEMINI_API_KEY`.
+
+### The fix
+
+* `GeminiLiveSession.validateApiKey` (static): `GET v1beta/models?pageSize=1` proves the key without spending a generation; returns null or a short human-readable reason (bodies truncated to one 220-char line). `testValidateOverride` seam for tests.
+* `GeminiLiveScreen._connectValidated`: the single choke point for opening the socket (first open, dialog save, settings change). Empty → `Key Needed`; validating → `Validating API key…`; rejected → `Key Invalid` plus the reason in both the reply box and the transcription line; accepted → snapshot `_lastLive*` and connect. Generation-guarded so a newer request wins.
+* Debounced settings listener (400 ms) reconnects on any key/model/voice drift and stands down when the dialog's own save already connected; removed in dispose with the debounce cancelled.
+* Socket-open status is now `Completing handshake…`; `Live Ready` still fires only on `setupComplete`. Close status carries `code + reason` for abnormal closes.
+* `transportFactory` seam on the screen so tests can drive dialog → validate → handshake with a recording transport.
+
+### Tests
+
+* `test/features/ai_assistant/key_connect_gate_test.dart` (5): empty/blank key fails with no network; override seam decides; rejected key shows `Key Invalid` + reason; accepted key sends exactly one setup frame with `outputAudioTranscription` and reaches `Live Ready` on `setupComplete`.
+* Full suite: `flutter analyze` clean, `flutter test` **399/399 green** (394 + 5).
+
+### Still unverified — do not claim it
+
+* A real key against the real endpoint: validation, handshake and the spoken round trip need the owner's key and ears. If the banner says `Key Invalid`, its reason line is the diagnosis.
+
+* **Files**: `lib/features/ai_assistant/gemini_live_session.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `test/features/ai_assistant/key_connect_gate_test.dart` · `AGENTS.md`
+* **Verification**: `flutter analyze` clean · `flutter test` 399/399 green.
 
 ---
 

@@ -93,6 +93,44 @@ class GeminiLiveSession {
       ? AppSettingsController.instance.geminiVoice
       : 'Aoede';
 
+  /// Test seam: when set, [validateApiKey] calls this instead of the network.
+  /// Production never sets it.
+  @visibleForTesting
+  static Future<String?> Function(String key)? testValidateOverride;
+
+  /// Checks an API key against the real Generative Language endpoint before a
+  /// socket is opened, so a bad key (or no network) is reported as exactly
+  /// that instead of a mysterious "not connected" session.
+  ///
+  /// Returns null when the key is accepted, otherwise a short human-readable
+  /// reason. A `GET models?pageSize=1` is used rather than a full
+  /// `generateContent` call: it proves the key without spending a generation.
+  static Future<String?> validateApiKey(String key) async {
+    final override = testValidateOverride;
+    if (override != null) return override(key);
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) return 'The API key is empty.';
+    try {
+      final uri = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=$trimmed',
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) return null;
+      return 'Gemini API error (${res.statusCode}): ${_shortBody(res.body)}';
+    } on TimeoutException {
+      return 'Validation timed out after 10 seconds. Please check your connection.';
+    } catch (e) {
+      return 'Could not reach the Gemini API: $e';
+    }
+  }
+
+  /// Keeps server error bodies out of the UI: one line, capped, no newlines.
+  static String _shortBody(String body) {
+    final oneLine = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (oneLine.length <= 220) return oneLine;
+    return '${oneLine.substring(0, 220)}…';
+  }
+
   static const String naturalTransitInstruction = '''You are BusBuddy, a warm, natural, human transit assistant for bus passengers in Vellore, India (VIT Main Gate to Katpadi Railway Station corridor).
 
 CRITICAL CONVERSATIONAL RULES:
@@ -161,7 +199,10 @@ CRITICAL CONVERSATIONAL RULES:
         _isSetupDone = false;
         _reconnectAttempts = 0;
         _reconnectTimer?.cancel();
-        onStatusChanged?.call('Live Connected', true);
+        // Honest naming: the socket is open but the session is NOT ready
+        // until setupComplete arrives. The old 'Live Connected' label made a
+        // half-open session look connected while every query fell back to REST.
+        onStatusChanged?.call('Completing handshake…', true);
         _sendSetupHandshake();
       },
       onMessage: _handleServerMessage,
@@ -183,7 +224,14 @@ CRITICAL CONVERSATIONAL RULES:
         if (_setupCompleter != null && !_setupCompleter!.isCompleted) {
           _setupCompleter!.completeError('Closed: $code $reason');
         }
-        onStatusChanged?.call('Disconnected', false);
+        // Name the real reason: the close code/reason is what distinguishes a
+        // bad key, a rejected model and a dropped network, and it used to stay
+        // in debugPrint where the passenger could never see it.
+        final detail = (reason == null || reason.isEmpty) ? '' : ': $reason';
+        onStatusChanged?.call(
+          code == 1000 ? 'Disconnected' : 'Disconnected (code $code$detail)',
+          false,
+        );
         if (code != 1000) {
           _handleUnexpectedDisconnect();
         }

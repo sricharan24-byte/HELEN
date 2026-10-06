@@ -23,6 +23,7 @@ import 'audio_speech_engine.dart';
 import 'ai_control_glow.dart';
 import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
+import 'gemini_live_transport.dart';
 import 'model_voice_player.dart';
 
 /// Full-Screen & Modal Interactive Gemini Live Conversational Overlay Screen.
@@ -33,12 +34,16 @@ class GeminiLiveScreen extends StatefulWidget {
     this.repository,
     this.journeyController,
     this.initialQuery,
+    this.transportFactory,
   });
 
   final TicketController? ticketController;
   final TransportRepository? repository;
   final JourneyController? journeyController;
   final String? initialQuery;
+
+  /// Injectable socket factory for tests; production uses the platform default.
+  final GeminiLiveTransport Function()? transportFactory;
 
   @override
   State<GeminiLiveScreen> createState() => _GeminiLiveScreenState();
@@ -108,6 +113,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     )..repeat(reverse: true);
 
     _liveSession = GeminiLiveSession(
+      transportFactory: widget.transportFactory,
       onTextChunk: (text) {
         if (!mounted) return;
         // Streaming text goes to the transcript only. The voice is spoken
@@ -287,9 +293,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
     );
 
-    if (AppSettingsController.instance.geminiApiKey.isNotEmpty) {
-      _liveSession.connect();
-    }
+    // The key, model and voice that the live socket was opened with. The
+    // settings listener below reconnects whenever these drift — previously a
+    // key saved from the settings page never reached the already-open screen,
+    // which sat there looking "not connected" with a valid key stored.
+    _lastLiveKey = AppSettingsController.instance.geminiApiKey;
+    _lastLiveModel = AppSettingsController.instance.geminiModel;
+    _lastLiveVoice = AppSettingsController.instance.geminiVoice;
+    AppSettingsController.instance.addListener(_onSettingsChanged);
+    unawaited(_connectValidated());
 
     // Prime the audio context, but do not rely on this to unlock it: initState
     // runs *after* the tap that pushed this screen, so Chrome's autoplay policy
@@ -360,6 +372,16 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   Timer? _speechTimer;
   StreamSubscription<void>? _modelDrainSub;
 
+  /// Last connection inputs the socket was opened (or gated) with; the
+  /// settings listener compares against these. See initState.
+  String _lastLiveKey = '';
+  String _lastLiveModel = '';
+  String _lastLiveVoice = '';
+  Timer? _settingsDebounce;
+
+  /// Abort token for in-flight key validation: a newer connect request wins.
+  int _connectGeneration = 0;
+
   @override
   void dispose() {
     // Every step is isolated and the process-wide reset comes FIRST.
@@ -383,11 +405,21 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _isListening = false;
     _isSpeaking = false;
     _continuousListening = false;
+    // A validation round-trip that lands after dispose must not touch state.
+    _connectGeneration++;
     runDisposeSteps([
       (name: 'aiControlGlow', run: AiControlGlow.instance.idle),
       (
         name: 'continuousListening',
         run: () => _continuousListening = false,
+      ),
+      (
+        name: 'settingsListener',
+        run: () {
+          AppSettingsController.instance.removeListener(_onSettingsChanged);
+          _settingsDebounce?.cancel();
+          _settingsDebounce = null;
+        },
       ),
       (
         name: 'timers',
@@ -796,6 +828,72 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     unawaited(_liveSession.sendQuery(clean));
   }
 
+  /// The single choke point for opening the socket: validates the key first so
+  /// a bad key (or no network) is reported as exactly that, then connects.
+  /// Every entry reaches here — first open, dialog save, settings change —
+  /// so no path can open a socket on an unchecked key.
+  Future<void> _connectValidated() async {
+    final generation = ++_connectGeneration;
+    final settings = AppSettingsController.instance;
+    if (settings.geminiApiKey.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _liveStatus = 'Key Needed';
+      });
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _liveStatus = 'Validating API key…';
+      });
+    }
+    final error =
+        await GeminiLiveSession.validateApiKey(settings.geminiApiKey);
+    if (!mounted || generation != _connectGeneration) return;
+    if (error != null) {
+      setState(() {
+        _isSpeaking = false;
+        _isListening = false;
+        _liveStatus = 'Key Invalid';
+        _liveTranscription =
+            'API key check failed: $error Tap Connect to try a different key, or type your question below.';
+        _spokenOutput =
+            'The Gemini API key check failed. Please check the key and try again, or type your question.';
+      });
+      return;
+    }
+    _lastLiveKey = settings.geminiApiKey;
+    _lastLiveModel = settings.geminiModel;
+    _lastLiveVoice = settings.geminiVoice;
+    _liveSession.connect();
+  }
+
+  /// Fires on every settings notification (including unrelated ones); the work
+  /// is debounced and then ignored unless the connection inputs moved.
+  void _onSettingsChanged() {
+    _settingsDebounce?.cancel();
+    _settingsDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final settings = AppSettingsController.instance;
+      if (settings.geminiApiKey == _lastLiveKey &&
+          settings.geminiModel == _lastLiveModel &&
+          settings.geminiVoice == _lastLiveVoice) {
+        return;
+      }
+      if (settings.geminiApiKey.trim().isEmpty) {
+        _lastLiveKey = '';
+        _liveSession.disconnect();
+        if (mounted) {
+          setState(() {
+            _liveStatus = 'Key Needed';
+          });
+        }
+        return;
+      }
+      unawaited(_connectValidated());
+    });
+  }
+
   void _showApiKeyDialog() {
     unawaited(
       showDialog<void>(
@@ -806,10 +904,21 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             // it only when the route leaves the tree, so rebuilding the
             // still-animating dialog here (settings notifications fire on
             // save) can never touch a disposed controller.
-            if (newKey.isNotEmpty) {
-              _liveSession.connect(customApiKey: newKey);
-            } else {
+            //
+            // The dialog already stored the key/model/voice in the settings
+            // controller; the settings listener will see the same values and
+            // stand down (its compare runs against the _lastLive* snapshot
+            // taken below), so this explicit connect is the only one.
+            if (newKey.isEmpty) {
               _liveSession.disconnect();
+              _lastLiveKey = '';
+              if (mounted) {
+                setState(() {
+                  _liveStatus = 'Key Needed';
+                });
+              }
+            } else {
+              unawaited(_connectValidated());
             }
             if (mounted) setState(() {});
           },
