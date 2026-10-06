@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/di/service_locator.dart';
@@ -14,7 +15,7 @@ import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
 import '../journey/live_location_map_widget.dart';
 import '../safety/safety_sharing_page.dart';
-import '../saved/saved_page.dart';
+import '../saved/saved_place_chips.dart';
 import '../tickets/booking_checkout_dialog.dart';
 import '../tickets/live_location_screen.dart';
 import '../tickets/ticket_controller.dart';
@@ -65,6 +66,39 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   String _selectedBusId = '18B';
   bool _isCurrentLocation = true;
   String? _lastAnnouncedStop;
+
+  /// Saved places resolved against the loaded stops, in the passenger's saved
+  /// order. Unknown IDs (e.g. a stop removed from fixtures) are skipped so a
+  /// stale entry can never break the pickers.
+  List<Stop> _savedPlaceStops() {
+    final byId = {for (final s in _allStops) s.id: s};
+    return [
+      for (final id in AppSettingsController.instance.savedPlaceStopIds)
+        if (byId.containsKey(id)) byId[id]!,
+    ];
+  }
+
+  /// Star toggle shared by the origin and destination picker rows. The sheets
+  /// rebuild through a ListenableBuilder on the settings controller, so the
+  /// toggle needs no local setState.
+  Widget _saveStarToggle(Stop stop) {
+    final colors = AppTheme.colors(context);
+    final saved = AppSettingsController.instance.isPlaceSaved(stop.id);
+    return IconButton(
+      icon: Icon(
+        saved ? Icons.star : Icons.star_outline,
+        color: saved ? colors.actionPrimary : colors.textSecondary,
+      ),
+      tooltip: saved
+          ? 'Remove ${stop.name} from saved places'
+          : 'Save ${stop.name} to saved places',
+      onPressed: () => AppSettingsController.instance.toggleSavedPlace(
+        stop.id,
+        save: !saved,
+      ),
+    );
+  }
+
   bool _hasArrived = false;
   bool _tripActionInFlight = false;
 
@@ -178,106 +212,115 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
         ),
         builder: (context) {
-          return Material(
-            color: colors.background,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select Origin Stop',
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
+          // Reactive to the settings controller so the star toggles repaint
+          // without local setState (the sheet is a separate route).
+          return ListenableBuilder(
+            listenable: AppSettingsController.instance,
+            builder: (context, _) {
+              return Material(
+                color: colors.background,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.7,
                   ),
-                  const SizedBox(height: 16),
-                  Material(
-                    color: Colors.transparent,
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.my_location,
-                        color: colors.actionPrimary,
-                      ),
-                      title: Text(
-                        'Current Location (VIT Main Gate)',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Origin Stop',
                         style: TextStyle(
                           color: colors.textPrimary,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      onTap: () {
-                        setState(() {
-                          _isCurrentLocation = true;
-                          _origin = _allStops.firstWhere(
-                            (s) => s.name.contains('VIT'),
-                            orElse: () => _allStops.isNotEmpty
-                                ? _allStops.first
-                                : const Stop(
-                                    id: 'vit-main-gate',
-                                    name: 'VIT Main Gate',
-                                    area: 'Vellore',
-                                  ),
-                          );
-                        });
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                  Divider(color: colors.border),
-                  Expanded(
-                    child: ListView(
-                      children: _allStops.map((stop) {
-                        final isSelected =
-                            !_isCurrentLocation && stop.id == _origin.id;
-                        return Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.location_on,
-                              color: isSelected
-                                  ? colors.actionPrimary
-                                  : colors.textSecondary,
-                            ),
-                            title: Text(
-                              stop.name,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? colors.actionPrimary
-                                    : colors.textPrimary,
-                                fontWeight: isSelected
-                                    ? FontWeight.w800
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                            subtitle: Text(
-                              stop.area,
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            onTap: () {
-                              setState(() {
-                                _isCurrentLocation = false;
-                                _origin = stop;
-                              });
-                              Navigator.of(context).pop();
-                            },
+                      const SizedBox(height: 16),
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.my_location,
+                            color: colors.actionPrimary,
                           ),
-                        );
-                      }).toList(),
-                    ),
+                          title: Text(
+                            'Current Location (VIT Main Gate)',
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _isCurrentLocation = true;
+                              _origin = _allStops.firstWhere(
+                                (s) => s.name.contains('VIT'),
+                                orElse: () => _allStops.isNotEmpty
+                                    ? _allStops.first
+                                    : const Stop(
+                                        id: 'vit-main-gate',
+                                        name: 'VIT Main Gate',
+                                        area: 'Vellore',
+                                      ),
+                              );
+                            });
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ),
+                      Divider(color: colors.border),
+                      Expanded(
+                        child: ListView(
+                          children: _allStops.map((stop) {
+                            final isSelected =
+                                !_isCurrentLocation && stop.id == _origin.id;
+                            return Material(
+                              color: Colors.transparent,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.location_on,
+                                  color: isSelected
+                                      ? colors.actionPrimary
+                                      : colors.textSecondary,
+                                ),
+                                title: Text(
+                                  stop.name,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? colors.actionPrimary
+                                        : colors.textPrimary,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w800
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  stop.area,
+                                  style: TextStyle(
+                                    color: colors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                // Star/unstar without leaving the picker.
+                                trailing: _saveStarToggle(stop),
+                                onTap: () {
+                                  setState(() {
+                                    _isCurrentLocation = false;
+                                    _origin = stop;
+                                  });
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -296,71 +339,78 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
         ),
         builder: (context) {
-          return Material(
-            color: colors.background,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select Destination Stop',
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
+          return ListenableBuilder(
+            listenable: AppSettingsController.instance,
+            builder: (context, _) {
+              return Material(
+                color: colors.background,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.7,
                   ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: ListView(
-                      children: _allStops.map((stop) {
-                        final isSelected = stop.id == _destination.id;
-                        return Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.location_on,
-                              color: isSelected
-                                  ? colors.actionPrimary
-                                  : colors.textSecondary,
-                            ),
-                            title: Text(
-                              stop.name,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? colors.actionPrimary
-                                    : colors.textPrimary,
-                                fontWeight: isSelected
-                                    ? FontWeight.w800
-                                    : FontWeight.w500,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Destination Stop',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: ListView(
+                          children: _allStops.map((stop) {
+                            final isSelected = stop.id == _destination.id;
+                            return Material(
+                              color: Colors.transparent,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.location_on,
+                                  color: isSelected
+                                      ? colors.actionPrimary
+                                      : colors.textSecondary,
+                                ),
+                                title: Text(
+                                  stop.name,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? colors.actionPrimary
+                                        : colors.textPrimary,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w800
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  stop.area,
+                                  style: TextStyle(
+                                    color: colors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                // Star/unstar without leaving the picker.
+                                trailing: _saveStarToggle(stop),
+                                onTap: () {
+                                  setState(() {
+                                    _destination = stop;
+                                  });
+                                  Navigator.of(context).pop();
+                                },
                               ),
-                            ),
-                            subtitle: Text(
-                              stop.area,
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            onTap: () {
-                              setState(() {
-                                _destination = stop;
-                              });
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -970,6 +1020,44 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
           const SizedBox(height: 14),
 
+          // Saved places — one tap sets the destination. Star any stop in the
+          // pickers above to add it here; unstar to remove it.
+          ListenableBuilder(
+            listenable: AppSettingsController.instance,
+            builder: (context, _) {
+              final saved = _savedPlaceStops();
+              if (saved.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SAVED PLACES',
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SavedPlaceChips(
+                    stops: saved,
+                    selectedStopId: _destination.id,
+                    onSelect: (stop) {
+                      setState(() {
+                        _destination = stop;
+                      });
+                      AnnouncementCoordinator.instance.announce(
+                        'Destination set to ${stop.name}.',
+                        priority: AnnouncementPriority.normal,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              );
+            },
+          ),
+
           // DATE Card
           InkWell(
             onTap: _openDatePicker,
@@ -1065,119 +1153,52 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ),
           const SizedBox(height: 24),
 
-          // Shortcut Cards Row (Saved Places | Recent Trips)
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    unawaited(
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => SavedPage(
-                            ticketController: widget.ticketController,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
+          // Recent Trips shortcut card (ticket history lives in My Tickets).
+          // Saved places moved to one-tap chips above, next to the TO card.
+          InkWell(
+            onTap: () {
+              setState(() => _activeStepIndex = 1);
+            },
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: colors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colors.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      border: Border.all(color: colors.border),
+                      color: colors.surface,
+                      shape: BoxShape.circle,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: colors.surface,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.star,
-                            color: colors.textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Saved Places',
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Home, College etc.',
-                          style: TextStyle(
-                            color: colors.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                    child: Icon(
+                      Icons.access_time_filled,
+                      color: colors.textPrimary,
+                      size: 20,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    setState(() => _activeStepIndex = 1);
-                  },
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: colors.surface,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.access_time_filled,
-                            color: colors.textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Recent Trips',
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'View history',
-                          style: TextStyle(
-                            color: colors.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 14),
+                  Text(
+                    'Recent Trips',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'View history',
+                    style: TextStyle(color: colors.textMuted, fontSize: 12),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),

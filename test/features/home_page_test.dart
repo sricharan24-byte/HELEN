@@ -72,7 +72,9 @@ void main() {
       expect(find.text('Travel Together, Go Further'), findsOneWidget);
     });
 
-    testWidgets('displays active ticket greeting banner (Image 2)', (tester) async {
+    testWidgets('displays active ticket greeting banner (Image 2)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         testApp(ticketController: bookCorridorTicketController()),
       );
@@ -82,24 +84,29 @@ void main() {
       expect(find.text("Here's your journey today."), findsOneWidget);
     });
 
-    testWidgets('displays idle greeting banner when no active ticket (Image 1)', (tester) async {
-      final ticketRepo = LocalTicketRepository();
-      final ticketController = TicketController(ticketRepo);
-      ticketController.cancelActiveTicket();
+    testWidgets(
+      'displays idle greeting banner when no active ticket (Image 1)',
+      (tester) async {
+        final ticketRepo = LocalTicketRepository();
+        final ticketController = TicketController(ticketRepo);
+        ticketController.cancelActiveTicket();
 
-      await tester.pumpWidget(testApp(ticketController: ticketController));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(testApp(ticketController: ticketController));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Good morning!'), findsOneWidget);
-      expect(find.text('What would you like to do?'), findsOneWidget);
-      // 'My Journey' option was removed from the home screen options.
-      expect(find.text('No active journey'), findsNothing);
-    });
+        expect(find.text('Good morning!'), findsOneWidget);
+        expect(find.text('What would you like to do?'), findsOneWidget);
+        // 'My Journey' option was removed from the home screen options.
+        expect(find.text('No active journey'), findsNothing);
+      },
+    );
   });
 
   // ── My Journey Card ──────────────────────────────────────────────────
   group('My Journey Card', () {
-    testWidgets('shows active journey details and status badge', (tester) async {
+    testWidgets('shows active journey details and status badge', (
+      tester,
+    ) async {
       final ticketController = bookCorridorTicketController();
       await tester.pumpWidget(testApp(ticketController: ticketController));
       await tester.pumpAndSettle();
@@ -119,7 +126,7 @@ void main() {
 
   // ── Task Action Cards ────────────────────────────────────────────────
   group('Task Action Cards', () {
-    testWidgets('shows 5 task-oriented action cards', (tester) async {
+    testWidgets('shows 4 task-oriented action cards', (tester) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 2000);
       addTearDown(() {
@@ -132,7 +139,8 @@ void main() {
 
       expect(find.text('Find a Place'), findsOneWidget);
       expect(find.text('My Tickets'), findsOneWidget);
-      expect(find.text('Saved Places'), findsOneWidget);
+      // Saved places left the home page for one-tap chips in the pickers.
+      expect(find.text('Saved Places'), findsNothing);
       expect(find.text('Ask BusBuddy'), findsOneWidget);
       expect(find.text('Settings'), findsWidgets);
     });
@@ -152,11 +160,14 @@ void main() {
 
   // ── Bottom Navigation Bar ─────────────────────────────────────────────
   group('Bottom Navigation', () {
-    testWidgets('bottom navigation bar is removed for clean full-screen layout', (tester) async {
-      await tester.pumpWidget(testApp());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'bottom navigation bar is removed for clean full-screen layout',
+      (tester) async {
+        await tester.pumpWidget(testApp());
+        await tester.pumpAndSettle();
 
-      expect(find.byType(BottomNavigationBar), findsNothing);
-    });
+        expect(find.byType(BottomNavigationBar), findsNothing);
+      },
+    );
   });
 }

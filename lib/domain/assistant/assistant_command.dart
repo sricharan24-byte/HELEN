@@ -1,10 +1,7 @@
 /// Categorization of voice assistant tools and user commands into
 /// read-only informational queries versus confirmable mutating commands
 /// per Astra BUS-P0-05.
-enum CommandSafetyLevel {
-  readOnly,
-  requiresUserConfirmation,
-}
+enum CommandSafetyLevel { readOnly, requiresUserConfirmation }
 
 class AssistantToolMetadata {
   const AssistantToolMetadata({
@@ -61,16 +58,10 @@ class AssistantCommandGateway {
     'search_route': AssistantToolMetadata(
       name: 'search_route',
       safetyLevel: CommandSafetyLevel.readOnly,
-      description: 'Finds available buses and shows route options between origin and destination.',
+      description:
+          'Finds available buses and shows route options between origin and destination. Saved places are one-tap chips inside route search and booking.',
       promptSummary: 'Route options and schedules are displayed.',
       gatewayScreenPrompt: '🚌 View Route Options',
-    ),
-    'open_saved': AssistantToolMetadata(
-      name: 'open_saved',
-      safetyLevel: CommandSafetyLevel.readOnly,
-      description: 'Opens saved places like Home, College, or Hostel.',
-      promptSummary: 'Saved places are open.',
-      gatewayScreenPrompt: '⭐ Saved Places',
     ),
     'emergency_sos': AssistantToolMetadata(
       name: 'emergency_sos',

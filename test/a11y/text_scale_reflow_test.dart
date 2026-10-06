@@ -11,8 +11,8 @@ import 'package:busbuddy/features/journey/journey_controller.dart';
 import 'package:busbuddy/features/route_details/route_details_page.dart';
 import 'package:busbuddy/features/route_search/route_search_page.dart';
 import 'package:busbuddy/features/safety/safety_sharing_page.dart';
-import 'package:busbuddy/features/saved/saved_page.dart';
 import 'package:busbuddy/features/tickets/booking_checkout_dialog.dart';
+import 'package:busbuddy/features/tickets/my_tickets_page.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 import '../helpers/map_test_tiles.dart';
 
@@ -53,116 +53,134 @@ void main() {
 
   group('Astra BUS-P1-05: Responsive Reflow at 200–300% Text Scale', () {
     for (final scale in [2.0, 3.0]) {
-      testWidgets('RouteSearchPage reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: RouteSearchPage(
-              controller: journeyController,
-              repository: repository,
-              onRouteSelected: (_) {},
+      testWidgets(
+        'RouteSearchPage reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: RouteSearchPage(
+                controller: journeyController,
+                repository: repository,
+                onRouteSelected: (_) {},
+              ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Choose starting stop'), findsOneWidget);
-        expect(find.text('Choose destination stop'), findsOneWidget);
-        expect(find.text('Search'), findsOneWidget);
-      });
+          expect(tester.takeException(), isNull);
+          expect(find.text('Choose starting stop'), findsOneWidget);
+          expect(find.text('Choose destination stop'), findsOneWidget);
+          expect(find.text('Search'), findsOneWidget);
+        },
+      );
 
-      testWidgets('RouteDetailsPage reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        journeyController.selectRoute(testRoute);
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: RouteDetailsPage(
-              controller: journeyController,
-              repository: repository,
+      testWidgets(
+        'RouteDetailsPage reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          journeyController.selectRoute(testRoute);
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: RouteDetailsPage(
+                controller: journeyController,
+                repository: repository,
+              ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text(testRoute.displayName), findsOneWidget);
-        expect(find.text('Start this journey'), findsOneWidget);
-      });
+          expect(tester.takeException(), isNull);
+          expect(find.text(testRoute.displayName), findsOneWidget);
+          expect(find.text('Start this journey'), findsOneWidget);
+        },
+      );
 
-      testWidgets('BookingCheckoutDialog reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        final origin = repository.getStop(testRoute.orderedStopIds.first)!;
-        final destination = repository.getStop(testRoute.orderedStopIds.last)!;
+      testWidgets(
+        'BookingCheckoutDialog reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          final origin = repository.getStop(testRoute.orderedStopIds.first)!;
+          final destination = repository.getStop(
+            testRoute.orderedStopIds.last,
+          )!;
 
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: BookingCheckoutDialog(
-              busId: '18B',
-              routeName: testRoute.displayName,
-              origin: origin,
-              destination: destination,
-              baseFare: 25.0,
-              onTicketBooked: (_) {},
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: BookingCheckoutDialog(
+                busId: '18B',
+                routeName: testRoute.displayName,
+                origin: origin,
+                destination: destination,
+                baseFare: 25.0,
+                onTicketBooked: (_) {},
+              ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
-        expect(find.text('TOTAL FARE'), findsOneWidget);
-      });
+          expect(tester.takeException(), isNull);
+          expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
+          expect(find.text('TOTAL FARE'), findsOneWidget);
+        },
+      );
 
-      testWidgets('SavedPage reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: SavedPage(
-              ticketController: ticketController,
+      testWidgets(
+        'MyTicketsPage reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: MyTicketsPage(ticketController: ticketController),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('Saved Passes & Favorites'), findsOneWidget);
-      });
+          expect(tester.takeException(), isNull);
+          expect(find.text('My Tickets'), findsOneWidget);
+        },
+      );
 
-      testWidgets('SafetySharingPage reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: SafetySharingPage(),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(tester.takeException(), isNull);
-        expect(find.text('Safety & Emergency Sharing'), findsOneWidget);
-        expect(find.text('BROADCAST SOS ALERT NOW'), findsOneWidget);
-      });
-
-      testWidgets('GeminiLiveScreen reflows cleanly at ${scale * 100}% text scale', (tester) async {
-        await tester.pumpWidget(
-          buildScaledContainer(
-            textScaleFactor: scale,
-            child: GeminiLiveScreen(
-              ticketController: ticketController,
-              repository: repository,
-              journeyController: journeyController,
+      testWidgets(
+        'SafetySharingPage reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: SafetySharingPage(),
             ),
-          ),
-        );
-        // The live visualizer runs continuous animation timers, so settle to a
-        // bounded number of frames rather than waiting for quiescence.
-        await tester.pump(const Duration(milliseconds: 300));
-        await tester.pump(const Duration(milliseconds: 300));
+          );
+          await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('GEMINI LIVE'), findsWidgets);
-        expect(find.text('Where is my bus?'), findsOneWidget);
-      });
+          expect(tester.takeException(), isNull);
+          expect(find.text('Safety & Emergency Sharing'), findsOneWidget);
+          expect(find.text('BROADCAST SOS ALERT NOW'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'GeminiLiveScreen reflows cleanly at ${scale * 100}% text scale',
+        (tester) async {
+          await tester.pumpWidget(
+            buildScaledContainer(
+              textScaleFactor: scale,
+              child: GeminiLiveScreen(
+                ticketController: ticketController,
+                repository: repository,
+                journeyController: journeyController,
+              ),
+            ),
+          );
+          // The live visualizer runs continuous animation timers, so settle to a
+          // bounded number of frames rather than waiting for quiescence.
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump(const Duration(milliseconds: 300));
+
+          expect(tester.takeException(), isNull);
+          expect(find.text('GEMINI LIVE'), findsWidgets);
+          expect(find.text('Where is my bus?'), findsOneWidget);
+        },
+      );
     }
   });
 }

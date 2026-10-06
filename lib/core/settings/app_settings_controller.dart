@@ -30,22 +30,60 @@ class AppSettingsController extends ChangeNotifier {
       bool flag(String key, bool fallback) =>
           value[key] is bool ? value[key] as bool : fallback;
 
-      textSize = choice('textSize', textSize, ['Small', 'Medium', 'Large', 'Extra Large']);
+      textSize = choice('textSize', textSize, [
+        'Small',
+        'Medium',
+        'Large',
+        'Extra Large',
+      ]);
       highContrast = choice('highContrast', highContrast, ['On', 'Off']);
       hapticFeedback = flag('hapticFeedback', hapticFeedback);
       simplifiedNav = flag('simplifiedNav', simplifiedNav);
       screenReaderHints = flag('screenReaderHints', screenReaderHints);
       adaptiveUi = flag('adaptiveUi', adaptiveUi);
-      startingScreen = choice('startingScreen', startingScreen, ['Home', 'Live Tracking', 'My Tickets', 'Alerts']);
-      preferredLanguage = choice('preferredLanguage', preferredLanguage, ['English', 'Tamil', 'Hindi', 'Telugu']);
+      startingScreen = choice('startingScreen', startingScreen, [
+        'Home',
+        'Live Tracking',
+        'My Tickets',
+        'Alerts',
+      ]);
+      preferredLanguage = choice('preferredLanguage', preferredLanguage, [
+        'English',
+        'Tamil',
+        'Hindi',
+        'Telugu',
+      ]);
       voiceSpeed = choice('voiceSpeed', voiceSpeed, ['Slow', 'Normal', 'Fast']);
       wakePhrase = flag('wakePhrase', wakePhrase);
       voiceConfirmations = flag('voiceConfirmations', voiceConfirmations);
       useGemini = flag('useGemini', useGemini);
-      floatingAssistantEnabled = flag('floatingAssistantEnabled', floatingAssistantEnabled);
+      floatingAssistantEnabled = flag(
+        'floatingAssistantEnabled',
+        floatingAssistantEnabled,
+      );
       final model = value['geminiModel'];
-      if (model is String && model.trim().isNotEmpty) geminiModel = model.trim();
-      geminiVoice = choice('geminiVoice', geminiVoice, ['Aoede', 'Kore', 'Charon', 'Puck', 'Fenrir']);
+      if (model is String && model.trim().isNotEmpty) {
+        geminiModel = model.trim();
+      }
+      geminiVoice = choice('geminiVoice', geminiVoice, [
+        'Aoede',
+        'Kore',
+        'Charon',
+        'Puck',
+        'Fenrir',
+      ]);
+
+      final savedRaw = value['savedPlaceStopIds'];
+      if (savedRaw is List) {
+        final loaded = savedRaw
+            .whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (loaded.isNotEmpty) {
+          savedPlaceStopIds = loaded;
+        }
+      }
 
       final layoutRaw = value['homeScreenLayout'];
       if (layoutRaw is List) {
@@ -56,12 +94,18 @@ class AppSettingsController extends ChangeNotifier {
             final parsed = HomeScreenItem.fromJson(item);
             // Skip items that no longer exist in the default layout
             // (e.g. removed options like 'my_journey' or 'live_tracking').
-            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) continue;
+            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) {
+              continue;
+            }
             loaded.add(parsed);
             seenIds.add(parsed.id);
           } else if (item is Map) {
-            final parsed = HomeScreenItem.fromJson(Map<String, dynamic>.from(item));
-            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) continue;
+            final parsed = HomeScreenItem.fromJson(
+              Map<String, dynamic>.from(item),
+            );
+            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) {
+              continue;
+            }
             loaded.add(parsed);
             seenIds.add(parsed.id);
           }
@@ -96,6 +140,7 @@ class AppSettingsController extends ChangeNotifier {
     'floatingAssistantEnabled': floatingAssistantEnabled,
     'geminiModel': geminiModel,
     'geminiVoice': geminiVoice,
+    'savedPlaceStopIds': savedPlaceStopIds.toList(),
     'homeScreenLayout': homeScreenItems.map((e) => e.toJson()).toList(),
   };
 
@@ -121,9 +166,49 @@ class AppSettingsController extends ChangeNotifier {
   bool voiceConfirmations = true;
   bool useGemini = true;
   bool floatingAssistantEnabled = true;
-  String geminiApiKey = const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-  String geminiModel = const String.fromEnvironment('GEMINI_MODEL', defaultValue: 'models/gemini-3.8-live');
-  String geminiVoice = const String.fromEnvironment('GEMINI_VOICE', defaultValue: 'Aoede');
+  String geminiApiKey = const String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
+  String geminiModel = const String.fromEnvironment(
+    'GEMINI_MODEL',
+    defaultValue: 'models/gemini-3.8-live',
+  );
+  String geminiVoice = const String.fromEnvironment(
+    'GEMINI_VOICE',
+    defaultValue: 'Aoede',
+  );
+
+  /// User-saved place stops, as transport stop IDs. Seeded with the corridor's
+  /// everyday places so the booking and route-search pickers offer one-tap
+  /// destinations from the first run; the passenger can star/unstar any stop
+  /// to add or remove entries. Rendered by name (resolved from the transport
+  /// data source), never persisted as display text.
+  List<String> savedPlaceStopIds = [
+    'vit-main-gate',
+    'katpadi-railway-station',
+    'green-circle',
+    'katpadi-bus-stand',
+  ];
+
+  /// True when [stopId] is in the passenger's saved places.
+  bool isPlaceSaved(String stopId) => savedPlaceStopIds.contains(stopId);
+
+  /// Stars ([save]=true) or unstars a stop. Unknown IDs are ignored so a
+  /// stale entry can never break the pickers.
+  void toggleSavedPlace(String stopId, {required bool save}) {
+    final id = stopId.trim();
+    if (id.isEmpty) return;
+    final updated = savedPlaceStopIds.toList();
+    if (save) {
+      if (!updated.contains(id)) updated.add(id);
+    } else {
+      updated.remove(id);
+    }
+    savedPlaceStopIds = updated;
+    notifyListeners();
+  }
+
   List<HomeScreenItem> homeScreenItems = List.from(HomeScreenItem.defaultItems);
 
   /// In-app text enlargement multiplier.
@@ -277,7 +362,9 @@ class AppSettingsController extends ChangeNotifier {
   void toggleHomeScreenItemVisibility(String id, bool isVisible) {
     final index = homeScreenItems.indexWhere((e) => e.id == id);
     if (index != -1) {
-      homeScreenItems[index] = homeScreenItems[index].copyWith(isVisible: isVisible);
+      homeScreenItems[index] = homeScreenItems[index].copyWith(
+        isVisible: isVisible,
+      );
       notifyListeners();
     }
   }
@@ -319,9 +406,24 @@ class AppSettingsController extends ChangeNotifier {
     voiceConfirmations = true;
     useGemini = true;
     floatingAssistantEnabled = true;
-    geminiApiKey = const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-    geminiModel = const String.fromEnvironment('GEMINI_MODEL', defaultValue: 'models/gemini-3.8-live');
-    geminiVoice = const String.fromEnvironment('GEMINI_VOICE', defaultValue: 'Aoede');
+    geminiApiKey = const String.fromEnvironment(
+      'GEMINI_API_KEY',
+      defaultValue: '',
+    );
+    geminiModel = const String.fromEnvironment(
+      'GEMINI_MODEL',
+      defaultValue: 'models/gemini-3.8-live',
+    );
+    geminiVoice = const String.fromEnvironment(
+      'GEMINI_VOICE',
+      defaultValue: 'Aoede',
+    );
+    savedPlaceStopIds = [
+      'vit-main-gate',
+      'katpadi-railway-station',
+      'green-circle',
+      'katpadi-bus-stand',
+    ];
     homeScreenItems = List.from(HomeScreenItem.defaultItems);
     notifyListeners();
   }

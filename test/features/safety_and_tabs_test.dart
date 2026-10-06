@@ -8,8 +8,8 @@ import 'package:busbuddy/features/alerts/alerts_page.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
 import 'package:busbuddy/features/safety/safety_sharing_page.dart';
-import 'package:busbuddy/features/saved/saved_page.dart';
 import 'package:busbuddy/features/settings/settings_page.dart';
+import 'package:busbuddy/features/tickets/my_tickets_page.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 
 void main() {
@@ -44,33 +44,38 @@ void main() {
       expect(find.textContaining('Bus TN-23-BUS-42 On Time'), findsOneWidget);
     });
 
-    testWidgets('SavedPage renders passbook', (tester) async {
-      final ticketRepo = LocalTicketRepository();
-      final ticketController = TicketController(ticketRepo);
-      // Fresh installs start ticketless: book the pass under test.
-      final dataSource = LocalTransportDataSource();
-      final route = dataSource.allRoutes.firstWhere(
-        (r) => r.id == 'vit-to-katpadi',
-        orElse: () => dataSource.allRoutes.first,
-      );
-      ticketController.bookTicket(
-        origin: dataSource.stopById('vit-main-gate')!,
-        destination: dataSource.stopById('katpadi-railway-station')!,
-        route: route,
-        passengerName: 'Pavan K',
-      );
+    testWidgets(
+      'MyTicketsPage renders the active pass (SavedPage was removed)',
+      (tester) async {
+        final ticketRepo = LocalTicketRepository();
+        final ticketController = TicketController(ticketRepo);
+        // Fresh installs start ticketless: book the pass under test.
+        final dataSource = LocalTransportDataSource();
+        final route = dataSource.allRoutes.firstWhere(
+          (r) => r.id == 'vit-to-katpadi',
+          orElse: () => dataSource.allRoutes.first,
+        );
+        ticketController.bookTicket(
+          origin: dataSource.stopById('vit-main-gate')!,
+          destination: dataSource.stopById('katpadi-railway-station')!,
+          route: route,
+          passengerName: 'Pavan K',
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData(useMaterial3: true),
-          home: SavedPage(ticketController: ticketController),
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(useMaterial3: true),
+            home: MyTicketsPage(ticketController: ticketController),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Saved Passes & Favorites'), findsOneWidget);
-      expect(find.text('ACTIVE DIGITAL PASS'), findsOneWidget);
-    });
+        // The deleted SavedPage showed this same ticket history; My Tickets is
+        // the only passbook now.
+        expect(find.text('My Tickets'), findsOneWidget);
+        expect(find.text('ACTIVE'), findsOneWidget);
+      },
+    );
 
     testWidgets('SettingsPage renders accessibility switches', (tester) async {
       await tester.pumpWidget(
@@ -86,7 +91,9 @@ void main() {
       expect(find.text('Personalization Settings'), findsOneWidget);
     });
 
-    testWidgets('HomePage opens SettingsPage via Settings action card', (tester) async {
+    testWidgets('HomePage opens SettingsPage via Settings action card', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {

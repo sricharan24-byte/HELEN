@@ -4,11 +4,13 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
+import '../saved/saved_place_chips.dart';
 
 /// A page for choosing origin and destination stops, then searching routes.
 ///
@@ -108,101 +110,160 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                   child: SingleChildScrollView(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Origin
-                      Semantics(
-                        label: 'Choose starting stop',
-                        button: true,
-                        excludeSemantics: true,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 52),
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
-                              foregroundColor: colors.textPrimary,
-                              side: BorderSide(color: colors.border, width: colors.isHighContrast ? 2 : 1),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            onPressed: () => _pickStop(isOrigin: true),
-                            icon: Icon(Icons.trip_origin, size: 20, color: colors.actionPrimary),
-                            label: Text(
-                              state.origin?.name ?? 'Choose starting stop',
-                              style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Origin
+                          Semantics(
+                            label: 'Choose starting stop',
+                            button: true,
+                            excludeSemantics: true,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 52),
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(
+                                    AppSpacing.minTouchTarget,
+                                    AppSpacing.minTouchTarget,
+                                  ),
+                                  foregroundColor: colors.textPrimary,
+                                  side: BorderSide(
+                                    color: colors.border,
+                                    width: colors.isHighContrast ? 2 : 1,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd,
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed: () => _pickStop(isOrigin: true),
+                                icon: Icon(
+                                  Icons.trip_origin,
+                                  size: 20,
+                                  color: colors.actionPrimary,
+                                ),
+                                label: Text(
+                                  state.origin?.name ?? 'Choose starting stop',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                          const SizedBox(height: 12),
 
-                      // Destination
-                      Semantics(
-                        label: 'Choose destination stop',
-                        button: true,
-                        excludeSemantics: true,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 52),
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
-                              foregroundColor: colors.textPrimary,
-                              side: BorderSide(color: colors.border, width: colors.isHighContrast ? 2 : 1),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            onPressed: () => _pickStop(isOrigin: false),
-                            icon: Icon(Icons.location_on, size: 20, color: colors.actionPrimary),
-                            label: Text(
-                              state.destination?.name ?? 'Choose destination stop',
-                              style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
+                          // Destination
+                          Semantics(
+                            label: 'Choose destination stop',
+                            button: true,
+                            excludeSemantics: true,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 52),
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(
+                                    AppSpacing.minTouchTarget,
+                                    AppSpacing.minTouchTarget,
+                                  ),
+                                  foregroundColor: colors.textPrimary,
+                                  side: BorderSide(
+                                    color: colors.border,
+                                    width: colors.isHighContrast ? 2 : 1,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd,
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed: () => _pickStop(isOrigin: false),
+                                icon: Icon(
+                                  Icons.location_on,
+                                  size: 20,
+                                  color: colors.actionPrimary,
+                                ),
+                                label: Text(
+                                  state.destination?.name ??
+                                      'Choose destination stop',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
-                      // Search status guidance
-                      Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          state.errorMessage ??
-                              (_canSearch
-                                  ? 'Ready to search routes.'
-                                  : 'Choose an origin and destination first.'),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: state.errorMessage != null ? colors.statusError : colors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Search button
-                      Semantics(
-                        label: 'Search routes',
-                        button: true,
-                        excludeSemantics: true,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 52),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
-                              backgroundColor: colors.actionPrimary,
-                              foregroundColor: colors.onActionPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          // Search status guidance
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              state.errorMessage ??
+                                  (_canSearch
+                                      ? 'Ready to search routes.'
+                                      : 'Choose an origin and destination first.'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: state.errorMessage != null
+                                    ? colors.statusError
+                                    : colors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            onPressed: _canSearch ? _search : null,
-                            child: const Text('Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+
+                          // Search button
+                          Semantics(
+                            label: 'Search routes',
+                            button: true,
+                            excludeSemantics: true,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 52),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(
+                                    AppSpacing.minTouchTarget,
+                                    AppSpacing.minTouchTarget,
+                                  ),
+                                  backgroundColor: colors.actionPrimary,
+                                  foregroundColor: colors.onActionPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd,
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed: _canSearch ? _search : null,
+                                child: const Text(
+                                  'Search',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                     ),
                   ),
                 ),
@@ -217,7 +278,10 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                             _canSearch
                                 ? 'Tap Search to find routes.'
                                 : 'Select origin and destination above.',
-                            style: TextStyle(fontSize: 15, color: colors.textSecondary),
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: colors.textSecondary,
+                            ),
                           ),
                         )
                       : ListView.builder(
@@ -233,8 +297,13 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                                 margin: const EdgeInsets.only(bottom: 10),
                                 decoration: BoxDecoration(
                                   color: colors.surface,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                  border: Border.all(color: colors.border, width: colors.isHighContrast ? 2 : 1),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
+                                  border: Border.all(
+                                    color: colors.border,
+                                    width: colors.isHighContrast ? 2 : 1,
+                                  ),
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
@@ -242,17 +311,28 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                                     leading: CircleAvatar(
                                       backgroundColor: colors.surfaceSubtle,
                                       foregroundColor: colors.actionPrimary,
-                                      child: const Icon(Icons.directions_bus, size: 20),
+                                      child: const Icon(
+                                        Icons.directions_bus,
+                                        size: 20,
+                                      ),
                                     ),
                                     title: Text(
                                       route.displayName,
-                                      style: TextStyle(fontWeight: FontWeight.w800, color: colors.textPrimary),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: colors.textPrimary,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       '${route.direction} · ${route.orderedStopIds.length} stops',
-                                      style: TextStyle(color: colors.textSecondary),
+                                      style: TextStyle(
+                                        color: colors.textSecondary,
+                                      ),
                                     ),
-                                    trailing: Icon(Icons.chevron_right_rounded, color: colors.textSecondary),
+                                    trailing: Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: colors.textSecondary,
+                                    ),
                                     onTap: () {
                                       _ctrl.selectRoute(route);
                                       widget.onRouteSelected(route.id);
@@ -321,62 +401,128 @@ class _StopPickerSheetState extends State<_StopPickerSheet> {
       builder: (context, scrollController) {
         return Material(
           color: colors.background,
-          child: Column(
-            children: [
-              // Handle bar
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Search field
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  style: TextStyle(color: colors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Search stops…',
-                    hintStyle: TextStyle(color: colors.textSecondary),
-                    prefixIcon: Icon(Icons.search, color: colors.actionPrimary),
-                  ),
-                  onChanged: _applyFilter,
-                ),
-              ),
-              // Stop list
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: _filtered.length,
-                  itemBuilder: (context, index) {
-                    final stop = _filtered[index];
-                    return Container(
+          child: ListenableBuilder(
+            listenable: AppSettingsController.instance,
+            builder: (context, _) {
+              // Saved places resolved against the full stop list, in the
+              // passenger's saved order. Stale IDs are skipped. The chips
+              // follow the search filter like the list below, so filtering
+              // for 'Katpadi' hides the VIT chip instead of contradicting
+              // the results.
+              final byId = {
+                for (final s in widget.repository.findStops('')) s.id: s,
+              };
+              final saved = [
+                for (final id
+                    in AppSettingsController.instance.savedPlaceStopIds)
+                  if (byId.containsKey(id)) byId[id]!,
+              ];
+              final query = _controller.text.trim().toLowerCase();
+              final visibleSaved = query.isEmpty
+                  ? saved
+                  : saved
+                        .where(
+                          (s) =>
+                              s.name.toLowerCase().contains(query) ||
+                              s.area.toLowerCase().contains(query),
+                        )
+                        .toList();
+              return Column(
+                children: [
+                  // Handle bar
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Container(
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: colors.border.withValues(alpha: 0.3))),
+                        color: colors.border,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      child: ListTile(
-                        title: Text(
-                          stop.name,
-                          style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),
+                    ),
+                  ),
+                  // Saved places — one tap picks the stop for whichever field
+                  // opened this sheet. Star any row below to manage the list.
+                  if (visibleSaved.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SavedPlaceChips(
+                          stops: visibleSaved,
+                          onSelect: (stop) => Navigator.of(context).pop(stop),
                         ),
-                        subtitle: Text(
-                          stop.area,
-                          style: TextStyle(color: colors.textSecondary),
-                        ),
-                        onTap: () => Navigator.of(context).pop(stop),
                       ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                    ),
+                  // Search field
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      style: TextStyle(color: colors.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Search stops…',
+                        hintStyle: TextStyle(color: colors.textSecondary),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: colors.actionPrimary,
+                        ),
+                      ),
+                      onChanged: _applyFilter,
+                    ),
+                  ),
+                  // Stop list
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: _filtered.length,
+                      itemBuilder: (context, index) {
+                        final stop = _filtered[index];
+                        final isSaved = AppSettingsController.instance
+                            .isPlaceSaved(stop.id);
+                        return Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: colors.border.withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ),
+                          child: ListTile(
+                            title: Text(
+                              stop.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            subtitle: Text(
+                              stop.area,
+                              style: TextStyle(color: colors.textSecondary),
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(
+                                isSaved ? Icons.star : Icons.star_outline,
+                                color: isSaved
+                                    ? colors.actionPrimary
+                                    : colors.textSecondary,
+                              ),
+                              tooltip: isSaved
+                                  ? 'Remove ${stop.name} from saved places'
+                                  : 'Save ${stop.name} to saved places',
+                              onPressed: () => AppSettingsController.instance
+                                  .toggleSavedPlace(stop.id, save: !isSaved),
+                            ),
+                            onTap: () => Navigator.of(context).pop(stop),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },

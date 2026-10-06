@@ -107,8 +107,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: colors.surface,
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusLg),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusLg,
+                          ),
                           border: Border.all(color: colors.border),
                         ),
                         child: Row(
@@ -127,7 +128,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       priority: AnnouncementPriority.low,
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                   child: Container(
                                     constraints: const BoxConstraints(
                                       minHeight: AppSpacing.minTouchTarget,
@@ -139,7 +142,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       color: _selectedTabIndex == 0
                                           ? colors.actionPrimary
                                           : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusMd,
+                                      ),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
@@ -170,7 +175,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       priority: AnnouncementPriority.low,
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                   child: Container(
                                     constraints: const BoxConstraints(
                                       minHeight: AppSpacing.minTouchTarget,
@@ -182,7 +189,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       color: _selectedTabIndex == 1
                                           ? colors.actionPrimary
                                           : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusMd,
+                                      ),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
@@ -240,12 +249,19 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       },
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                       child: Container(
-                        height: 60,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        // minHeight, not fixed height: the two-line label must
+                        // reflow at large text scales instead of clipping
+                        // (same contract as the settings Ask bars).
+                        constraints: const BoxConstraints(minHeight: 60),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: colors.actionPrimary,
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusLg),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusLg,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -265,30 +281,32 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ask BusBuddy',
-                                  style: TextStyle(
-                                    color: colors.onActionPrimary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  _selectedTabIndex == 0
-                                      ? 'Show my ticket, check ticket status, etc.'
-                                      : 'Get details about a previous ticket',
-                                  style: TextStyle(
-                                    color: colors.onActionPrimary.withValues(
-                                      alpha: 0.8,
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ask BusBuddy',
+                                    style: TextStyle(
+                                      color: colors.onActionPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
                                     ),
-                                    fontSize: 12,
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    _selectedTabIndex == 0
+                                        ? 'Show my ticket, check ticket status, etc.'
+                                        : 'Get details about a previous ticket',
+                                    style: TextStyle(
+                                      color: colors.onActionPrimary.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -308,33 +326,46 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
   Widget _buildCurrentTicketTab(Ticket? activeTicket) {
     final colors = AppTheme.colors(context);
     if (activeTicket == null) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.confirmation_number_outlined,
-              color: colors.textMuted,
-              size: 48,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No Active Ticket',
-              style: TextStyle(
-                color: colors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+      // Scrollable so the empty state reflows instead of overflowing at
+      // large text scales; vertically centered while it fits.
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.confirmation_number_outlined,
+                        color: colors.textMuted,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No Active Ticket',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Book a ticket to view active pass details and live tracking.',
+                        style: TextStyle(color: colors.textMuted, fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Book a ticket to view active pass details and live tracking.',
-              style: TextStyle(color: colors.textMuted, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          );
+        },
       );
     }
 
@@ -392,8 +423,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     ),
                     decoration: BoxDecoration(
                       color: colors.statusSuccessBg,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusSm),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
                     child: Text(
                       'ACTIVE',
@@ -465,10 +495,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       ),
                       Text(
                         'Show this ticket while boarding',
-                        style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: colors.textMuted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -521,8 +548,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                       ),
                     ),
                   ),
@@ -573,8 +601,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                   // role, on-error foreground from the theme.
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: colors.statusError,
-                                    foregroundColor:
-                                        Theme.of(context).colorScheme.onError,
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.onError,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(
                                         AppSpacing.radiusMd,
@@ -606,8 +635,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: colors.statusError),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
@@ -754,10 +784,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: colors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),

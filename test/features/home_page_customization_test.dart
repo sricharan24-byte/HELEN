@@ -38,26 +38,41 @@ void main() {
   tearDown(AppSettingsController.instance.resetHomeScreenLayout);
 
   group('HomePage Custom Layout Rendering', () {
-    testWidgets('renders cards according to customized order in AppSettingsController', (tester) async {
-      // Move Settings to the very top (index 0)
-      final items = List<HomeScreenItem>.from(AppSettingsController.instance.homeScreenItems);
-      final settingsItem = items.firstWhere((e) => e.id == HomeScreenItem.idSettings);
-      items.remove(settingsItem);
-      items.insert(0, settingsItem);
-      AppSettingsController.instance.updateHomeScreenItems(items);
+    testWidgets(
+      'renders cards according to customized order in AppSettingsController',
+      (tester) async {
+        // Move Settings to the very top (index 0)
+        final items = List<HomeScreenItem>.from(
+          AppSettingsController.instance.homeScreenItems,
+        );
+        final settingsItem = items.firstWhere(
+          (e) => e.id == HomeScreenItem.idSettings,
+        );
+        items.remove(settingsItem);
+        items.insert(0, settingsItem);
+        AppSettingsController.instance.updateHomeScreenItems(items);
 
-      await tester.pumpWidget(testHomePageApp());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(testHomePageApp());
+        await tester.pumpAndSettle();
 
-      // Both Settings and Find a Place are visible
-      expect(find.text('Settings'), findsWidgets);
-      expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
-    });
+        // Both Settings and Find a Place are visible
+        expect(find.text('Settings'), findsWidgets);
+        expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
+      },
+    );
 
-    testWidgets('excludes cards marked as hidden (isVisible == false)', (tester) async {
+    testWidgets('excludes cards marked as hidden (isVisible == false)', (
+      tester,
+    ) async {
       // Hide 'Find a Place' and 'Ask BusBuddy'
-      AppSettingsController.instance.toggleHomeScreenItemVisibility(HomeScreenItem.idRouteSearch, false);
-      AppSettingsController.instance.toggleHomeScreenItemVisibility(HomeScreenItem.idVoiceAssistant, false);
+      AppSettingsController.instance.toggleHomeScreenItemVisibility(
+        HomeScreenItem.idRouteSearch,
+        false,
+      );
+      AppSettingsController.instance.toggleHomeScreenItemVisibility(
+        HomeScreenItem.idVoiceAssistant,
+        false,
+      );
 
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
@@ -65,40 +80,48 @@ void main() {
       expect(find.text('Find a Place'), findsNothing);
       expect(find.text('Ask BusBuddy'), findsNothing);
 
-      // Other visible cards remain
+      // Other visible cards remain (Saved Places left the home page).
       expect(find.text('My Tickets', skipOffstage: false), findsOneWidget);
-      expect(find.text('Saved Places', skipOffstage: false), findsOneWidget);
+      expect(find.text('Saved Places', skipOffstage: false), findsNothing);
     });
 
-    testWidgets('displays empty layout state when all cards are hidden, and restores default cards', (tester) async {
-      // Hide all cards
-      for (final item in AppSettingsController.instance.homeScreenItems) {
-        AppSettingsController.instance.toggleHomeScreenItemVisibility(item.id, false);
-      }
+    testWidgets(
+      'displays empty layout state when all cards are hidden, and restores default cards',
+      (tester) async {
+        // Hide all cards
+        for (final item in AppSettingsController.instance.homeScreenItems) {
+          AppSettingsController.instance.toggleHomeScreenItemVisibility(
+            item.id,
+            false,
+          );
+        }
 
-      await tester.pumpWidget(testHomePageApp());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(testHomePageApp());
+        await tester.pumpAndSettle();
 
-      // Empty layout card is visible
-      expect(find.text('All Home Cards Hidden'), findsOneWidget);
-      expect(find.text('Restore Default Cards'), findsOneWidget);
-      expect(find.text('Find a Place'), findsNothing);
+        // Empty layout card is visible
+        expect(find.text('All Home Cards Hidden'), findsOneWidget);
+        expect(find.text('Restore Default Cards'), findsOneWidget);
+        expect(find.text('Find a Place'), findsNothing);
 
-      // Tap 'Restore Default Cards'
-      await tester.ensureVisible(find.text('Restore Default Cards'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Restore Default Cards'));
-      await tester.pumpAndSettle();
+        // Tap 'Restore Default Cards'
+        await tester.ensureVisible(find.text('Restore Default Cards'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Restore Default Cards'));
+        await tester.pumpAndSettle();
 
-      // Cards are restored
-      expect(find.text('All Home Cards Hidden'), findsNothing);
-      expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
-      expect(find.text('My Tickets', skipOffstage: false), findsOneWidget);
-    });
+        // Cards are restored
+        expect(find.text('All Home Cards Hidden'), findsNothing);
+        expect(find.text('Find a Place', skipOffstage: false), findsOneWidget);
+        expect(find.text('My Tickets', skipOffstage: false), findsOneWidget);
+      },
+    );
   });
 
   group('HomePage Navigation for Additional Configurable Cards', () {
-    testWidgets('Live Bus Map card is removed from the home page', (tester) async {
+    testWidgets('Live Bus Map card is removed from the home page', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 2400);
       addTearDown(() {
@@ -132,7 +155,9 @@ void main() {
       expect(find.byType(AlertsPage), findsOneWidget);
     });
 
-    testWidgets('tapping Emergency SOS opens SafetySharingPage', (tester) async {
+    testWidgets('tapping Emergency SOS opens SafetySharingPage', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 2400);
       addTearDown(() {

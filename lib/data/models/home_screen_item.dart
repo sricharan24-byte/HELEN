@@ -32,7 +32,6 @@ class HomeScreenItem {
   /// Standard component IDs in the BusBuddy system.
   static const String idRouteSearch = 'route_search';
   static const String idMyTickets = 'my_tickets';
-  static const String idSavedPlaces = 'saved_places';
   static const String idVoiceAssistant = 'voice_assistant';
   static const String idAlerts = 'alerts';
   static const String idSafety = 'safety';
@@ -46,8 +45,6 @@ class HomeScreenItem {
         return Icons.directions_bus;
       case idMyTickets:
         return Icons.confirmation_number_outlined;
-      case idSavedPlaces:
-        return Icons.star;
       case idVoiceAssistant:
         return Icons.auto_awesome;
       case idAlerts:
@@ -94,11 +91,11 @@ class HomeScreenItem {
 
   /// Serializes to a JSON-compatible map for persistent storage.
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'subtitle': subtitle,
-        'isVisible': isVisible,
-      };
+    'id': id,
+    'title': title,
+    'subtitle': subtitle,
+    'isVisible': isVisible,
+  };
 
   /// Constructs an item from JSON, falling back to default metadata if titles are missing.
   factory HomeScreenItem.fromJson(Map<String, dynamic> json) {
@@ -115,54 +112,48 @@ class HomeScreenItem {
 
   /// Default ordered list of home screen components matching the accessible master UI design.
   static List<HomeScreenItem> get defaultItems => [
-        const HomeScreenItem(
-          id: idRouteSearch,
-          title: 'Find a Place',
-          subtitle: 'Search destination, find buses and book tickets',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idSafety,
-          title: 'Emergency SOS',
-          subtitle: 'Share location with trusted contacts',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idMyTickets,
-          title: 'My Tickets',
-          subtitle: 'View current and previous tickets',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idSavedPlaces,
-          title: 'Saved Places',
-          subtitle: 'Home, College, Work, etc.',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idVoiceAssistant,
-          title: 'Ask BusBuddy',
-          subtitle: 'Gemini Live Voice Mode',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idAlerts,
-          title: 'Corridor Alerts',
-          subtitle: 'Delay & schedule updates',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idSettings,
-          title: 'Settings',
-          subtitle: 'Customize your experience',
-          isVisible: true,
-        ),
-      ];
+    const HomeScreenItem(
+      id: idRouteSearch,
+      title: 'Find a Place',
+      subtitle: 'Search destination, find buses and book tickets',
+      isVisible: true,
+    ),
+    const HomeScreenItem(
+      id: idSafety,
+      title: 'Emergency SOS',
+      subtitle: 'Share location with trusted contacts',
+      isVisible: true,
+    ),
+    const HomeScreenItem(
+      id: idMyTickets,
+      title: 'My Tickets',
+      subtitle: 'View current and previous tickets',
+      isVisible: true,
+    ),
+    const HomeScreenItem(
+      id: idVoiceAssistant,
+      title: 'Ask BusBuddy',
+      subtitle: 'Gemini Live Voice Mode',
+      isVisible: true,
+    ),
+    const HomeScreenItem(
+      id: idAlerts,
+      title: 'Corridor Alerts',
+      subtitle: 'Delay & schedule updates',
+      isVisible: true,
+    ),
+    const HomeScreenItem(
+      id: idSettings,
+      title: 'Settings',
+      subtitle: 'Customize your experience',
+      isVisible: true,
+    ),
+  ];
 
   /// Map lookup for default items by ID.
   static Map<String, HomeScreenItem> get defaultItemsMap => {
-        for (final item in defaultItems) item.id: item,
-      };
+    for (final item in defaultItems) item.id: item,
+  };
 
   @override
   bool operator ==(Object other) =>

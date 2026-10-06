@@ -19,7 +19,6 @@ import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
-import '../saved/saved_page.dart';
 import '../settings/settings_page.dart';
 import '../alerts/alerts_page.dart';
 import '../tickets/live_location_screen.dart';
@@ -171,7 +170,9 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case AdaptiveShortcutType.savedPlace:
-        _openSavedPlaces();
+        // Saved places no longer own a page: they are one-tap chips inside
+        // the booking pickers, so the shortcut opens booking step 1.
+        _openRouteSearch();
         break;
 
       case AdaptiveShortcutType.corridorAlerts:
@@ -220,7 +221,8 @@ class _HomePageState extends State<HomePage> {
   bool _shouldNavigate() {
     final now = DateTime.now();
     final last = _lastNavigationAt;
-    if (last != null && now.difference(last) < const Duration(milliseconds: 500)) {
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 500)) {
       return false;
     }
     _lastNavigationAt = now;
@@ -240,26 +242,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-    );
-  }
-
-  void _openSavedPlaces() {
-    if (!_shouldNavigate()) return;
-    // Remember the currently focused widget so focus can be returned to it
-    // once the pushed SavedPage route is popped (TalkBack focus return).
-    final previouslyFocused = FocusManager.instance.primaryFocus;
-    unawaited(
-      Navigator.of(context)
-          .push(
-            MaterialPageRoute<void>(
-              builder: (_) => SavedPage(
-                ticketController: widget.ticketController,
-              ),
-            ),
-          )
-          .whenComplete(() {
-            previouslyFocused?.requestFocus();
-          }),
     );
   }
 
@@ -478,8 +460,9 @@ class _HomePageState extends State<HomePage> {
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: heroBg,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusLg),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusLg,
+                              ),
                               border: Border.all(
                                 color: heroBorder,
                                 width: colors.isHighContrast ? 2 : 1.5,
@@ -865,16 +848,6 @@ class _HomePageState extends State<HomePage> {
               ),
             );
           },
-        );
-
-      case HomeScreenItem.idSavedPlaces:
-        return _buildTaskActionCard(
-          color: item.color,
-          icon: item.icon,
-          title: item.title,
-          subtitle: item.subtitle,
-          semanticLabel: '${item.title}. ${item.subtitle}.',
-          onTap: _openSavedPlaces,
         );
 
       case HomeScreenItem.idVoiceAssistant:

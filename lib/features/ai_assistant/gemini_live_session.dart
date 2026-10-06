@@ -89,7 +89,8 @@ class GeminiLiveSession {
 
   String get effectiveApiKey => AppSettingsController.instance.geminiApiKey;
   String get effectiveModel => AppSettingsController.instance.geminiModel;
-  String get effectiveVoice => AppSettingsController.instance.geminiVoice.isNotEmpty
+  String get effectiveVoice =>
+      AppSettingsController.instance.geminiVoice.isNotEmpty
       ? AppSettingsController.instance.geminiVoice
       : 'Aoede';
 
@@ -131,11 +132,12 @@ class GeminiLiveSession {
     return '${oneLine.substring(0, 220)}…';
   }
 
-  static const String naturalTransitInstruction = '''You are BusBuddy, a warm, natural, human transit assistant for bus passengers in Vellore, India (VIT Main Gate to Katpadi Railway Station corridor).
+  static const String naturalTransitInstruction =
+      '''You are BusBuddy, a warm, natural, human transit assistant for bus passengers in Vellore, India (VIT Main Gate to Katpadi Railway Station corridor).
 
 CRITICAL CONVERSATIONAL RULES:
 1. Speak in a warm, relaxed, human tone like a friendly local transit companion.
-2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "open_saved", "set_trip", "select_bus", "set_passenger", "set_payment", "confirm_booking", "function_call", "toolResponse", or "executing").
+2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "set_trip", "select_bus", "set_passenger", "set_payment", "confirm_booking", "function_call", "toolResponse", or "executing").
 3. When triggering or confirming an action, phrase your response in natural, conversational English (e.g., "I've pulled up the live bus tracker for you!", "Here is the ticket booking screen.", "Let me check the buses to Katpadi for you.").
 4. Keep spoken responses concise and natural (1 to 2 sentences). Do NOT output markdown, bullet points, asterisks, or system logs.
 5. Key transit facts: General bus fare is ₹20. Student and senior citizen concession fare is ₹12 (40% discount). Main stops: VIT Main Gate, Green Circle, New Bus Stand, Katpadi Railway Station. Frequent buses: Bus 18B, Bus 12A.
@@ -194,7 +196,9 @@ CRITICAL CONVERSATIONAL RULES:
     _transport!.connect(
       url,
       onOpen: () {
-        debugPrint('[GeminiLive] Connected to AI Studio Live WebSocket ($modelToUse, voice: $effectiveVoice)');
+        debugPrint(
+          '[GeminiLive] Connected to AI Studio Live WebSocket ($modelToUse, voice: $effectiveVoice)',
+        );
         _isConnected = true;
         _isSetupDone = false;
         _reconnectAttempts = 0;
@@ -244,9 +248,13 @@ CRITICAL CONVERSATIONAL RULES:
     if (effectiveApiKey.trim().isEmpty) return;
 
     if (_reconnectAttempts >= maxReconnectAttempts) {
-      debugPrint('[GeminiLive] Reached maximum reconnection attempts ($maxReconnectAttempts).');
+      debugPrint(
+        '[GeminiLive] Reached maximum reconnection attempts ($maxReconnectAttempts).',
+      );
       onStatusChanged?.call('Connection lost. Tap to reconnect.', false);
-      onError?.call('Could not reconnect to Gemini Live after $maxReconnectAttempts attempts.');
+      onError?.call(
+        'Could not reconnect to Gemini Live after $maxReconnectAttempts attempts.',
+      );
       return;
     }
 
@@ -256,8 +264,13 @@ CRITICAL CONVERSATIONAL RULES:
     final jitterMs = Random().nextInt(200);
     final totalDelayMs = cappedDelayMs + jitterMs;
 
-    debugPrint('[GeminiLive] Scheduling reconnect attempt $_reconnectAttempts/$maxReconnectAttempts in ${totalDelayMs}ms');
-    onStatusChanged?.call('Reconnecting in ${(totalDelayMs / 1000).toStringAsFixed(1)}s...', false);
+    debugPrint(
+      '[GeminiLive] Scheduling reconnect attempt $_reconnectAttempts/$maxReconnectAttempts in ${totalDelayMs}ms',
+    );
+    onStatusChanged?.call(
+      'Reconnecting in ${(totalDelayMs / 1000).toStringAsFixed(1)}s...',
+      false,
+    );
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(milliseconds: totalDelayMs), () {
@@ -282,7 +295,9 @@ CRITICAL CONVERSATIONAL RULES:
     _isConnected = false;
     _isSetupDone = false;
     if (_setupCompleter != null && !_setupCompleter!.isCompleted) {
-      _setupCompleter!.completeError(isExplicit ? 'Disconnected' : 'Reconnecting');
+      _setupCompleter!.completeError(
+        isExplicit ? 'Disconnected' : 'Reconnecting',
+      );
     }
     _setupCompleter = null;
     _transport?.close();
@@ -310,32 +325,30 @@ CRITICAL CONVERSATIONAL RULES:
           'inputAudioTranscription': <String, dynamic>{},
           'speechConfig': {
             'voiceConfig': {
-              'prebuiltVoiceConfig': {
-                'voiceName': voiceToUse,
-              }
-            }
+              'prebuiltVoiceConfig': {'voiceName': voiceToUse},
+            },
           },
         },
         'systemInstruction': {
           'parts': [
-            {
-              'text': naturalTransitInstruction,
-            }
-          ]
+            {'text': naturalTransitInstruction},
+          ],
         },
         'tools': [
           {
             'functionDeclarations': AssistantCommandGateway.registry.values
                 .map((tool) => tool.toFunctionDeclaration())
                 .toList(),
-          }
-        ]
-      }
+          },
+        ],
+      },
     };
 
     _transport?.send(jsonEncode(setup));
     // NOTE: Handshake sent; wait for server setupComplete before setting _isSetupDone
-    debugPrint('[GeminiLive] Setup handshake frame sent for $modelToUse with voice $voiceToUse');
+    debugPrint(
+      '[GeminiLive] Setup handshake frame sent for $modelToUse with voice $voiceToUse',
+    );
   }
 
   /// Streams a user query to the Gemini Multimodal Live API.
@@ -362,7 +375,9 @@ CRITICAL CONVERSATIONAL RULES:
 
     // If connected but setupComplete hasn't arrived yet, wait up to 3 seconds for handshake
     if (isConnected && !_isSetupDone && _setupCompleter != null) {
-      debugPrint('[GeminiLive] Awaiting setupComplete before transmitting query...');
+      debugPrint(
+        '[GeminiLive] Awaiting setupComplete before transmitting query...',
+      );
       try {
         await _setupCompleter!.future.timeout(const Duration(seconds: 3));
       } catch (e) {
@@ -377,19 +392,21 @@ CRITICAL CONVERSATIONAL RULES:
             {
               'role': 'user',
               'parts': [
-                {'text': query}
-              ]
-            }
+                {'text': query},
+              ],
+            },
           ],
-          'turnComplete': true
-        }
+          'turnComplete': true,
+        },
       };
 
       _transport?.send(jsonEncode(message));
       debugPrint('[GeminiLive] Sent client turn: "$query"');
     } else {
       // Fall back to real Google AI Studio Gemini 2.5 Flash REST API
-      debugPrint('[GeminiLive] Live session not ready (_isConnected=$_isConnected, _isSetupDone=$_isSetupDone); falling back to REST');
+      debugPrint(
+        '[GeminiLive] Live session not ready (_isConnected=$_isConnected, _isSetupDone=$_isSetupDone); falling back to REST',
+      );
       await _sendRestQuery(query);
     }
   }
@@ -431,7 +448,9 @@ CRITICAL CONVERSATIONAL RULES:
         }
 
         // Output transcription (text stream of spoken response)
-        final trans = serverContent['outputTranscription'] ?? serverContent['outputAudioTranscription'];
+        final trans =
+            serverContent['outputTranscription'] ??
+            serverContent['outputAudioTranscription'];
         if (trans != null) {
           if (trans is Map<String, dynamic> && trans.containsKey('text')) {
             final text = trans['text'] as String;
@@ -458,12 +477,14 @@ CRITICAL CONVERSATIONAL RULES:
                 }
                 // Audio streaming (24kHz PCM linear 16-bit)
                 String? base64Pcm;
-                if (part.containsKey('inlineData') && part['inlineData'] is Map) {
+                if (part.containsKey('inlineData') &&
+                    part['inlineData'] is Map) {
                   final inline = part['inlineData'] as Map<String, dynamic>;
                   base64Pcm = inline['data']?.toString();
                 } else if (part.containsKey('data') && part['data'] is String) {
                   base64Pcm = part['data'] as String?;
-                } else if (part.containsKey('audio') && part['audio'] is String) {
+                } else if (part.containsKey('audio') &&
+                    part['audio'] is String) {
                   base64Pcm = part['audio'] as String?;
                 }
 
@@ -494,7 +515,9 @@ CRITICAL CONVERSATIONAL RULES:
               final callId = call['id']?.toString() ?? 'call_1';
               final args = call['args'] as Map<String, dynamic>?;
               _currentTurnAction = name;
-              debugPrint('[GeminiLive] Tool call received: $name (id: $callId)');
+              debugPrint(
+                '[GeminiLive] Tool call received: $name (id: $callId)',
+              );
               onAction?.call(name, args);
 
               final outputContext =
@@ -503,9 +526,7 @@ CRITICAL CONVERSATIONAL RULES:
               functionResponses.add({
                 'id': callId,
                 'name': name,
-                'response': {
-                  'output': outputContext,
-                }
+                'response': {'output': outputContext},
               });
             }
           }
@@ -513,9 +534,7 @@ CRITICAL CONVERSATIONAL RULES:
           // Return toolResponse to Gemini server
           if (functionResponses.isNotEmpty && isConnected) {
             final toolResponse = {
-              'toolResponse': {
-                'functionResponses': functionResponses,
-              }
+              'toolResponse': {'functionResponses': functionResponses},
             };
             _transport?.send(jsonEncode(toolResponse));
             debugPrint('[GeminiLive] Sent toolResponse frame');
@@ -526,7 +545,9 @@ CRITICAL CONVERSATIONAL RULES:
       // 3. Error
       if (data.containsKey('error')) {
         final errObj = data['error'];
-        final msg = errObj is Map ? (errObj['message']?.toString() ?? 'Server error') : errObj.toString();
+        final msg = errObj is Map
+            ? (errObj['message']?.toString() ?? 'Server error')
+            : errObj.toString();
         debugPrint('[GeminiLive] Server error: $msg');
         onError?.call(msg);
       }
@@ -539,7 +560,9 @@ CRITICAL CONVERSATIONAL RULES:
   Future<void> _sendRestQuery(String query) async {
     final apiKey = effectiveApiKey.trim();
     if (apiKey.isEmpty) {
-      onError?.call('Please set your Google AI Studio API key (from https://aistudio.google.com/live-api)');
+      onError?.call(
+        'Please set your Google AI Studio API key (from https://aistudio.google.com/live-api)',
+      );
       return;
     }
 
@@ -554,36 +577,38 @@ CRITICAL CONVERSATIONAL RULES:
           {
             'role': 'user',
             'parts': [
-              {'text': query}
-            ]
-          }
+              {'text': query},
+            ],
+          },
         ],
         'systemInstruction': {
           'parts': [
-            {
-              'text': naturalTransitInstruction,
-            }
-          ]
+            {'text': naturalTransitInstruction},
+          ],
         },
         'tools': [
           {
             'functionDeclarations': AssistantCommandGateway.registry.values
                 .map((tool) => tool.toFunctionDeclaration())
                 .toList(),
-          }
-        ]
+          },
+        ],
       };
 
-      final res = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw TimeoutException('Gemini REST API request timed out after 10 seconds.');
-        },
-      );
+      final res = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException(
+                'Gemini REST API request timed out after 10 seconds.',
+              );
+            },
+          );
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -606,7 +631,10 @@ CRITICAL CONVERSATIONAL RULES:
                   final fn = part['functionCall'] as Map<String, dynamic>;
                   actionName = fn['name'] as String?;
                   if (actionName != null) {
-                    onAction?.call(actionName, fn['args'] as Map<String, dynamic>?);
+                    onAction?.call(
+                      actionName,
+                      fn['args'] as Map<String, dynamic>?,
+                    );
                   }
                 }
               }
@@ -619,8 +647,10 @@ CRITICAL CONVERSATIONAL RULES:
                 trimmed.toLowerCase().contains('executing') ||
                 trimmed.toLowerCase().contains(actionName.toLowerCase())) {
               responseText =
-                  AssistantCommandGateway.getMetadata(actionName)?.promptSummary ??
-                      'Sure, right away.';
+                  AssistantCommandGateway.getMetadata(
+                    actionName,
+                  )?.promptSummary ??
+                  'Sure, right away.';
             }
           }
 
@@ -632,7 +662,9 @@ CRITICAL CONVERSATIONAL RULES:
       }
     } on TimeoutException catch (e) {
       debugPrint('[GeminiLive] REST fallback timeout: $e');
-      onError?.call('Request timed out. Please check your internet connection.');
+      onError?.call(
+        'Request timed out. Please check your internet connection.',
+      );
     } catch (e) {
       debugPrint('[GeminiLive] REST fallback error: $e');
       onError?.call('Could not connect to Gemini API: $e');

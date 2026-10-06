@@ -3,33 +3,41 @@ import 'package:busbuddy/data/models/home_screen_item.dart';
 
 void main() {
   group('HomeScreenItem Model', () {
-    test('defaultItems contains all 7 required core home screen components', () {
-      final items = HomeScreenItem.defaultItems;
-      expect(items.length, 7);
+    test(
+      'defaultItems contains all 6 required core home screen components',
+      () {
+        final items = HomeScreenItem.defaultItems;
+        expect(items.length, 6);
 
-      final ids = items.map((e) => e.id).toList();
-      expect(ids, contains(HomeScreenItem.idRouteSearch));
-      expect(ids, contains(HomeScreenItem.idMyTickets));
-      expect(ids, contains(HomeScreenItem.idSavedPlaces));
-      expect(ids, contains(HomeScreenItem.idVoiceAssistant));
-      expect(ids, contains(HomeScreenItem.idAlerts));
-      expect(ids, contains(HomeScreenItem.idSafety));
-      expect(ids, contains(HomeScreenItem.idSettings));
-      // Removed options must no longer appear in the default home layout.
-      expect(ids, isNot(contains('my_journey')));
-      expect(ids, isNot(contains('live_tracking')));
-    });
+        final ids = items.map((e) => e.id).toList();
+        expect(ids, contains(HomeScreenItem.idRouteSearch));
+        expect(ids, contains(HomeScreenItem.idMyTickets));
+        expect(ids, contains(HomeScreenItem.idVoiceAssistant));
+        expect(ids, contains(HomeScreenItem.idAlerts));
+        expect(ids, contains(HomeScreenItem.idSafety));
+        expect(ids, contains(HomeScreenItem.idSettings));
+        // Removed options must no longer appear in the default home layout.
+        // Saved places moved into the booking and route-search pickers as
+        // one-tap chips instead of a home option.
+        expect(ids, isNot(contains('saved_places')));
+        expect(ids, isNot(contains('my_journey')));
+        expect(ids, isNot(contains('live_tracking')));
+      },
+    );
 
-    test('all default items have valid non-empty titles, subtitles, icons, and colors', () {
-      for (final item in HomeScreenItem.defaultItems) {
-        expect(item.id.isNotEmpty, isTrue);
-        expect(item.title.isNotEmpty, isTrue);
-        expect(item.subtitle.isNotEmpty, isTrue);
-        expect(item.isVisible, isTrue);
-        expect(item.icon, isNotNull);
-        expect(item.color, isNotNull);
-      }
-    });
+    test(
+      'all default items have valid non-empty titles, subtitles, icons, and colors',
+      () {
+        for (final item in HomeScreenItem.defaultItems) {
+          expect(item.id.isNotEmpty, isTrue);
+          expect(item.title.isNotEmpty, isTrue);
+          expect(item.subtitle.isNotEmpty, isTrue);
+          expect(item.isVisible, isTrue);
+          expect(item.icon, isNotNull);
+          expect(item.color, isNotNull);
+        }
+      },
+    );
 
     test('toJson and fromJson serialize and deserialize accurately', () {
       const original = HomeScreenItem(
@@ -42,7 +50,10 @@ void main() {
       final json = original.toJson();
       expect(json['id'], HomeScreenItem.idRouteSearch);
       expect(json['title'], 'Find a Place');
-      expect(json['subtitle'], 'Search destination, find buses and book tickets');
+      expect(
+        json['subtitle'],
+        'Search destination, find buses and book tickets',
+      );
       expect(json['isVisible'], false);
 
       final restored = HomeScreenItem.fromJson(json);
@@ -52,13 +63,16 @@ void main() {
       expect(restored.isVisible, original.isVisible);
     });
 
-    test('fromJson falls back to defaults when title or subtitle are missing', () {
-      final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idAlerts});
-      expect(item.id, HomeScreenItem.idAlerts);
-      expect(item.title, 'Corridor Alerts');
-      expect(item.subtitle, 'Delay & schedule updates');
-      expect(item.isVisible, isTrue);
-    });
+    test(
+      'fromJson falls back to defaults when title or subtitle are missing',
+      () {
+        final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idAlerts});
+        expect(item.id, HomeScreenItem.idAlerts);
+        expect(item.title, 'Corridor Alerts');
+        expect(item.subtitle, 'Delay & schedule updates');
+        expect(item.isVisible, isTrue);
+      },
+    );
 
     test('copyWith updates specified fields only', () {
       const original = HomeScreenItem(
@@ -68,7 +82,10 @@ void main() {
         isVisible: true,
       );
 
-      final updated = original.copyWith(isVisible: false, title: 'Emergency Assistance');
+      final updated = original.copyWith(
+        isVisible: false,
+        title: 'Emergency Assistance',
+      );
       expect(updated.id, original.id);
       expect(updated.title, 'Emergency Assistance');
       expect(updated.subtitle, original.subtitle);

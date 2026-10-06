@@ -9,7 +9,6 @@ enum GeminiLiveIntent {
   remainingStops,
   bookTicket,
   emergencySos,
-  openSaved,
   customizeHome,
   resetHome,
   unknown,
@@ -37,8 +36,12 @@ class GeminiLiveService {
   const GeminiLiveService();
 
   /// Reads API key from AppSettingsController or via --dart-define=GEMINI_API_KEY at build/runtime.
-  static const String defaultApiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-  static String get apiKey => AppSettingsController.instance.geminiApiKey.isNotEmpty
+  static const String defaultApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
+  static String get apiKey =>
+      AppSettingsController.instance.geminiApiKey.isNotEmpty
       ? AppSettingsController.instance.geminiApiKey
       : defaultApiKey;
 
@@ -130,12 +133,17 @@ class GeminiLiveService {
             'Buses available: VIT → Katpadi\n• Bus 18B: Arriving in 4 min (₹20)\n• Bus 12A: In 12 min (₹20)',
         intent: GeminiLiveIntent.searchRoute,
         actionType: 'search_route',
-        actionData: const {'origin': 'VIT Main Gate', 'destination': 'Katpadi Railway Station'},
+        actionData: const {
+          'origin': 'VIT Main Gate',
+          'destination': 'Katpadi Railway Station',
+        },
       );
     }
 
     // 4. Book ticket / Buy pass
-    if (lower.contains('book') || lower.contains('buy') || lower.contains('pass')) {
+    if (lower.contains('book') ||
+        lower.contains('buy') ||
+        lower.contains('pass')) {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
@@ -167,7 +175,10 @@ class GeminiLiveService {
     }
 
     // 6. Reset Home Screen Layout (Specific command checked before general home)
-    if (lower.contains('reset') && (lower.contains('home') || lower.contains('layout') || lower.contains('card')) ||
+    if (lower.contains('reset') &&
+            (lower.contains('home') ||
+                lower.contains('layout') ||
+                lower.contains('card')) ||
         lower.contains('reset home') ||
         lower.contains('reset layout') ||
         lower.contains('restore default cards') ||
@@ -201,7 +212,9 @@ class GeminiLiveService {
       );
     }
 
-    // 8. Saved places / Favourite route / Go home
+    // 8. Saved places: there is no saved-places page anymore — saved places
+    // are one-tap chips inside the booking and route-search pickers. Route
+    // the query to route search, where the chips live.
     if (lower.contains('saved') ||
         lower.contains('favourite') ||
         lower.contains('favorite') ||
@@ -212,11 +225,11 @@ class GeminiLiveService {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'Opening your saved places and favourite routes. Your primary saved destination is Katpadi Railway Station.',
+            'I have opened route search, where your saved places are one tap away. Your primary saved destination is Katpadi Railway Station.',
         displayText:
             'Saved Places:\n• Katpadi Railway Station\n• VIT Main Gate',
-        intent: GeminiLiveIntent.openSaved,
-        actionType: 'open_saved',
+        intent: GeminiLiveIntent.searchRoute,
+        actionType: 'search_route',
       );
     }
 

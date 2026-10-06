@@ -185,8 +185,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // VIT Main Gate should no longer be visible; Katpadi stops should be.
+      // The saved-places chips follow the same filter, so Katpadi Railway
+      // Station appears both as a chip and as a list row.
       expect(find.text('VIT Main Gate'), findsNothing);
-      expect(find.text('Katpadi Railway Station'), findsOneWidget);
+      expect(find.text('Katpadi Railway Station'), findsWidgets);
       expect(find.text('Katpadi Junction'), findsOneWidget);
     });
 

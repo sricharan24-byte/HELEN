@@ -4,7 +4,35 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 6, 2026 (Key-connect repair: validate-before-connect gate, settings-change reconnect, honest statuses; 399/399 green, analyze clean)
+**Last Updated**: October 6, 2026 (Saved places rebuilt: deleted the ticket-history SavedPage, home option removed, one-tap starred-place chips in the booking + Find-a-Place pickers; 407/407 green, analyze clean)
+
+---
+
+## 🛠️ Session Log — 2026-10-06: Saved Places Rebuild (places move into the pickers)
+
+> **Trigger**: Owner report — the Saved Places page showed previous tickets instead of saved places. Confirmed: `SavedPage` was built entirely from `ticketController.tickets` (active pass + passbook history); no saved-place data existed anywhere. Owner direction (confirmed A): remove the home-page option, put saved places as tap options where places are chosen.
+
+### What changed
+
+* **New store** (`AppSettingsController.savedPlaceStopIds`): seeded with `vit-main-gate`, `katpadi-railway-station`, `green-circle`, `katpadi-bus-stand`; persisted like the home layout; `toggleSavedPlace` / `isPlaceSaved`. Names resolve from fixtures at render, so nothing stale can display.
+* **New `SavedPlaceChips`** (`lib/features/saved/saved_place_chips.dart`): 48dp star chips with `selected:` semantics. Booking step 1 shows them between the TO and DATE cards — tap sets the destination with a polite announcement. The Find-a-Place stop sheet shows them above the search field (they follow the search filter) and pops the tapped stop into whichever field opened the sheet.
+* **Add/remove**: star toggles on every row of the booking origin/destination sheets and the Find-a-Place sheet, rebuilding through a `ListenableBuilder` on settings (the sheets are separate routes, so no local setState).
+* **Removed**: `SavedPage` deleted (its history already lives in My Tickets); `saved_places` home option deleted (7→6 cards, stale layouts skip the unknown id and the card builder's `default:` renders nothing); booking-suite Saved Places shortcut card deleted (Recent Trips goes full width); assistant `open_saved` tool retired — "saved places" voice queries now route to `search_route`, where the chips live; the prompt chip and NEVER-say entry updated.
+* **Drive-by honesty fixes the retargeted tests exposed**: My Tickets Ask-bar `height:60` → `minHeight` + `Expanded` label, and the no-ticket empty state wrapped scrollable-but-centered — both overflowed at 200–300% text scale.
+
+### Tests
+
+* New `test/features/saved_places_test.dart` (8): seed contents, toggle add/remove, no-duplicate re-save, blank-ID ignore, chip tap selects, highlight marks the current value, empty renders nothing, chip tap sets the booking destination.
+* Updated: home counts 7→6, `saved_places` asserted absent, SavedPage tests retargeted to MyTicketsPage, saved-voice query → `search_route`, route-search filter expectations account for chips.
+* Full suite: `flutter analyze` clean, `flutter test` **407/407 green** (399 + 8).
+
+### Judgment calls (revert if you disagree)
+
+| Call | Rationale |
+| --- | --- |
+| Chips set the **destination** in booking | Origin defaults to current location/VIT; destination is the common choice. Full origin control stays in the dropdowns |
+| Names-only, no custom labels ("Home", "College") | Keeps the store to stop IDs; a label dialog can come later if wanted |
+| Adaptive `savedPlace` shortcut kept, retargeted to booking | Preserves the shortcut type + icon tests; it now opens where the chips live |
 
 ---
 

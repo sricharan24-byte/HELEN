@@ -8,7 +8,6 @@ import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
-import '../saved/saved_page.dart';
 import '../settings/home_screen_customization_page.dart';
 import '../tickets/live_location_screen.dart';
 import '../tickets/ticket_booking_suite_page.dart';
@@ -79,11 +78,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   AndroidVoiceTurn? _voiceTurn;
   int _turnCounter = 0;
   Timer? _watchdogTimer;
+
   /// Starts neutral rather than claiming to listen: capture is opened by the
   /// post-frame start, which replaces this with the real state.
   String _liveTranscription =
       'Tap the microphone or a chip below to ask BusBuddy something.';
-  String _spokenOutput = 'Hi, I\'m BusBuddy! Where would you like to travel today?';
+  String _spokenOutput =
+      'Hi, I\'m BusBuddy! Where would you like to travel today?';
   GeminiLiveResponse? _lastResponse;
   String _liveStatus = 'Ready';
 
@@ -135,8 +136,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _turnCounter++;
         // Slot-tool protocol turns are silent: the follow-up answer turn
         // carries the voice, so speaking one would repeat the same words.
-        final bool silentProtocol =
-            AssistantCommandGateway.isSilentProtocol(actionType);
+        final bool silentProtocol = AssistantCommandGateway.isSilentProtocol(
+          actionType,
+        );
         setState(() {
           _isSpeaking = true;
           if (fullText.isNotEmpty) {
@@ -146,22 +148,23 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             if (actionType != null) {
               switch (actionType) {
                 case 'track_bus':
-                  _spokenOutput = 'Here is the live bus tracker on your screen.';
+                  _spokenOutput =
+                      'Here is the live bus tracker on your screen.';
                   break;
                 case 'book_ticket':
                   _spokenOutput = 'Opening ticket booking for you now.';
                   break;
                 case 'search_route':
-                  _spokenOutput = 'Showing available buses between VIT and Katpadi.';
+                  _spokenOutput =
+                      'Showing available buses between VIT and Katpadi.';
                   break;
                 case 'emergency_sos':
-                  _spokenOutput = 'Emergency safety broadcast has been triggered.';
-                  break;
-                case 'open_saved':
-                  _spokenOutput = 'Opening your saved places and routes.';
+                  _spokenOutput =
+                      'Emergency safety broadcast has been triggered.';
                   break;
                 default:
-                  _spokenOutput = 'Here are the transit details for your journey.';
+                  _spokenOutput =
+                      'Here are the transit details for your journey.';
               }
             } else {
               // No text and no tool call. With outputAudioTranscription now
@@ -282,7 +285,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _isListening = false;
           _liveStatus = 'Error';
           _liveTranscription = 'Connection notice: $err';
-          _spokenOutput = 'Gemini Live encountered a connection issue. Please check your API key or network.';
+          _spokenOutput =
+              'Gemini Live encountered a connection issue. Please check your API key or network.';
         });
       },
       onStatusChanged: (status, _) {
@@ -409,10 +413,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _connectGeneration++;
     runDisposeSteps([
       (name: 'aiControlGlow', run: AiControlGlow.instance.idle),
-      (
-        name: 'continuousListening',
-        run: () => _continuousListening = false,
-      ),
+      (name: 'continuousListening', run: () => _continuousListening = false),
       (
         name: 'settingsListener',
         run: () {
@@ -430,7 +431,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         },
       ),
       (name: 'liveSession', run: _liveSession.dispose),
-      (name: 'androidVoiceTurn', run: () => unawaited(_releaseAndroidVoiceTurn())),
+      (
+        name: 'androidVoiceTurn',
+        run: () => unawaited(_releaseAndroidVoiceTurn()),
+      ),
       (
         name: 'audioEngine',
         run: () {
@@ -501,7 +505,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     });
   }
 
-  void _startMicrophoneListening({bool playChimeTone = false, bool isRestart = false}) {
+  void _startMicrophoneListening({
+    bool playChimeTone = false,
+    bool isRestart = false,
+  }) {
     if (!mounted) return;
     if (_isSpeaking) return;
     if (_isListening && !isRestart) return;
@@ -550,7 +557,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       onError: (err) {
         if (!mounted) return;
         debugPrint('[GeminiLiveScreen] Speech recognition error: $err');
-        final isPermissionError = err.toLowerCase().contains('blocked') ||
+        final isPermissionError =
+            err.toLowerCase().contains('blocked') ||
             err.toLowerCase().contains('denied') ||
             err.toLowerCase().contains('not-allowed');
 
@@ -560,7 +568,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           setState(() {
             _isPermissionBlocked = true;
             _isListening = false;
-            _liveTranscription = 'Microphone permission blocked. Please allow mic access in your browser.';
+            _liveTranscription =
+                'Microphone permission blocked. Please allow mic access in your browser.';
           });
           return;
         }
@@ -586,7 +595,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           } else {
             setState(() {
               _isListening = false;
-              _liveTranscription = 'Tap the microphone orb to speak, or choose a prompt below.';
+              _liveTranscription =
+                  'Tap the microphone orb to speak, or choose a prompt below.';
             });
           }
         }
@@ -594,13 +604,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     );
   }
 
-  void _scheduleRestartListening({int delayMs = 300, bool playChimeTone = false}) {
+  void _scheduleRestartListening({
+    int delayMs = 300,
+    bool playChimeTone = false,
+  }) {
     _restartListenTimer?.cancel();
     if (!mounted || !_continuousListening || _isSpeaking) return;
 
     _restartListenTimer = Timer(Duration(milliseconds: delayMs), () {
       if (mounted && _continuousListening && !_isSpeaking && !_isListening) {
-        _startMicrophoneListening(playChimeTone: playChimeTone, isRestart: true);
+        _startMicrophoneListening(
+          playChimeTone: playChimeTone,
+          isRestart: true,
+        );
       }
     });
   }
@@ -648,10 +664,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _releaseAndroidVoiceTurnUi(
         noKey
             ? 'BusBuddy needs a Gemini Live key before it can listen, so the '
-                'microphone stayed off. Please type your question, or tap Connect '
-                'to add your key.'
+                  'microphone stayed off. Please type your question, or tap Connect '
+                  'to add your key.'
             : 'BusBuddy is still connecting, so the microphone stayed off. Please '
-                'type your question, or tap the microphone orb again in a moment.',
+                  'type your question, or tap the microphone orb again in a moment.',
         false,
       );
       return;
@@ -761,7 +777,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // Debounce duplicate queries within 1.5s to prevent feedback loops
     final now = DateTime.now();
     if (_lastVoiceInputTime != null &&
-        now.difference(_lastVoiceInputTime!) < const Duration(milliseconds: 1500) &&
+        now.difference(_lastVoiceInputTime!) <
+            const Duration(milliseconds: 1500) &&
         _lastProcessedQuery.toLowerCase() == clean.toLowerCase()) {
       return;
     }
@@ -795,7 +812,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     });
 
     if (AppSettingsController.instance.geminiApiKey.isEmpty) {
-      const msg = 'Please connect your Google AI Studio API key to chat with Gemini Live.';
+      const msg =
+          'Please connect your Google AI Studio API key to chat with Gemini Live.';
       setState(() {
         _isSpeaking = true;
         _isListening = false;
@@ -847,8 +865,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _liveStatus = 'Validating API key…';
       });
     }
-    final error =
-        await GeminiLiveSession.validateApiKey(settings.geminiApiKey);
+    final error = await GeminiLiveSession.validateApiKey(settings.geminiApiKey);
     if (!mounted || generation != _connectGeneration) return;
     if (error != null) {
       setState(() {
@@ -938,8 +955,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       return;
     }
     if (actionType == 'confirm_booking') {
-      final readiness =
-          _automation.handleToolCall('confirm_booking', args);
+      final readiness = _automation.handleToolCall('confirm_booking', args);
       if (!readiness.isComplete) {
         if (mounted) {
           setState(() {
@@ -950,89 +966,90 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       }
       if (_actionExecutedThisTurn) return;
       _actionExecutedThisTurn = true;
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TicketBookingSuitePage(
-            ticketController: _ticketController,
-            journeyController: widget.journeyController,
-            initialOrigin: _automation.origin,
-            initialDestination: _automation.destination,
-            initialBusId:
-                _automation.hasCustomBus ? _automation.busId : null,
-            initialPassengerType: _automation.passengerType,
-            initialPaymentMethod: _automation.paymentMethod,
-            initialPassengerName: _automation.passengerName == 'Passenger'
-                ? null
-                : _automation.passengerName,
-            autoOpenCheckout: true,
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TicketBookingSuitePage(
+              ticketController: _ticketController,
+              journeyController: widget.journeyController,
+              initialOrigin: _automation.origin,
+              initialDestination: _automation.destination,
+              initialBusId: _automation.hasCustomBus ? _automation.busId : null,
+              initialPassengerType: _automation.passengerType,
+              initialPaymentMethod: _automation.paymentMethod,
+              initialPassengerName: _automation.passengerName == 'Passenger'
+                  ? null
+                  : _automation.passengerName,
+              autoOpenCheckout: true,
+            ),
           ),
         ),
-      ));
+      );
       return;
     }
     if (_actionExecutedThisTurn) return;
     _actionExecutedThisTurn = true;
     if (actionType == 'book_ticket') {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TicketBookingSuitePage(
-            ticketController: _ticketController,
-            initialStepIndex: 0,
-          ),
-        ),
-      ));
-    } else if (actionType == 'track_bus') {
-      final ticket = _activeTicket;
-      if (ticket != null) {
-        unawaited(Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => LiveLocationScreen(
-              ticket: ticket,
-              repository: _repository,
-            ),
-          ),
-        ));
-      } else {
-        unawaited(Navigator.of(context).push(
+      unawaited(
+        Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => TicketBookingSuitePage(
               ticketController: _ticketController,
               initialStepIndex: 0,
             ),
           ),
-        ));
+        ),
+      );
+    } else if (actionType == 'track_bus') {
+      final ticket = _activeTicket;
+      if (ticket != null) {
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  LiveLocationScreen(ticket: ticket, repository: _repository),
+            ),
+          ),
+        );
+      } else {
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => TicketBookingSuitePage(
+                ticketController: _ticketController,
+                initialStepIndex: 0,
+              ),
+            ),
+          ),
+        );
       }
     } else if (actionType == 'search_route') {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TicketBookingSuitePage(
-            ticketController: _ticketController,
-            initialStepIndex: 1,
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TicketBookingSuitePage(
+              ticketController: _ticketController,
+              initialStepIndex: 1,
+            ),
           ),
         ),
-      ));
+      );
     } else if (actionType == 'share_location') {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => SafetySharingPage(
-            activeTicket: _activeTicket,
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => SafetySharingPage(activeTicket: _activeTicket),
           ),
         ),
-      ));
-    } else if (actionType == 'open_saved') {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => SavedPage(
-            ticketController: _ticketController,
-          ),
-        ),
-      ));
+      );
     } else if (actionType == 'customize_home') {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const HomeScreenCustomizationPage(),
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const HomeScreenCustomizationPage(),
+          ),
         ),
-      ));
+      );
     } else if (actionType == 'reset_home') {
       AppSettingsController.instance.resetHomeScreenLayout();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1118,7 +1135,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (AppSettingsController
-                        .instance.geminiApiKey.isNotEmpty) ...[
+                        .instance
+                        .geminiApiKey
+                        .isNotEmpty) ...[
                       Icon(Icons.bolt, size: 16, color: colors.statusSuccess),
                       const SizedBox(width: 2),
                     ],
@@ -1127,8 +1146,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           ? 'GEMINI LIVE'
                           : 'NOT CONNECTED',
                       style: TextStyle(
-                        color: AppSettingsController
-                                .instance.geminiApiKey.isNotEmpty
+                        color:
+                            AppSettingsController
+                                .instance
+                                .geminiApiKey
+                                .isNotEmpty
                             ? colors.statusSuccess
                             : colors.textSecondary,
                         fontSize: 10,
@@ -1157,19 +1179,26 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             children: [
               // AI Studio Live API Status / Connection Banner
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 4,
+                ),
                 child: InkWell(
                   onTap: _showApiKeyDialog,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: AppSettingsController.instance.geminiApiKey.isEmpty
                           ? colors.surface
                           : colors.statusSuccess.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       border: Border.all(
-                        color: AppSettingsController.instance.geminiApiKey.isEmpty
+                        color:
+                            AppSettingsController.instance.geminiApiKey.isEmpty
                             ? colors.actionSecondary.withValues(alpha: 0.3)
                             : colors.statusSuccess.withValues(alpha: 0.5),
                       ),
@@ -1180,7 +1209,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           AppSettingsController.instance.geminiApiKey.isEmpty
                               ? Icons.vpn_key
                               : Icons.check_circle_outline,
-                          color: AppSettingsController.instance.geminiApiKey.isEmpty
+                          color:
+                              AppSettingsController
+                                  .instance
+                                  .geminiApiKey
+                                  .isEmpty
                               ? colors.actionSecondary
                               : colors.statusSuccess,
                           size: 18,
@@ -1192,18 +1225,28 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                                 ? 'Gemini Live key not set. Tap to connect your API key (aistudio.google.com/live-api)'
                                 : 'Gemini Live Active (${AppSettingsController.instance.geminiModel.replaceAll('models/', '')}) • $_liveStatus',
                             style: TextStyle(
-                              color: AppSettingsController.instance.geminiApiKey.isEmpty
+                              color:
+                                  AppSettingsController
+                                      .instance
+                                      .geminiApiKey
+                                      .isEmpty
                                   ? colors.textSecondary
                                   : colors.statusSuccess,
                               fontSize: 12,
-                              fontWeight: AppSettingsController.instance.geminiApiKey.isEmpty
+                              fontWeight:
+                                  AppSettingsController
+                                      .instance
+                                      .geminiApiKey
+                                      .isEmpty
                                   ? FontWeight.w500
                                   : FontWeight.w600,
                             ),
                           ),
                         ),
                         Text(
-                          AppSettingsController.instance.geminiApiKey.isEmpty ? 'Connect' : 'Change',
+                          AppSettingsController.instance.geminiApiKey.isEmpty
+                              ? 'Connect'
+                              : 'Change',
                           style: TextStyle(
                             color: colors.actionSecondary,
                             fontSize: 12,
@@ -1211,7 +1254,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           ),
                         ),
                         const SizedBox(width: 2),
-                        Icon(Icons.chevron_right, color: colors.actionSecondary, size: 16),
+                        Icon(
+                          Icons.chevron_right,
+                          color: colors.actionSecondary,
+                          size: 16,
+                        ),
                       ],
                     ),
                   ),
@@ -1240,7 +1287,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     decoration: BoxDecoration(
                       color: colors.surfaceSubtle,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      border: Border.all(color: colors.actionPrimary.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: colors.actionPrimary.withValues(alpha: 0.4),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: colors.actionPrimary.withValues(alpha: 0.15),
@@ -1262,7 +1311,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                _isSpeaking ? 'GEMINI SPEAKING' : 'AUDIO RESPONSE',
+                                _isSpeaking
+                                    ? 'GEMINI SPEAKING'
+                                    : 'AUDIO RESPONSE',
                                 style: TextStyle(
                                   color: colors.actionSecondary,
                                   fontSize: 11,
@@ -1272,14 +1323,23 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               ),
                             ),
                             IconButton(
-                              icon: Icon(Icons.volume_up, color: colors.actionSecondary, size: 20),
+                              icon: Icon(
+                                Icons.volume_up,
+                                color: colors.actionSecondary,
+                                size: 20,
+                              ),
                               tooltip: 'Voice response powered by Gemini Live',
-                              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                              constraints: const BoxConstraints(
+                                minWidth: 48,
+                                minHeight: 48,
+                              ),
                               padding: EdgeInsets.zero,
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Voice is streamed in real-time by Gemini Live.'),
+                                    content: Text(
+                                      'Voice is streamed in real-time by Gemini Live.',
+                                    ),
                                     duration: Duration(seconds: 2),
                                   ),
                                 );
@@ -1315,16 +1375,25 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         if (_lastResponse?.actionType != null) ...[
                           const SizedBox(height: 12),
                           ConstrainedBox(
-                            constraints: const BoxConstraints(minWidth: double.infinity, minHeight: 48),
+                            constraints: const BoxConstraints(
+                              minWidth: double.infinity,
+                              minHeight: 48,
+                            ),
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 backgroundColor: colors.actionPrimary,
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                 ),
                               ),
-                              onPressed: () => _executeAction(_lastResponse!.actionType!),
+                              onPressed: () =>
+                                  _executeAction(_lastResponse!.actionType!),
                               icon: const Icon(Icons.touch_app, size: 18),
                               label: Text(
                                 _getActionLabel(_lastResponse!.actionType!),
@@ -1394,30 +1463,31 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           },
                           child: Semantics(
                             button: true,
-                            label: 'Microphone orb. Double tap to start or pause continuous voice.',
+                            label:
+                                'Microphone orb. Double tap to start or pause continuous voice.',
                             child: Tooltip(
                               message: _isListening
                                   ? 'Microphone listening. Tap to pause.'
                                   : 'Microphone paused. Tap to start continuous voice.',
                               child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
+                                width: 64,
+                                height: 64,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _isListening
+                                      ? Icons.mic
+                                      : _isSpeaking
+                                      ? Icons.graphic_eq
+                                      : Icons.mic_off,
+                                  color: _isListening
+                                      ? colors.actionPrimary
+                                      : colors.textMuted,
+                                  size: 32,
+                                ),
                               ),
-                              child: Icon(
-                                _isListening
-                                    ? Icons.mic
-                                    : _isSpeaking
-                                        ? Icons.graphic_eq
-                                        : Icons.mic_off,
-                                color: _isListening
-                                    ? colors.actionPrimary
-                                    : colors.textMuted,
-                                size: 32,
-                              ),
-                            ),
                             ),
                           ),
                         ),
@@ -1437,17 +1507,28 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   children: [
                     if (_continuousListening && _isListening) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
                         margin: const EdgeInsets.only(bottom: 6),
                         decoration: BoxDecoration(
                           color: colors.statusSuccess.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          border: Border.all(color: colors.statusSuccess.withValues(alpha: 0.4)),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
+                          border: Border.all(
+                            color: colors.statusSuccess.withValues(alpha: 0.4),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.mic, size: 13, color: colors.statusSuccess),
+                            Icon(
+                              Icons.mic,
+                              size: 13,
+                              color: colors.statusSuccess,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Continuous Mic Active',
@@ -1465,18 +1546,30 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     if (_isPermissionBlocked) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: colors.statusError.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: colors.statusError, width: 1.5),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                          border: Border.all(
+                            color: colors.statusError,
+                            width: 1.5,
+                          ),
                         ),
                         child: Column(
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.mic_off, color: colors.statusError, size: 20),
+                                Icon(
+                                  Icons.mic_off,
+                                  color: colors.statusError,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Microphone Permission Blocked',
@@ -1499,21 +1592,34 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             ),
                             const SizedBox(height: 10),
                             ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                              constraints: const BoxConstraints(
+                                minHeight: 48,
+                                minWidth: 48,
+                              ),
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: colors.actionPrimary,
                                   foregroundColor: colors.onActionPrimary,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  ),
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusSm,
+                                    ),
+                                  ),
                                 ),
                                 onPressed: () {
-                                  _startMicrophoneListening(playChimeTone: true);
+                                  _startMicrophoneListening(
+                                    playChimeTone: true,
+                                  );
                                 },
                                 icon: const Icon(Icons.refresh, size: 18),
-                                label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w700)),
+                                label: const Text(
+                                  'Try Again',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
                               ),
                             ),
                           ],
@@ -1576,63 +1682,68 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     _buildPromptChip('How many stops left?'),
                     _buildPromptChip('Share my location'),
                     _buildPromptChip('Book ticket'),
-                    _buildPromptChip('Open saved places'),
                   ],
                 ),
               ),
 
               const SizedBox(height: 14),
 
-            // Text Input Fallback Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      style: TextStyle(color: colors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: 'Or type your question...',
-                        hintStyle: TextStyle(color: colors.textSecondary),
-                        filled: true,
-                        fillColor: colors.surfaceSubtle,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: colors.surface),
+              // Text Input Fallback Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _textController,
+                        style: TextStyle(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Or type your question...',
+                          hintStyle: TextStyle(color: colors.textSecondary),
+                          filled: true,
+                          fillColor: colors.surfaceSubtle,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: colors.surface),
+                          ),
                         ),
+                        onSubmitted: (val) {
+                          _audioEngine.unlockAudio();
+                          _handleVoiceInput(val, isUserTap: true);
+                          _textController.clear();
+                        },
                       ),
-                      onSubmitted: (val) {
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: colors.actionPrimary,
+                        padding: const EdgeInsets.all(14),
+                      ),
+                      icon: Icon(Icons.send, color: colors.onActionPrimary),
+                      onPressed: () {
                         _audioEngine.unlockAudio();
-                        _handleVoiceInput(val, isUserTap: true);
+                        _handleVoiceInput(
+                          _textController.text,
+                          isUserTap: true,
+                        );
                         _textController.clear();
                       },
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton.filled(
-                    style: IconButton.styleFrom(
-                      backgroundColor: colors.actionPrimary,
-                      padding: const EdgeInsets.all(14),
-                    ),
-                    icon: Icon(Icons.send, color: colors.onActionPrimary),
-                    onPressed: () {
-                      _audioEngine.unlockAudio();
-                      _handleVoiceInput(_textController.text, isUserTap: true);
-                      _textController.clear();
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildPromptChip(String prompt) {
     final colors = AppTheme.colors(context);
@@ -1679,8 +1790,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         return 'View Available Buses';
       case 'share_location':
         return 'Share Location with Contacts';
-      case 'open_saved':
-        return 'Open Saved Places';
       case 'customize_home':
         return 'Customize Home Screen';
       case 'reset_home':
@@ -1788,7 +1897,11 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
           children: [
             Text(
               'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice and audio streaming.',
-              style: TextStyle(color: colors.textSecondary, fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1805,7 +1918,9 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: colors.actionSecondary.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: colors.actionSecondary.withValues(alpha: 0.4),
+                ),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -1817,7 +1932,10 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: colors.actionSecondary,
+                  ),
                   items: _voiceOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -1849,7 +1967,9 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: colors.actionSecondary.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: colors.actionSecondary.withValues(alpha: 0.4),
+                ),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -1861,7 +1981,10 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: colors.actionSecondary,
+                  ),
                   items: _modelOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -1889,7 +2012,9 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
                 hintStyle: TextStyle(color: colors.textSecondary),
                 filled: true,
                 fillColor: colors.surface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
               ),
             ),
           ],
@@ -1910,10 +2035,7 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: colors.textSecondary),
-          ),
+          child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: () {
