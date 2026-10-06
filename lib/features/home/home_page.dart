@@ -148,6 +148,7 @@ class _HomePageState extends State<HomePage> {
               builder: (_) => LiveLocationScreen(
                 ticket: ticketToTrack,
                 repository: widget.repository,
+                ticketController: widget.ticketController,
               ),
             ),
           ),

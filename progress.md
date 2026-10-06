@@ -4,7 +4,28 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 6, 2026 (Saved places rebuilt: deleted the ticket-history SavedPage, home option removed, one-tap starred-place chips in the booking + Find-a-Place pickers; 407/407 green, analyze clean)
+**Last Updated**: October 6, 2026 (Live-map arrival: destination popup + ticket expiry + 10-sec return-home countdown; 410/410 green, analyze clean)
+
+---
+
+## 🛠️ Session Log — 2026-10-06: Live-Map Destination Arrival
+
+> **Trigger**: Owner request — when the bus reaches the destination, show a popup, expire the ticket, display a 10-second "live map closing" countdown, and return to the homepage.
+
+### What changed
+
+* `LiveLocationScreen` watches the GPS stream for completion (`routeDone`: stream done or 100% progress, never an error) and fires `_onArrival` exactly once, post-frame.
+* `_onArrival` expires the ticket via `completeActiveTrip(reason: 'Reached destination')` — but only if this ticket is still the active one — announces the arrival politely, and opens a non-dismissible `Destination Reached` dialog naming the bus and stop.
+* The dialog shows `Live map closing in Ns…` on a 1-second periodic timer (dialog-local `StateSetter`, so the screen below never rebuilds per tick). At zero — or immediately via `Back to Home now` — the timer is cancelled and `popUntil(isFirst)` returns to the home page. Timer is cancelled in `dispose`, so it can never fire on a popped route.
+* The screen takes an optional `TicketController` (falling back to the service locator); all four push sites (home, booking suite, My Tickets, assistant dialog) now pass theirs explicitly.
+
+### Tests
+
+* New `test/features/live_arrival_test.dart` (3, terminal-stream fake): dialog + expiry on arrival; countdown ticks then auto-returns home; the button returns immediately. Uses fixed pumps only — the countdown is periodic, so `pumpAndSettle` would never settle mid-countdown (verified the hard way: only settle *after* the return).
+* Full suite: `flutter analyze` clean, `flutter test` **410/410 green** (407 + 3).
+
+* **Files**: `lib/features/tickets/live_location_screen.dart` · call sites in `home_page.dart`, `ticket_booking_suite_page.dart`, `my_tickets_page.dart`, `ai_assistant_dialog.dart` · `test/features/live_arrival_test.dart`
+* **Verification**: `flutter analyze` clean · `flutter test` 410/410 green.
 
 ---
 

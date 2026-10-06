@@ -676,6 +676,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         builder: (_) => LiveLocationScreen(
                           ticket: activeTicket,
                           repository: repo,
+                          ticketController: widget.ticketController,
                         ),
                       ),
                     ),

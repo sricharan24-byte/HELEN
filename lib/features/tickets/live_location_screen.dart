@@ -3,22 +3,29 @@ import 'package:flutter/material.dart' hide Route;
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../journey/live_location_map_widget.dart';
+import 'ticket_controller.dart';
 
 class LiveLocationScreen extends StatefulWidget {
   const LiveLocationScreen({
     super.key,
     required this.ticket,
     required this.repository,
+    this.ticketController,
   });
 
   final Ticket ticket;
   final TransportRepository repository;
+
+  /// Expires the ticket on arrival. Falls back to the shared instance so
+  /// callers that only have a ticket snapshot still complete the trip.
+  final TicketController? ticketController;
 
   @override
   State<LiveLocationScreen> createState() => _LiveLocationScreenState();
@@ -28,6 +35,133 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   /// Bumped by the AppBar refresh action (and the error-card Retry button)
   /// to re-subscribe the live GPS stream.
   int _streamKey = 0;
+
+  /// Arrival is a one-shot: the dialog, countdown and expiry run exactly once
+  /// even though the StreamBuilder rebuilds on every tick.
+  bool _arrivalHandled = false;
+
+  /// 10-second countdown that auto-returns to the home page after arrival.
+  /// Cancelled in dispose so it can never fire on a popped route.
+  Timer? _countdownTimer;
+  int _countdownSeconds = 0;
+
+  /// Refresh for the arrival dialog's countdown line, captured by the
+  /// dialog's StatefulBuilder and cleared when the dialog closes.
+  StateSetter? _dialogRefresh;
+
+  TicketController get _tickets =>
+      widget.ticketController ?? AppServiceLocator.instance.ticketController;
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    super.dispose();
+  }
+
+  /// Fires once when the stream reports the destination reached: expires the
+  /// ticket, announces it, and opens the arrival dialog with its 10-second
+  /// return-home countdown.
+  void _onArrival() {
+    if (_arrivalHandled || !mounted) return;
+    _arrivalHandled = true;
+
+    final ticket = widget.ticket;
+    if (_tickets.activeTicket?.id == ticket.id) {
+      _tickets.completeActiveTrip(reason: 'Reached destination');
+    }
+    AnnouncementCoordinator.instance.announce(
+      'Destination reached: ${ticket.destination.name}. Your ticket has expired.',
+      priority: AnnouncementPriority.normal,
+    );
+    _showArrivalDialog();
+  }
+
+  void _showArrivalDialog() {
+    final ticket = widget.ticket;
+    _countdownSeconds = 10;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_countdownSeconds <= 1) {
+        timer.cancel();
+        _returnHome();
+        return;
+      }
+      _countdownSeconds--;
+      // Repaint the dialog countdown without rebuilding the screen below.
+      _dialogRefresh?.call(() {});
+    });
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          final colors = AppTheme.colors(ctx);
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              _dialogRefresh = setDialogState;
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                ),
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: colors.statusSuccess,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('Destination Reached')),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bus ${ticket.busId} has arrived at ${ticket.destination.name}. Your ticket has expired.',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Live map closing in $_countdownSeconds sec…',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: _returnHome,
+                    child: const Text('Back to Home now'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ).then((_) {
+        _dialogRefresh = null;
+      }),
+    );
+  }
+
+  /// Dismisses the arrival dialog (if open) and returns to the home page.
+  void _returnHome() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    // The dialog is a route above this screen: close it first, then pop
+    // everything back to the first (home) route.
+    navigator.popUntil((route) => route.isFirst);
+  }
 
   void _resubscribe() {
     setState(() => _streamKey++);
@@ -45,6 +179,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
   }
+
   @override
   void initState() {
     super.initState();
@@ -111,6 +246,12 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               snapshot.connectionState == ConnectionState.done ||
               (live != null && live.progressPercentage >= 1.0);
 
+          // Arrival is stream completion (or 100% progress), never an error:
+          // the dialog, expiry and countdown run exactly once, post-frame.
+          if (routeDone && !_arrivalHandled && !snapshot.hasError) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _onArrival());
+          }
+
           // Honest stream states: never invent telemetry. While the GPS
           // stream is still connecting (or has produced nothing yet) show a
           // muted waiting card; on a real stream error show the actual error
@@ -128,7 +269,8 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               ),
             );
           }
-          final waiting = snapshot.connectionState == ConnectionState.waiting ||
+          final waiting =
+              snapshot.connectionState == ConnectionState.waiting ||
               live == null;
 
           return SingleChildScrollView(
@@ -157,8 +299,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colors.statusSuccessBg,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusLg),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                       border: Border.all(color: colors.statusSuccess),
                     ),
                     child: Row(
@@ -190,8 +331,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colors.surface,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusLg),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                       border: Border.all(color: colors.border),
                     ),
                     child: Row(
@@ -270,11 +410,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                   excludeSemantics: true,
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.update,
-                        size: 14,
-                        color: colors.textMuted,
-                      ),
+                      Icon(Icons.update, size: 14, color: colors.textMuted),
                       const SizedBox(width: 6),
                       Text(
                         live != null
@@ -369,8 +505,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: colors.border),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
@@ -425,9 +562,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Pass #${ticket.id} • ${ticket.origin.name} → ${ticket.destination.name}',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colors.textMuted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(color: colors.textMuted),
                 ),
               ],
             ),
@@ -577,8 +712,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: colors.surfaceSubtle,
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     border: Border.all(color: colors.border),
                   ),
                   child: Text(

@@ -91,6 +91,7 @@ class _AiAssistantDialogState extends State<AiAssistantDialog> {
             builder: (_) => LiveLocationScreen(
               ticket: ticket,
               repository: _repository,
+              ticketController: _ticketController,
             ),
           ),
         ));

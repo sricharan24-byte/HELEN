@@ -1961,6 +1961,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           builder: (_) => LiveLocationScreen(
                             ticket: ticket,
                             repository: repo,
+                            ticketController: widget.ticketController,
                           ),
                         ),
                       ),
