@@ -126,5 +126,25 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
       expect(AiControlGlow.instance.mode, AiGlowMode.idle);
     });
+
+    testWidgets('dispose clears the glow even when it was armed mid-teardown',
+        (tester) async {
+      // Regression: `mounted` stays true for the whole runDisposeSteps window
+      // inside GeminiLiveScreen.dispose, so a synchronous teardown callback
+      // (the web JS bridge fires some) could re-run setState and re-arm the
+      // glow after the idle reset — leaving the glow over Home. The dispose
+      // now clears the conversational flags first and resets the glow again
+      // as the LAST step, so the worst case below still lands on idle.
+      AiControlGlow.instance.idle();
+      await tester.pumpWidget(const MaterialApp(home: GeminiLiveScreen()));
+      await tester.pump();
+      expect(AiControlGlow.instance.mode, AiGlowMode.listening);
+
+      // Worst case: the glow is armed to a stale active mode right before the
+      // screen leaves the tree (as if a mid-teardown callback had re-armed it).
+      AiControlGlow.instance.speaking();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      expect(AiControlGlow.instance.mode, AiGlowMode.idle);
+    });
   });
 }

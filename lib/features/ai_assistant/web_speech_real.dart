@@ -23,12 +23,30 @@ bool _jsBridgeInitialized = false;
 /// unchanged and simply moves with the voice: when model chunks play for a
 /// turn, [speakText] is not called for that turn, and the TTS remains the
 /// fallback for turns that carry no audio at all.
-const int kJsBridgeVersion = 6;
+/// v7: Chrome voice fixes. Two real silence bugs:
+///
+/// 1. `__bb_play_model_audio` used to schedule chunks even while the
+///    AudioContext was suspended (Chrome autoplay policy) and still return
+///    true, so the caller believed the model voice had played and skipped TTS
+///    for the whole turn — total silence. It now returns false while the
+///    context is not running, which routes the turn to the TTS fallback, and
+///    it no longer queues chunks that would all pile up at t≈0 and overlap
+///    when the context eventually resumes.
+/// 2. `__bb_speak_text` called `speechSynthesis.cancel()` and `speak()`
+///    synchronously in the same tick — a known Chrome bug swallows the new
+///    utterance (it never plays and never fires onend/onerror). The speak is
+///    now deferred a tick after a cancel.
+const int kJsBridgeVersion = 7;
 
 int _pageBridgeVersion() {
   try {
-    final w = js.context['window'];
-    final v = js_util.getProperty(w, '__bb_bridge_version');
+    // Legacy `dart:js` lookup, NOT `js_util.getProperty`: `js.context` is a
+    // `JsObject` wrapper around the real `window`, and js_util reads the
+    // property off the Dart-side wrapper — always `undefined`, so the version
+    // check silently returned -1 forever and forced a full re-eval on every
+    // call. `JsObject.operator[]` goes through the same native path as
+    // `js.context.callMethod`, which is the interop that demonstrably works.
+    final v = js.context['__bb_bridge_version'];
     if (v is num) return v.toInt();
   } catch (_) {}
   return -1;
@@ -36,28 +54,35 @@ int _pageBridgeVersion() {
 
 /// Resolves one bridge function by name.
 ///
-/// Called through the function reference rather than `js.context.callMethod`
-/// so a missing install is an observable `null` this file can report, instead
-/// of a `NoSuchMethodError` thrown at the call site with no explanation of why
-/// the page JS was not there.
+/// Looked up through the legacy `dart:js` [js.context] `JsObject` API — the
+/// same interop path as `js.context.callMethod`, which is what installs the
+/// bridge (`eval`) in the first place. The earlier version called
+/// `js_util.getProperty(js.context, name)`, which silently returns `null` for
+/// *every* name: `js.context` is a `JsObject` wrapper, not a raw JS object, so
+/// js_util reads a property off the Dart-side wrapper and sees `undefined`.
+/// That made this function report a perfectly installed bridge as missing —
+/// `speakText` never invoked `__bb_speak_text`, `playModelAudio` always
+/// returned `false`, and every reply fell through to a TTS path that could
+/// never run: total silence on every turn (regression introduced by the
+/// bridge-verification commit `decab6c`).
+///
+/// A missing install is still an observable `null` here, so the "bridge has no
+/// X" report keeps its original purpose.
 Object? _bridgeFn(String name) {
   try {
-    final direct = js_util.getProperty(js.context, name);
-    if (direct != null) return direct;
-    // js.context is the global scope on every target today; the extra hop
-    // covers a page where the bridge landed on `window` proper.
-    final window = js_util.getProperty(js.context, 'window');
-    if (window != null) return js_util.getProperty(window, name);
-  } catch (_) {}
-  return null;
+    return js.context[name];
+  } catch (_) {
+    return null;
+  }
 }
 
-/// Runs a bridge function with `this` unbound — the bridge only ever reads
-/// globals, so the receiver is irrelevant.
+/// Runs one bridge function with the legacy `JsObject.callMethod` path.
+/// Returns `null` when the function is not installed (or when the JS function
+/// itself returns `undefined` — callers that must tell those apart check
+/// [_bridgeFn] first).
 Object? _callBridgeFn(String name, List<Object?> args) {
-  final fn = _bridgeFn(name);
-  if (fn == null) return null;
-  return js_util.callMethod(fn, 'call', <Object?>[null, ...args]);
+  if (_bridgeFn(name) == null) return null;
+  return js.context.callMethod(name, args);
 }
 
 /// The bridge entry points this file depends on. Verified after install, so a
@@ -254,12 +279,16 @@ void _ensureJsBridge() {
               console.warn("[BusBuddy ModelAudio] no AudioContext yet; reply stays silent");
               return false;
             }
-            // A context created before the first gesture stays suspended and
-            // would queue audio that never plays.
-            if (ctx.state === "suspended") {
-              ctx.resume().catch(function(e) {
-                console.warn("[BusBuddy ModelAudio] resume failed:", e);
-              });
+            // Chrome autoplay policy: a context created before the first
+            // gesture stays suspended, and audio scheduled on it never plays
+            // (currentTime is frozen, so queued chunks would also all pile up
+            // at t≈0 and overlap on resume). Returning false here routes the
+            // whole turn to the TTS fallback instead of a silent reply.
+            if (ctx.state !== "running") {
+              try { ctx.resume(); } catch (e) {}
+              console.warn("[BusBuddy ModelAudio] AudioContext not running (" + ctx.state +
+                "); falling back to TTS for this chunk");
+              return false;
             }
             var bin = window.atob(b64);
             var frames = Math.floor(bin.length / 2);
@@ -327,6 +356,12 @@ void _ensureJsBridge() {
               window.__bb_speak_timer = null;
             }
             window.__bb_is_speaking = true;
+            // Chrome bug: an utterance queued in the same tick as cancel() is
+            // silently swallowed (no playback, no onend, no onerror). Defer
+            // the speak one tick whenever something was actually playing or
+            // queued, so the cancel settles first.
+            var hadSpeech =
+              window.speechSynthesis.speaking || window.speechSynthesis.pending;
             window.speechSynthesis.cancel();
 
             var cleanText = text.replace(/[*_#`~>]/g, "").trim();
@@ -357,10 +392,18 @@ void _ensureJsBridge() {
               }
             };
 
-            if (window.speechSynthesis.paused) {
-              window.speechSynthesis.resume();
+            var startSpeech = function() {
+              if (currentGen !== (window.__bb_generation || 0)) return;
+              if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+              }
+              window.speechSynthesis.speak(utter);
+            };
+            if (hadSpeech) {
+              window.__bb_speak_timer = setTimeout(startSpeech, 60);
+            } else {
+              startSpeech();
             }
-            window.speechSynthesis.speak(utter);
           } catch (e) {
             console.error("[BusBuddy TTS] init exception:", e);
           }
@@ -495,12 +538,19 @@ void playAudioTone({bool isListening = false}) {
 void speakText(String text) {
   try {
     _ensureJsBridge();
+    // Presence is checked first: `__bb_speak_text` returns `undefined`, so the
+    // call result alone cannot distinguish "spoke" from "bridge missing".
+    if (_bridgeFn('__bb_speak_text') == null) {
+      _reportMissingBridge('__bb_speak_text');
+      return;
+    }
     final langCode = AppSettingsController.instance.speechLanguageCode;
     final speechRate = AppSettingsController.instance.speechRate;
-    if (_callBridgeFn('__bb_speak_text', <Object?>[text, langCode, speechRate]) ==
-        null) {
-      _reportMissingBridge('__bb_speak_text');
-    }
+    js.context.callMethod('__bb_speak_text', <Object?>[
+      text,
+      langCode,
+      speechRate,
+    ]);
   } catch (e) {
     debugPrint('[WebSpeech] speakText error: $e');
   }

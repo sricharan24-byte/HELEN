@@ -54,10 +54,14 @@ class AppSettingsController extends ChangeNotifier {
         for (final item in layoutRaw) {
           if (item is Map<String, dynamic>) {
             final parsed = HomeScreenItem.fromJson(item);
+            // Skip items that no longer exist in the default layout
+            // (e.g. removed options like 'my_journey' or 'live_tracking').
+            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) continue;
             loaded.add(parsed);
             seenIds.add(parsed.id);
           } else if (item is Map) {
             final parsed = HomeScreenItem.fromJson(Map<String, dynamic>.from(item));
+            if (!HomeScreenItem.defaultItemsMap.containsKey(parsed.id)) continue;
             loaded.add(parsed);
             seenIds.add(parsed.id);
           }

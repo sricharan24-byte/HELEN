@@ -10,7 +10,6 @@ import 'package:busbuddy/features/alerts/alerts_page.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
 import 'package:busbuddy/features/safety/safety_sharing_page.dart';
-import 'package:busbuddy/features/tickets/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 import '../helpers/map_test_tiles.dart';
 
@@ -99,7 +98,7 @@ void main() {
   });
 
   group('HomePage Navigation for Additional Configurable Cards', () {
-    testWidgets('tapping Live Bus Map opens LiveLocationScreen', (tester) async {
+    testWidgets('Live Bus Map card is removed from the home page', (tester) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 2400);
       addTearDown(() {
@@ -110,13 +109,7 @@ void main() {
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
 
-      final liveMapFinder = find.text('Live Bus Map');
-      await tester.ensureVisible(liveMapFinder);
-      await tester.pumpAndSettle();
-      await tester.tap(liveMapFinder);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(LiveLocationScreen), findsOneWidget);
+      expect(find.text('Live Bus Map'), findsNothing);
     });
 
     testWidgets('tapping Corridor Alerts opens AlertsPage', (tester) async {

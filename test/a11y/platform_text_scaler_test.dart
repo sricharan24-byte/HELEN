@@ -140,8 +140,8 @@ void main() {
       await tester.scrollUntilVisible(find.text('Find a Place'), 200, scrollable: verticalFeed);
       expect(find.text('Find a Place'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.text('My Journey'), 200, scrollable: verticalFeed);
-      expect(find.text('My Journey'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('My Tickets'), 200, scrollable: verticalFeed);
+      expect(find.text('My Tickets'), findsOneWidget);
     });
   });
 }

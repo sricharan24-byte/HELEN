@@ -16,7 +16,7 @@ void main() {
   setUp(AppSettingsController.instance.resetHomeScreenLayout);
 
   group('HomeScreenCustomizationPage Rendering', () {
-    testWidgets('renders header branding, guidance hero, tip box, and all 9 items', (tester) async {
+    testWidgets('renders header branding, guidance hero, tip box, and all 7 items', (tester) async {
       await tester.pumpWidget(testCustomizationApp());
       await tester.pumpAndSettle();
 
@@ -25,15 +25,15 @@ void main() {
       expect(find.text('Customize Home Screen'), findsOneWidget);
       expect(find.text('Customize Your Home'), findsOneWidget);
       expect(find.textContaining('Drag cards using ≡ to reorder'), findsOneWidget);
-      expect(find.textContaining('9 of 9 visible'), findsOneWidget);
+      expect(find.textContaining('7 of 7 visible'), findsOneWidget);
 
-      // Verify all 9 default items are displayed
+      // Verify all 7 default items are displayed (My Journey and Live Bus Map removed)
       expect(find.text('Find a Place'), findsOneWidget);
-      expect(find.text('My Journey'), findsOneWidget);
       expect(find.text('My Tickets'), findsOneWidget);
       expect(find.text('Saved Places'), findsOneWidget);
       expect(find.text('Ask BusBuddy'), findsOneWidget);
-      expect(find.text('Live Bus Map'), findsOneWidget);
+      expect(find.text('My Journey'), findsNothing);
+      expect(find.text('Live Bus Map'), findsNothing);
       expect(find.text('Corridor Alerts'), findsOneWidget);
       expect(find.text('Emergency SOS'), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
@@ -63,14 +63,14 @@ void main() {
 
       // Shows 'Hidden' badge
       expect(find.text('Hidden'), findsOneWidget);
-      expect(find.textContaining('8 of 9 visible'), findsOneWidget);
+      expect(find.textContaining('6 of 7 visible'), findsOneWidget);
 
       // Toggle back to true
       await tester.tap(switches.first);
       await tester.pumpAndSettle();
 
       expect(AppSettingsController.instance.homeScreenItems.first.isVisible, true);
-      expect(find.textContaining('9 of 9 visible'), findsOneWidget);
+      expect(find.textContaining('7 of 7 visible'), findsOneWidget);
     });
 
     testWidgets('move down and move up buttons reorder items correctly', (tester) async {
@@ -115,7 +115,7 @@ void main() {
       AppSettingsController.instance.toggleHomeScreenItemVisibility(HomeScreenItem.idAlerts, false);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('8 of 9 visible'), findsOneWidget);
+      expect(find.textContaining('6 of 7 visible'), findsOneWidget);
 
       // Tap reset layout button
       await tester.tap(find.text('Reset Layout'));
@@ -124,7 +124,7 @@ void main() {
       final items = AppSettingsController.instance.homeScreenItems;
       expect(items[0].id, HomeScreenItem.idRouteSearch);
       expect(items.every((e) => e.isVisible), isTrue);
-      expect(find.textContaining('9 of 9 visible'), findsOneWidget);
+      expect(find.textContaining('7 of 7 visible'), findsOneWidget);
     });
 
     testWidgets('tapping Done button pops the screen', (tester) async {

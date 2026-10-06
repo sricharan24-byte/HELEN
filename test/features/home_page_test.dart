@@ -82,7 +82,7 @@ void main() {
       expect(find.text("Here's your journey today."), findsOneWidget);
     });
 
-    testWidgets('displays idle greeting banner & 6 cards when no active ticket (Image 1)', (tester) async {
+    testWidgets('displays idle greeting banner when no active ticket (Image 1)', (tester) async {
       final ticketRepo = LocalTicketRepository();
       final ticketController = TicketController(ticketRepo);
       ticketController.cancelActiveTicket();
@@ -92,7 +92,8 @@ void main() {
 
       expect(find.text('Good morning!'), findsOneWidget);
       expect(find.text('What would you like to do?'), findsOneWidget);
-      expect(find.text('No active journey'), findsOneWidget);
+      // 'My Journey' option was removed from the home screen options.
+      expect(find.text('No active journey'), findsNothing);
     });
   });
 

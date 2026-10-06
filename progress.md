@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 6, 2026 (Chunk 50: cross-screen design-contract polish — SOS-red misuse fixed on 8 screens, token system restored on 12 screens, honest live-GPS states, paise-exact fare display; per-agent runs 389/389 tests, analyze clean)
+**Last Updated**: October 6, 2026 (Chunk 51: home options trimmed — "My Journey" + "Live Bus Map" cards removed, bus logo moved to "Find a Place"; Chrome voice silence fixed — web bridge v7 gates model audio on a running AudioContext and defers TTS past the cancel-race; AI glow hard to kill on Home fixed; stale `build/web` identified as the reason fixes weren't heard; per-agent runs 390/390 tests, analyze clean)
 
 ---
 
@@ -1153,3 +1153,42 @@ An emulator validates platform wiring, the permission contract and honest-failur
 
 * **Files**: `lib/features/tickets/{ticket_booking_suite_page,booking_checkout_dialog,my_tickets_page,ticket_details_page,live_location_screen}.dart` · `lib/features/settings/{settings_page,accessibility_settings_page,personalization_settings_page,voice_assistant_settings_page,home_screen_customization_page}.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/features/adaptive_ui/{adaptive_shortcuts_view,adaptive_shortcuts_modal}.dart` · `lib/features/{home/home_page,journey/journey_page,route_search/route_search_page,route_details/route_details_page,saved/saved_page}.dart` · `lib/domain/ticketing/entities/fare.dart` · `web/index.html` · `test/features/ai_assistant/gemini_api_key_dialog_test.dart` · `test/features/home_screen_customization_test.dart`
 * **Verification**: `flutter analyze` clean, `flutter test` 389/389 green (per-agent full-suite runs; final post-merge re-run pending — see above).
+
+---
+
+## 🛠️ Session Log — 2026-10-06: Chunk 51 — Home Options Trim, Chrome Voice Silence, Glow-Over-Home
+
+> **Trigger**: Three user reports from hands-on Chrome testing: (1) remove the "My Journey" option and move its bus logo to the "Find a Place" card, and drop the "Live Bus Map" ("life map") from the homepage options; (2) no Gemini voice audible in Chrome at all; (3) the AI control edge glow stays lit on Home after backing out of Gemini Live. Item (2) turned out to have a code half AND a deployment half — the deployed `build/web` predated every fix.
+
+### 🏠 Home screen options — My Journey & Live Bus Map removed, bus logo relocated
+
+* `lib/data/models/home_screen_item.dart`: `idMyJourney` and `idLiveTracking` deleted (constant, icon-switch cases, `defaultItems` entries — 9 → 7 default cards). `idRouteSearch` ("Find a Place") now carries the bus logo (`Icons.directions_bus`) that used to brand "My Journey"; its old icon was `Icons.search`.
+* `lib/features/home/home_page.dart`: the `idMyJourney` ("No active journey") and `idLiveTracking` card builders + tap handlers removed from `_buildCustomCardForItem`. The **active-ticket hero card** (titled "My Journey", shown only while a ticket is active) is intentionally kept — it is the trip status display, not a configurable option; flagged to the owner, revert freely if unwanted.
+* `lib/core/settings/app_settings_controller.dart`: the persisted-layout loader now **skips ids absent from `defaultItemsMap`**, so old saved layouts containing `my_journey` / `live_tracking` can never resurrect them in the Customize Home Screen list. (Live tracking stays reachable from My Tickets, the booking suite's Step 3 map actions, and the AI assistant.)
+* Tests: `test/data/home_screen_item_test.dart` pinned to 7 items with `isNot(contains(...))` guards for both removed ids; the `fromJson` fallback test moved from `idLiveTracking` to `idAlerts`; `home_page_test` no longer expects "No active journey" (and asserts its absence); `home_page_customization_test`'s "tapping Live Bus Map opens LiveLocationScreen" became "Live Bus Map card is removed from the home page" (unused `LiveLocationScreen` import dropped); `home_screen_customization_test` counts 9→7 (`7 of 7 visible` / `6 of 7 visible`) with removed rows asserted absent; the 320dp/300% a11y scroll test scrolls to "My Tickets" instead of "My Journey".
+
+### 🔇 Chrome voice silence — web bridge v7 (two real bugs)
+
+* **Single-speaker trap on a suspended AudioContext** (`web_speech_real.dart`): `__bb_play_model_audio` used to schedule Gemini's 24 kHz PCM chunks even while the Web Audio context was **suspended** (Chrome autoplay policy) *and* return `true` — so `ModelVoicePlayer.hasModelAudioThisTurn` went true, `onTurnComplete` skipped TTS for the whole turn, and the passenger got **total silence**. Worse, chunks scheduled while suspended all pile at t≈0 (frozen `currentTime`) and would overlap into garbage on resume. Now: context not running → attempt `resume()` and **return `false`**, which routes the turn to the TTS fallback and queues nothing.
+* **Chrome `cancel()`→`speak()` race**: `__bb_speak_text` called `speechSynthesis.cancel()` and `speak()` in the same tick — the known Chrome bug that silently swallows the new utterance (no playback, no `onend`, no `onerror`). Now `speak()` is deferred ~60 ms via `__bb_speak_timer` when something was actually `speaking || pending`, with the existing generation guard making `__bb_stop_speech` / `__bb_reset_turn` cancel the deferred speak safely.
+* **Bridge version bumped 6 → 7** (hot reload preserves Dart statics; the page only re-evals on version mismatch). Verified the extracted v7 bridge in **Node against mocked Chrome APIs — 5/5**: running context schedules + returns true; suspended context returns false and queues nothing; immediate speak; deferred speak fires after the timer; `__bb_stop_speech` cancels a deferred speak. (Mock artifacts — missing `SpeechSynthesisUtterance` global and bare `setTimeout` — were mock bugs, not bridge bugs.)
+
+### ✨ Glow stuck on Home — dispose re-arm window closed
+
+* `GeminiLiveScreen.dispose()` resets `AiControlGlow` first (Chunk 48 fix), but `mounted` stays **true** for the whole `runDisposeSteps` window, so a synchronous callback fired by a teardown step (the web JS bridge fires some synchronously) could re-run `setState`, re-derive `listening`/`speaking` in the `setState` override, and re-arm the glow *after* the reset — leaving the glow lit over Home for the rest of the process.
+* Fix: the conversational flags (`_isListening`, `_isSpeaking`, `_continuousListening`) are cleared as plain writes **before** the steps (any re-entrant `setState` now derives idle), and the glow is reset again as the **last** step (`aiControlGlowFinal`) — duplicate-mode suppression makes the no-op case free. Regression test added: `test/features/ai_assistant/ai_control_glow_test.dart` ("dispose clears the glow even when it was armed mid-teardown") drives the worst case — speaking-mode armed right before the screen leaves the tree — and asserts idle.
+
+### 🕵️ The reason the fix "didn't work" — stale build
+
+* After the v7 code landed, the user still heard nothing. `build/web/main.dart.js` was timestamped **07:14 (pre-fix)** and contained `__bb_bridge_version = 6` — the fixes were never in what Chrome ran. `flutter build web` re-ran (13:52) and the fresh bundle was grepped-verified: `__bb_bridge_version = 7`, the suspended-context fallback string, and the v7 banner all present.
+* Deployment guidance recorded: Flutter web's service worker (`skipWaiting`) caches `main.dart.js` — a **hard refresh (`Ctrl+Shift+R`) or DevTools → Empty Cache and Hard Reload** is required after every rebuild, and the console banner `[BusBuddy SingleVoice] JS bridge v7 ready (TTS-only)` is the quick check that the page is current.
+
+### 🧪 Verification
+
+* `flutter analyze` clean (no issues).
+* `flutter test` **390/390 green** (389 prior + 1 new glow regression test; five suites updated for the 7-card layout).
+* Node bridge simulation 5/5 (see above); `node --check` on the extracted bridge JS passes.
+* On-device Chrome listening still pending user re-test against the fresh build with a hard refresh; if silent, the `[BusBuddy ...]` / `[GeminiLive]` console lines (AudioContext-not-running, utterance error, Server error, WebSocket error) localize the remaining cause.
+
+* **Files**: `lib/data/models/home_screen_item.dart` · `lib/features/home/home_page.dart` · `lib/core/settings/app_settings_controller.dart` · `lib/features/ai_assistant/web_speech_real.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `test/data/home_screen_item_test.dart` · `test/features/{home_page_test,home_page_customization_test,home_screen_customization_test}.dart` · `test/a11y/platform_text_scaler_test.dart` · `test/features/ai_assistant/ai_control_glow_test.dart`
+* **Verification**: `flutter analyze` clean · `flutter test` 390/390 green · Node bridge simulation 5/5 · fresh `flutter build web` grep-verified v7.

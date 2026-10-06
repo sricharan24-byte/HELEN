@@ -31,11 +31,9 @@ class HomeScreenItem {
 
   /// Standard component IDs in the BusBuddy system.
   static const String idRouteSearch = 'route_search';
-  static const String idMyJourney = 'my_journey';
   static const String idMyTickets = 'my_tickets';
   static const String idSavedPlaces = 'saved_places';
   static const String idVoiceAssistant = 'voice_assistant';
-  static const String idLiveTracking = 'live_tracking';
   static const String idAlerts = 'alerts';
   static const String idSafety = 'safety';
   static const String idSettings = 'settings';
@@ -45,8 +43,6 @@ class HomeScreenItem {
     if (customIcon != null) return customIcon!;
     switch (id) {
       case idRouteSearch:
-        return Icons.search;
-      case idMyJourney:
         return Icons.directions_bus;
       case idMyTickets:
         return Icons.confirmation_number_outlined;
@@ -54,8 +50,6 @@ class HomeScreenItem {
         return Icons.star;
       case idVoiceAssistant:
         return Icons.auto_awesome;
-      case idLiveTracking:
-        return Icons.map_outlined;
       case idAlerts:
         return Icons.notifications_outlined;
       case idSafety:
@@ -134,12 +128,6 @@ class HomeScreenItem {
           isVisible: true,
         ),
         const HomeScreenItem(
-          id: idMyJourney,
-          title: 'My Journey',
-          subtitle: 'Active trip & stop progress',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
           id: idMyTickets,
           title: 'My Tickets',
           subtitle: 'View current and previous tickets',
@@ -155,12 +143,6 @@ class HomeScreenItem {
           id: idVoiceAssistant,
           title: 'Ask BusBuddy',
           subtitle: 'Gemini Live Voice Mode',
-          isVisible: true,
-        ),
-        const HomeScreenItem(
-          id: idLiveTracking,
-          title: 'Live Bus Map',
-          subtitle: 'Real-time bus location & speed',
           isVisible: true,
         ),
         const HomeScreenItem(

@@ -3,20 +3,21 @@ import 'package:busbuddy/data/models/home_screen_item.dart';
 
 void main() {
   group('HomeScreenItem Model', () {
-    test('defaultItems contains all 9 required core home screen components', () {
+    test('defaultItems contains all 7 required core home screen components', () {
       final items = HomeScreenItem.defaultItems;
-      expect(items.length, 9);
+      expect(items.length, 7);
 
       final ids = items.map((e) => e.id).toList();
       expect(ids, contains(HomeScreenItem.idRouteSearch));
-      expect(ids, contains(HomeScreenItem.idMyJourney));
       expect(ids, contains(HomeScreenItem.idMyTickets));
       expect(ids, contains(HomeScreenItem.idSavedPlaces));
       expect(ids, contains(HomeScreenItem.idVoiceAssistant));
-      expect(ids, contains(HomeScreenItem.idLiveTracking));
       expect(ids, contains(HomeScreenItem.idAlerts));
       expect(ids, contains(HomeScreenItem.idSafety));
       expect(ids, contains(HomeScreenItem.idSettings));
+      // Removed options must no longer appear in the default home layout.
+      expect(ids, isNot(contains('my_journey')));
+      expect(ids, isNot(contains('live_tracking')));
     });
 
     test('all default items have valid non-empty titles, subtitles, icons, and colors', () {
@@ -52,10 +53,10 @@ void main() {
     });
 
     test('fromJson falls back to defaults when title or subtitle are missing', () {
-      final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idLiveTracking});
-      expect(item.id, HomeScreenItem.idLiveTracking);
-      expect(item.title, 'Live Bus Map');
-      expect(item.subtitle, 'Real-time bus location & speed');
+      final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idAlerts});
+      expect(item.id, HomeScreenItem.idAlerts);
+      expect(item.title, 'Corridor Alerts');
+      expect(item.subtitle, 'Delay & schedule updates');
       expect(item.isVisible, isTrue);
     });
 

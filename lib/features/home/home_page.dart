@@ -848,32 +848,6 @@ class _HomePageState extends State<HomePage> {
           onTap: _openRouteSearch,
         );
 
-      case HomeScreenItem.idMyJourney:
-        if (hasActiveTicket) {
-          // The active journey is already prominently featured in the Hero Card above
-          return const SizedBox.shrink();
-        }
-        return _buildTaskActionCard(
-          color: item.color,
-          icon: item.icon,
-          title: item.title,
-          subtitle: 'No active journey',
-          semanticLabel: '${item.title}. No active journey.',
-          onTap: () {
-            unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => TicketBookingSuitePage(
-                    ticketController: widget.ticketController,
-                    journeyController: widget.controller,
-                    initialStepIndex: 0,
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-
       case HomeScreenItem.idMyTickets:
         return _buildTaskActionCard(
           color: item.color,
@@ -917,67 +891,6 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute<void>(
                   builder: (_) => GeminiLiveScreen(
                     ticketController: widget.ticketController,
-                    repository: widget.repository,
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-
-      case HomeScreenItem.idLiveTracking:
-        return _buildTaskActionCard(
-          color: item.color,
-          icon: item.icon,
-          title: item.title,
-          subtitle: hasActiveTicket
-              ? 'Bus ${activeTicket?.busId ?? "18B"} • Live corridor tracking'
-              : item.subtitle,
-          semanticLabel: '${item.title}. ${item.subtitle}.',
-          onTap: () {
-            final allStops = widget.repository.findStops('');
-            final origin = allStops.isNotEmpty
-                ? allStops.first
-                : const Stop(
-                    id: 'vit-main-gate',
-                    name: 'VIT Main Gate',
-                    area: 'Vellore',
-                  );
-            final destination = allStops.length > 1 ? allStops.last : origin;
-            final ticketToTrack =
-                activeTicket ??
-                Ticket(
-                  id: 'BB-PREVIEW-CORRIDOR',
-                  busId: '18B',
-                  routeId: 'vit-to-katpadi',
-                  routeName: 'VIT → Katpadi Express',
-                  origin: origin,
-                  destination: destination,
-                  passengerName: 'Pavan',
-                  passengerType: PassengerType.general,
-                  fareQuote: FareEngine.calculateCorridorFare(
-                    PassengerType.general,
-                  ),
-                  paymentMethod: PaymentMethod.upi,
-                  issuedAt: DateTime.now(),
-                  validUntil: DateTime.now().add(const Duration(hours: 4)),
-                  status: TicketStatus.active,
-                  qrCodeData: Ticket.buildQrPayload(
-                    ticketId: 'BB-PREVIEW-CORRIDOR',
-                    originId: origin.id,
-                    destinationId: destination.id,
-                    busId: '18B',
-                    farePaise: 2000,
-                    validUntil: DateTime.now().add(const Duration(hours: 4)),
-                    isDemo: true,
-                  ),
-                  isDemo: true,
-                );
-            unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => LiveLocationScreen(
-                    ticket: ticketToTrack,
                     repository: widget.repository,
                   ),
                 ),

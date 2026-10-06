@@ -74,7 +74,7 @@ The application combines real-time interactive mapping, turn-by-turn street rout
 - **Screen Reader First (TalkBack / VoiceOver)**: Explicit semantic descriptions, live region announcements, and focus management across all screens.
 
 ### ⚙️ 7. User-Created Customizable Home Screen & Personalization Hub
-- **User-Created Interface (`HomeScreenCustomizationPage`)**: Commuters can reorder, show, hide, and reset home screen components (Route Search, Journey Assistant, Tickets, Saved Places, Gemini Live, Live Bus Map, Corridor Alerts, Emergency SOS, Settings).
+- **User-Created Interface (`HomeScreenCustomizationPage`)**: Commuters can reorder, show, hide, and reset home screen components (Find a Place, Emergency SOS, My Tickets, Saved Places, Ask BusBuddy, Corridor Alerts, Settings). The "My Journey" and "Live Bus Map" cards were removed from the default layout (2026-10-06) — live tracking remains reachable from tickets and the booking suite, and the Find a Place card carries the bus logo.
 - **Dual Touch & Non-Touch Accessible Reordering**: Provides touch drag-and-drop (`ReorderableListView`) alongside accessible `Move Up` and `Move Down` buttons with full TalkBack semantics announcements (`SemanticsService.announce`), catering to blind and low-vision commuters.
 - **Dynamic Home Screen Rendering**: Reactive card stack that automatically excludes hidden features and renders cards in the commuter's saved custom order, with an accessible empty state and 1-tap restore action.
 - **Voice Control Alternative**: Commuters can customize or reset their home layout via Gemini Live voice commands (*"Customize my home screen"*, *"Reset home layout"*).
@@ -165,7 +165,7 @@ BusBuddy/
 │       ├── saved/                            # Saved places & digital passbook tab
 │       ├── settings/                         # Accessibility, Personalization & Voice Assistant settings
 │       └── tickets/                          # BookingCheckoutDialog (concession modal), 3-step suite & passbook
-├── test/                                     # Automated test suite (61 test files, 389 tests, CI-verified green)
+├── test/                                     # Automated test suite (61 test files, 390 tests, CI-verified green)
 │   ├── a11y/                                 # Announcement arbiter, contrast verification, reflow, semantics
 │   ├── core/                                 # Accessible components, theme tokens, service locator tests
 │   ├── data/                                 # Live telemetry ordering, OSRM failure states, persistence tests

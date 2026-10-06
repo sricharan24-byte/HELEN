@@ -360,6 +360,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // and left the glow in `listening` over Home for the rest of the process.
     // The microphone release matters for the same reason: leaving it armed is
     // the same class of lie as advertising a mic that is not open (BUS-P1-08).
+    //
+    // The conversational flags are cleared as plain writes BEFORE the steps:
+    // `mounted` stays true for the whole runDisposeSteps window, so a
+    // synchronous callback fired by a teardown step (the web JS bridge fires
+    // some synchronously) would otherwise re-run setState and re-derive
+    // listening/speaking in the override below — re-arming the glow right
+    // after this reset. With the flags down, any such re-entrant setState
+    // derives idle instead.
+    _isListening = false;
+    _isSpeaking = false;
+    _continuousListening = false;
     runDisposeSteps([
       (name: 'aiControlGlow', run: AiControlGlow.instance.idle),
       (
@@ -395,6 +406,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           unawaited(_modelVoice.dispose());
         },
       ),
+      // And LAST, not just first: any teardown step above that synchronously
+      // re-armed the glow (a web JS bridge callback firing mid-teardown) is
+      // undone here, so Home can never inherit an active glow. Duplicate-mode
+      // suppression in AiControlGlow makes the no-op case free.
+      (name: 'aiControlGlowFinal', run: AiControlGlow.instance.idle),
     ]);
     super.dispose();
   }
