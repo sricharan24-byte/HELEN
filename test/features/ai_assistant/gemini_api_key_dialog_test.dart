@@ -77,9 +77,11 @@ void main() {
       await tester.pump(const Duration(seconds: 6));
 
       // Dialog dismissed, key stored, and the tree is intact (no framework
-      // teardown asserts). The header status pill flips to the live badge.
+      // teardown asserts). The header status pill flips to the live badge —
+      // now a bolt icon plus the 'GEMINI LIVE' text (emoji removed).
       expect(find.text('Save & Connect'), findsNothing);
-      expect(find.text('⚡ GEMINI LIVE'), findsOneWidget);
+      expect(find.byIcon(Icons.bolt), findsOneWidget);
+      expect(find.text('GEMINI LIVE'), findsWidgets);
       expect(AppSettingsController.instance.geminiApiKey, 'test-key-123');
     },
   );

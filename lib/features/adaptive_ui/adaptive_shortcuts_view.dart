@@ -5,6 +5,9 @@ import 'package:flutter/semantics.dart';
 import 'adaptive_shortcuts_modal.dart';
 import 'adaptive_ui_service.dart';
 import '../../core/settings/app_settings_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../data/models/adaptive_shortcut.dart';
 
 /// Horizontal suggestion bar displayed on the HomePage when Adaptive UI is active.
@@ -59,6 +62,8 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
     final shortcuts = _service.visibleShortcuts;
     if (shortcuts.isEmpty) return const SizedBox.shrink();
 
+    final colors = AppTheme.colors(context);
+
     // Scale the horizontal strip height with the platform text scaler so card
     // content reflows at 200–300% accessibility text sizes (Astra BUS-P1-05).
     final shortcutStripHeight = MediaQuery.textScalerOf(context).scale(114.0);
@@ -73,13 +78,13 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
             Expanded(
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 16),
+                  Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 16),
                   const SizedBox(width: 8),
-                  const Flexible(
+                  Flexible(
                     child: Text(
                       'Suggested for You',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.2,
@@ -93,12 +98,15 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
               onPressed: () => AdaptiveShortcutsModal.show(context),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(48, 32),
+                minimumSize: const Size(
+                  AppSpacing.minTouchTarget,
+                  AppSpacing.minTouchTarget,
+                ),
               ),
-              child: const Text(
+              child: Text(
                 'Manage',
                 style: TextStyle(
-                  color: Color(0xFF38BDF8),
+                  color: colors.actionSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -117,7 +125,7 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
             separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final shortcut = shortcuts[index];
-              return _buildShortcutCard(shortcut);
+              return _buildShortcutCard(shortcut, colors);
             },
           ),
         ),
@@ -126,7 +134,7 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
     );
   }
 
-  Widget _buildShortcutCard(AdaptiveShortcut shortcut) {
+  Widget _buildShortcutCard(AdaptiveShortcut shortcut, AppSemanticColors colors) {
     final isAccepted = shortcut.isAccepted;
 
     return Semantics(
@@ -134,20 +142,20 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
       label: '${shortcut.title}. ${shortcut.subtitle}. Tap to execute shortcut.',
       excludeSemantics: true,
       child: Material(
-        color: const Color(0xFF111C33),
-        borderRadius: BorderRadius.circular(20),
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         child: InkWell(
           onTap: () => widget.onExecuteShortcut(shortcut),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           child: Container(
             width: 230,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               border: Border.all(
                 color: isAccepted
-                    ? const Color(0xFF16A34A).withValues(alpha: 0.6)
-                    : const Color(0xFF1E293B),
+                    ? colors.statusSuccess.withValues(alpha: 0.6)
+                    : colors.border,
                 width: isAccepted ? 1.5 : 1,
               ),
             ),
@@ -162,26 +170,26 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: shortcut.color.withValues(alpha: 0.2),
+                        color: colors.actionPrimary.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(shortcut.icon, color: shortcut.color, size: 18),
+                      child: Icon(shortcut.icon, color: colors.actionPrimary, size: 18),
                     ),
                     if (isAccepted) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF14532D),
-                          borderRadius: BorderRadius.circular(6),
+                          color: colors.statusSuccessBg,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.star, color: Color(0xFF86EFAC), size: 10),
-                            SizedBox(width: 3),
+                          children: [
+                            Icon(Icons.star, color: colors.statusSuccess, size: 10),
+                            const SizedBox(width: 3),
                             Text(
                               'Pinned',
-                              style: TextStyle(color: Color(0xFF86EFAC), fontSize: 10, fontWeight: FontWeight.w700),
+                              style: TextStyle(color: colors.statusSuccess, fontSize: 10, fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
@@ -195,7 +203,7 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                             label: 'Pin ${shortcut.title}',
                             excludeSemantics: true,
                             child: IconButton(
-                              icon: const Icon(Icons.check, size: 18, color: Color(0xFF22C55E)),
+                              icon: Icon(Icons.check, size: 18, color: colors.statusSuccess),
                               padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               tooltip: 'Pin Shortcut',
@@ -207,7 +215,7 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                             label: 'Dismiss ${shortcut.title}',
                             excludeSemantics: true,
                             child: IconButton(
-                              icon: const Icon(Icons.close, size: 18, color: Color(0xFF94A3B8)),
+                              icon: Icon(Icons.close, size: 18, color: colors.textSecondary),
                               padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               tooltip: 'Dismiss',
@@ -226,8 +234,8 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                   children: [
                     Text(
                       shortcut.title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -237,8 +245,8 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
                     const SizedBox(height: 2),
                     Text(
                       shortcut.subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        color: colors.textSecondary,
                         fontSize: 11,
                       ),
                       maxLines: 1,

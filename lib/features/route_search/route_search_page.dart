@@ -153,7 +153,7 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
                             onPressed: () => _pickStop(isOrigin: false),
-                            icon: const Icon(Icons.location_on, size: 20, color: Color(0xFFE11D48)),
+                            icon: Icon(Icons.location_on, size: 20, color: colors.actionPrimary),
                             label: Text(
                               state.destination?.name ?? 'Choose destination stop',
                               style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary),

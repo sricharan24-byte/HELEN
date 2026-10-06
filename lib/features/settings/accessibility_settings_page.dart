@@ -44,7 +44,9 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
       context: context,
       backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusLg),
+        ),
       ),
       builder: (context) {
         return Material(
@@ -122,20 +124,11 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-              ],
-            ),
-            Text(
-              'Accessibility',
-              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-          ],
+        // Single reflow-safe title: the two-line brand Column overflowed at
+        // large text scales; the descriptive hero below carries the details.
+        title: Text(
+          'Accessibility',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         centerTitle: true,
       ),
@@ -150,7 +143,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: colors.surface,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                     border: Border.all(color: colors.border),
                   ),
                   child: Row(
@@ -339,6 +332,9 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
             ),
 
             // ── Sticky Bottom Ask BusBuddy Action Bar ─────────────────────
+            // Single actionPrimary accent (red is reserved for Emergency SOS;
+            // statusAlert was wrong here). minHeight instead of a fixed height
+            // so two-line content reflows at 300% text scale.
             Positioned(
               left: 16,
               right: 16,
@@ -348,23 +344,18 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                 label: 'Ask BusBuddy. Need help with settings? Just ask.',
                 excludeSemantics: true,
                 child: Material(
-                  color: Colors.transparent,
+                  color: colors.actionPrimary,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   child: InkWell(
                     onTap: _openAskBusBuddy,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                     child: Container(
-                      height: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: colors.statusAlert,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.statusAlert.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                      constraints: const BoxConstraints(
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
                       child: Row(
                         children: [
@@ -372,25 +363,41 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: colors.onActionPrimary.withValues(
+                                alpha: 0.2,
+                              ),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.mic, color: Colors.white, size: 22),
+                            child: Icon(
+                              Icons.mic,
+                              color: colors.onActionPrimary,
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 14),
-                          const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ask BusBuddy',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-                              ),
-                              Text(
-                                'Need help with settings? Just ask.',
-                                style: TextStyle(color: Colors.white70, fontSize: 12),
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ask BusBuddy',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  'Need help with settings? Just ask.',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

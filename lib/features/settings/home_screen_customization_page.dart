@@ -44,10 +44,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
       priority: AnnouncementPriority.normal,
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Home screen layout reset to default settings.'),
-        backgroundColor: Color(0xFF15803D),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: const Text('Home screen layout reset to default settings.'),
+        backgroundColor: AppTheme.colors(context).statusSuccess,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -100,20 +100,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-              ],
-            ),
-            Text(
-              'Customize Home Screen',
-              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-          ],
+        // Single reflow-safe title: the two-line brand Column overflowed at
+        // large text scales; the guidance hero below carries the details.
+        title: Text(
+          'Customize Home Screen',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         centerTitle: true,
       ),
@@ -129,7 +120,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: colors.surface,
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                       border: Border.all(color: colors.border),
                     ),
                     child: Row(
@@ -247,7 +238,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
@@ -267,10 +258,10 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                           priority: AnnouncementPriority.normal,
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Home screen layout saved.'),
-                            backgroundColor: Color(0xFF15803D),
-                            duration: Duration(seconds: 2),
+                          SnackBar(
+                            content: const Text('Home screen layout saved.'),
+                            backgroundColor: colors.statusSuccess,
+                            duration: const Duration(seconds: 2),
                           ),
                         );
                         Navigator.of(context).pop();
@@ -278,7 +269,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                       style: FilledButton.styleFrom(
                         backgroundColor: colors.actionPrimary,
                         foregroundColor: colors.actionPrimaryText,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
@@ -314,7 +305,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isVisible ? colors.surface : colors.background,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
           color: isVisible ? colors.border : colors.border.withValues(alpha: 0.5),
         ),
@@ -363,7 +354,8 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                             decoration: BoxDecoration(
                               color: colors.border,
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
                             ),
                             child: Text(
                               'Hidden',
@@ -435,10 +427,13 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
               ),
 
               // ── Reorder Drag Handle (≡) ─────────────────────────────
+              // 48x48 tappable: the bare 22dp icon was far below the WCAG
+              // touch-target floor.
               ReorderableDragStartListener(
                 index: index,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 6),
+                child: SizedBox(
+                  width: AppSpacing.minTouchTarget,
+                  height: AppSpacing.minTouchTarget,
                   child: Icon(
                     Icons.drag_handle,
                     color: colors.textSecondary,

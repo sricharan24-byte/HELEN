@@ -4,7 +4,7 @@
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  
 **Architecture**: Clean Architecture (Core, Data, Features)  
-**Last Updated**: October 3, 2026 (Chunk 48: AI control edge glow — pulsing top/bottom bar + side rail glow driven by the Gemini Live screen; 375/375 tests, analyze clean)
+**Last Updated**: October 6, 2026 (Chunk 50: cross-screen design-contract polish — SOS-red misuse fixed on 8 screens, token system restored on 12 screens, honest live-GPS states, paise-exact fare display; per-agent runs 389/389 tests, analyze clean)
 
 ---
 
@@ -1041,3 +1041,115 @@ An emulator validates platform wiring, the permission contract and honest-failur
 - **Tests** (`test/features/ai_assistant/ai_control_glow_test.dart`, 5): mode-change notifications, exactly 4 edge glows while active, nothing when idle, repaint on mode change, and the end-to-end screen→glow integration (listening while the mic is open, idle on exit).
 - **Verification**: `flutter analyze` clean, `flutter test` **375/375 green** (370 + 5).
 - **Code review (same day)**: verified against Flutter 3.44 `RenderStack` source that the frame's inner Stack (only `Positioned` children) expands to `constraints.biggest`, so the glow fills the screen in production — pinned by a rendered-size assertion (top bar = full width × 72 dp). Fixed: cached the `Listenable.merge` in a `late final` field (a fresh merge per build forced `ListenableBuilder` subscription swaps on every pulse tick); scoped all `DecoratedBox` finders under the frame so framework-internal widgets can't break them.
+
+## 🛠️ Session Log — 2026-10-04: Chunk 49 — Single-Speaker Audio Architecture, Model Voice Restored
+
+> **Trigger**: Chunk 43 removed Gemini's native audio playback entirely because Android's device `TextToSpeech` was the only voice available and double-voice bugs were unfixable around it. That fixed the duplication but left the answer robotic. This chunk re-wired the model's own audio and **redesigned the contract instead of adding a second path**.
+
+### 🎯 The redesigned contract: one voice per turn, decided by `ModelVoicePlayer`
+
+* **The rule** ([model_voice_player.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/model_voice_player.dart) — NEW): if Gemini streamed audio for a turn (`ModelVoicePlayer.hasModelAudioThisTurn`), that audio *is* the reply and TTS is skipped entirely. TTS (`AudioSpeechEngine.speak`) speaks **only** turns that carried no audio — plain text turns, the REST fallback, a socket without audio. A reply can still be both spoken *and* acted on, so tool calls on spoken turns are not skipped.
+* **The end of a turn is playback drain, not TTS**: for model-audio turns no TTS utterance runs, so `onAudioEnded` never fires and the microphone would stay paused forever after the first spoken reply. The turn now ends on the drain signal — the native `onPlaybackDrained` notification (`AudioTrack` buffer empty + 140 ms) on Android, or the Web Audio queue-drain timer on web — and a 30 s `_armWatchdog()` backstop covers a lost drain.
+* **`GeminiLiveScreen` rewiring**: `onAudioPcmChunk` → `addChunk`, drain → release the mic + resume continuous listening, `onInterrupted` → drop queued audio. `onTurnComplete` no longer speaks a reply that already played as audio.
+* **Native playback** (`BusBuddyVoiceChannel.kt`): `AudioTrack` `MODE_STREAM` at 24 kHz mono PCM16 with `onPlaybackDrained` posted when the buffer empties; lazy open on the first chunk; `stop()` is barge-in (drops queued audio) and idempotent; `dispose` cannot leave the `AudioTrack` alive after the screen.
+* **Teardown must never strand process-wide state** ([dispose_guard.dart](file:///home/pavan/BusBuddy/lib/core/a11y/dispose_guard.dart) — NEW): `State.dispose` stops at the first exception, and the glow + model-audio `AudioTrack` + mic feed outlive a single screen — a throw in live-socket teardown previously skipped every reset below it and left the edge glow lit over Home forever. All `GeminiLiveScreen` teardown now goes through `runDisposeSteps`, which isolates each step and **runs the process-wide resets first** (glow, then mic/voice-turn release). Widget tests never saw this class of bug because every native and socket call is faked there.
+
+### 🌐 The web half: Chrome stopped dropping Gemini's voice
+
+* **Problem**: `ModelVoicePlayer.isSupported` was Android-only, so Chrome threw every model-audio chunk away and spoke replies through `speechSynthesis` — which is *silent* on a host with no system TTS engine. A flawless text transcript with no voice at all.
+* **Fix** ([web_speech_real.dart](file:///home/pavan/BusBuddy/lib/features/ai_assistant/web_speech_real.dart), bridge v6): the same 24 kHz PCM16 now plays through the Web Audio context the listening chime already uses (`__bb_play_model_audio` / `__bb_stop_model_audio`), start times chained off a queue cursor for gapless playback, queue-drain timer as the end-of-turn signal, and the existing gesture unlock primes it — no second audio stack. A chunk that will not schedule returns `false`, leaving `hasModelAudioThisTurn` clear so that turn still falls back to TTS rather than dropping the reply. `isSupported` is now `kIsWeb || platformHasNativeAudio`.
+
+### 🐛 Bug found by the first browser run: the page bridge was never installed (ADR-004 §3.5)
+
+`__bb_speak_text` was missing too — the web build had **never** actually been able to speak; it had only ever appeared to. Two defects, both invisible to `flutter analyze`, `flutter test` and `flutter build web`, because none of them execute the page:
+
+1. **Silent failure at the call site** — installation was tracked by a Dart flag plus a page-written version stamp, and nothing verified the eval had installed anything. A missing bridge surfaced as one `NoSuchMethodError` per chunk.
+2. **A failed install could still look successful** — the version stamp is a separate eval written *after* the big one, so it survives an eval that threw. The next call saw flag + version matching, skipped the install, and the bridge stayed missing for the life of the page.
+
+* **The fix keeps the eval but stops trusting it**: calls resolve the entry point and invoke the **function reference** (`Function.prototype.call`), so a missing bridge is an observable `null` instead of a throw; every install verifies the required entry points and resets the initialized flag when any is missing (a throwing install resets it too); a missing entry point is reported once, by name, naming the fix ("hot restart, or reload the page"). Do not simplify this back into blind `js.context.callMethod('__bb_…')` calls.
+* **The bridge JS is verified, not assumed**: extracted from the Dart source and executed in Node against stubbed browser globals — all six entry points install, play returns `true` for a real 24 kHz PCM16 base64 chunk, the queue cursor advances for gapless scheduling, stop clears the queue, the drain callback fires.
+* **Diagnostic split is now explicit**: `[ModelVoice] turn N` = chunks arriving and scheduling; `[WebSpeech] page bridge has no …` = page JS missing (hot restart); `[BusBuddy ModelAudio]` = the `AudioContext` itself failed.
+
+### 🧪 Tests
+
+* `test/features/ai_assistant/model_voice_player_test.dart` (9): first chunk opens playback, turn marked model-audio so TTS is skipped, no-audio turn never touches the track, unsupported platform defers to TTS, empty chunks ignored, drain ends the turn, `stop()` barge-in + idempotence, dispose stops playback, stop-before-audio never opens the bridge.
+* `test/a11y/dispose_guard_test.dart` (5): ordered execution, a throwing step never skips later steps, a later failure cannot strand a reset that already ran, several failures all isolated, empty list is a no-op.
+* Still forbidden (contract, not preference): speaking a reply through *both* paths in one turn; a second `AudioTrack`/`TtsFallbackArbiter`-style owner; resurrecting the deleted arbiter.
+
+### ✅ Verification
+
+* `flutter analyze` clean; `flutter test` **389/389 green** (375 + 14); `flutter build web --profile` compiles under dart2js. Pushed as `6840102`, `263c758`, `decab6c`.
+
+### ⚠️ Still NOT verified — do not claim it
+
+| Check | Blocked by |
+| --- | --- |
+| Model-audio playback is audible and natural with a live Gemini session | Never run against a live session on hardware or in the browser — wire path is unit-tested, bridges are built and Node-verified, but "it sounds natural" is not yet claimable (ADR-004 §3.1, §3.4, §3.5) |
+| Spoken question → `realtimeInput` → spoken reply round trip | Needs a physical device + valid API key (AVD mic yields silence, no host audio backend) |
+| Echo cancellation / AEC behaviour with the mic open during playback | No hardware AEC on any available emulator |
+| TalkBack announcement *sound* | Node tree is observable via `uiautomator dump`, but the AVD cannot open an audio output on this host |
+
+* **Files**: `lib/features/ai_assistant/model_voice_player.dart` · `lib/features/ai_assistant/web_speech_real.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/core/a11y/dispose_guard.dart` · `android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt` · `test/features/ai_assistant/model_voice_player_test.dart` · `test/a11y/dispose_guard_test.dart` · `docs/adr/ADR-004-android-native-voice-io.md` (§2.5, §3.4, §3.5) · `progress.md`
+* **Verification**: `flutter analyze` clean, `flutter test` **389/389 green**, `flutter build web --profile` PASSED, bridge JS verified in Node.
+
+---
+
+## 🛠️ Session Log — 2026-10-06: Chunk 50 — Cross-Screen Design-Contract Polish
+
+> **Trigger**: A full-app UI audit (three parallel read-only passes over ~8,000 lines across every major screen, judged against the flutter-ui / ui-taste craft rules and BusBuddy's own ADR-002 / Chunk 47 design contracts) surfaced ~45 findings. The worst: the app's primary CTA was painted SOS-red on eight screens, a dozen screens bypassed the token system entirely, live GPS screens fabricated telemetry, and fares were formatted from doubles. This chunk fixes the contract violations in one coherent pass — visual polish only, no behavior rewiring.
+
+### 🔴 Red misuse — the "Ask BusBuddy" bar was SOS-red on 8 screens
+
+* The sticky "Ask BusBuddy" CTA was hardcoded `#DC2626` (or `colors.statusAlert`) on the booking suite, my tickets, accessibility, personalization and voice settings pages — violating "red is reserved exclusively for Emergency SOS" on the app's most-used control. All of them are now `colors.actionPrimary` + `colors.onActionPrimary`.
+* Other decorative reds swept the same way: Cancel Ticket controls → neutral/statusError tokens, destination pins in route search/details → `actionPrimary`, last-stop avatars → neutral, saved-page hero hint → `actionPrimary`. Genuine SOS controls (Emergency Help tile, SOS dialog, the home SOS card) keep red via `colors.statusError` tokens — hardcoded hex eliminated everywhere.
+
+### 🎨 Token system restored — high-contrast theme actually works now
+
+* `ticket_booking_suite_page.dart` (2,327 lines), `ticket_details_page.dart` (a hardcoded *light-only* boarding pass), `live_location_screen.dart` (a hardcoded light palette), `my_tickets_page.dart` (dark cards + `Colors.white` texts invisible off-theme), `adaptive_shortcuts_view.dart` + `adaptive_shortcuts_modal.dart` (dark island, white-on-white header in light contexts), `gemini_live_screen.dart` (~40 hardcoded hexes incl. a second blue `#2563EB`), and the settings hub (four different accent bubbles `#3B82F6/#16A34A/#7C3AED/#DC2626`) — all rebuilt on `AppTheme.colors(context)` / `AppSemanticColors` / `AppSpacing`. Dark-theme pixels are (near-)identical; high-contrast theme now correctly re-skins every one of these screens. The home hero card's hardcoded green ramp (`#14532D/#15803D/#BBF7D0/#86EFAC`) is tokenized the same way, with its CTA on the single accent.
+
+### 🧾 Honesty — stop showing invented data as real
+
+* **Live GPS screens** (`live_location_screen.dart`, `route_details_page.dart`): the fabricated "32 km/h / 4 mins / 0.25 progress" defaults are gone. No data → muted "Waiting for live GPS…" state with an indeterminate indicator; stream error → real error card with a ≥48dp Retry that re-subscribes. Metrics render only with real telemetry.
+* **TalkBack flood fixed** (`route_details_page.dart`): the telemetry StreamBuilder announced on *every tick*; now a `_lastAnnouncedNextStop` gate fires announcements only when the next stop actually changes. The ticking "Updated HH:MM:SS" timestamp stays plain text, untouched (Chunk 47 contract).
+* **Settings hub captions** ("Large · On", "Adaptive On", "English", "Active") were hardcoded strings; they now read the real `AppSettingsController` values (text size, contrast, adaptive flag, preferred language) and the emergency card shows the real contact count. The page listens to the controller so it can't go stale.
+* **Dead controls removed/clarified**: the "Floating AI Assistant Bubble" toggle (controls a feature deleted in Chunk 42) is deleted from voice settings; "Reset My Layout" in personalization no longer silently calls `resetToDefaults()` (wiping text size, contrast, everything) — it calls `resetHomeScreenLayout()` only, and its subtitle says so.
+* **The fabricated `'Gandhi Nagar'` next-stop fallback** (shown when a route has <2 stops) is replaced by a neutral "Next Stop".
+
+### 🧮 Money — integer-paise invariant extended to display
+
+* `FareQuote.formattedAmount` / `formattedBaseFare` / `formattedSavings` (`lib/domain/ticketing/entities/fare.dart`) previously did `(finalPaise / 100).toStringAsFixed(0)` — a float round-trip that displayed ₹19.50 as ₹20. Now formatted by integer division from paise (whole rupees render "₹20", odd paise render "₹19.50"; existing whole-rupee outputs unchanged so no test churn). All UI call sites that formatted from the double getter `fareAmount.toStringAsFixed(0)` (my tickets ×3 incl. a semantics label reading "19.5 rupees", ticket details, saved page) now use `fareQuote.formattedAmount`.
+
+### 👆 Touch targets & text-scale reflow
+
+* Step tabs (~34dp), Gemini prompt chips (~32dp), the shortcuts "Manage" button (48×32) and the home-screen drag handle (~28×22) all brought to the 48×48dp floor.
+* Fixed heights that clip at 300% text scale replaced with reflowing layouts: the three settings "Ask BusBuddy" bars (`height:60` → `minHeight` + Expanded content), booking quick-action tiles (`height:105` → `minHeight:105`), and the five settings-family appbars whose two-line brand `Column` overflowed the 56dp toolbar — replaced by single-scale titles (the settings hub now shows "Settings & Preferences"; each page's description lives in its body hero with heading semantics intact).
+
+### ✨ Consistency polish
+
+* Radii snapped to the single 8/14/20/pill system across every touched file (28/24/22/18→20, 16/14/12→14, 10/6→8).
+* Emoji-as-icons replaced with real `Icon`s: `⚡ GEMINI LIVE` → `Icons.bolt` badge (voice settings + Gemini appbar), `🗣️ "…"` transcript marker → `Icons.record_voice_over` prefix, home greeting `☀️/👋` → `Icons.wb_sunny_outlined` / `Icons.waving_hand_outlined`.
+* Saved-page hero rebuilt from a full primary-blue fill to the contract pattern: neutral surface card + 4dp accent bar (matches home task cards); live-location metric row reflowed 2+1 so "Katpadi Railway Station" gets full width; journey idle state given an icon + supporting line; boarding-pass perforation notches re-anchored inside the divider row (no more magic `top: 250` that detaches under text scaling).
+* Web shell (`web/index.html`): `theme-color` + dark `html/body` background matching Corridor Midnight — no white flash before Flutter's first frame.
+* Passenger chips and payment tiles in checkout now expose `Semantics(selected:)` / `checked:`; sub-11sp text (DEMO badge, concession badge, timeline labels) raised to `textTheme.labelSmall`.
+
+### 🧪 Tests
+
+* Two pinned strings were legitimately updated with the UI: `⚡ GEMINI LIVE` → bolt icon + `GEMINI LIVE` (`test/features/ai_assistant/gemini_api_key_dialog_test.dart`), and the home-customization test no longer pins the removed appbar brand column (`test/features/home_screen_customization_test.dart`). Everything else survived untouched — including `'Scan this QR code while boarding'` (pinned at `test/features/my_tickets_ui_test.dart:149`), so the decorative demo QR painter and its instruction remain; rewording honestly requires relaxing that pin first.
+
+### ✅ Verification
+
+* Per-agent full-suite runs during the pass: `flutter analyze` clean, `flutter test` **389/389 green** (three separate full-suite confirmations).
+* **Not re-verified after the final agent finished** (implementation was stopped by request): a final cross-agent `flutter analyze` + `flutter test` re-run, a release rebuild, and rendered visual verification at 390/1440 dp. The release-build screenshot pipeline (puppeteer + `--enable-unsafe-swiftshader` against `flutter build web`) was proven working this session and pre-edit baselines are saved under `.a11y/shots/`.
+
+### ⚠️ Judgment calls made (revert if you disagree)
+
+| Call | Where | Rationale |
+| --- | --- | --- |
+| "Share Live Location with Emergency Contacts" button/dialog moved red → accent blue | `live_location_screen.dart` | Red is contractually SOS-only and this lives in tracking, not the SOS page; arguably SOS-family, easy to revert |
+| Settings appbars lost the two-line "BusBuddy" brand column | settings hub + 4 subpages | The Column overflowed the 56dp toolbar at 300% text scale; single reflowing titles instead |
+| Gemini send button / orb shifted `#007AFF` → token `#0369A1` | `gemini_live_screen.dart` | ONE-accent contract; visible dark-mode pixel shift |
+| Demo bus list (18B/12A/20C) left hardcoded | booking suite step 2 | Rewiring to real repository search is a behavior change, out of polish scope |
+| Demo QR painter kept (string test-pinned) | `ticket_details_page.dart` | Honest reword needs the test pin relaxed first |
+
+* **Files**: `lib/features/tickets/{ticket_booking_suite_page,booking_checkout_dialog,my_tickets_page,ticket_details_page,live_location_screen}.dart` · `lib/features/settings/{settings_page,accessibility_settings_page,personalization_settings_page,voice_assistant_settings_page,home_screen_customization_page}.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/features/adaptive_ui/{adaptive_shortcuts_view,adaptive_shortcuts_modal}.dart` · `lib/features/{home/home_page,journey/journey_page,route_search/route_search_page,route_details/route_details_page,saved/saved_page}.dart` · `lib/domain/ticketing/entities/fare.dart` · `web/index.html` · `test/features/ai_assistant/gemini_api_key_dialog_test.dart` · `test/features/home_screen_customization_test.dart`
+* **Verification**: `flutter analyze` clean, `flutter test` 389/389 green (per-agent full-suite runs; final post-merge re-run pending — see above).

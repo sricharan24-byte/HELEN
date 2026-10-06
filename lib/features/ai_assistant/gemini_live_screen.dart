@@ -14,6 +14,8 @@ import '../tickets/live_location_screen.dart';
 import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../domain/assistant/assistant_command.dart';
 import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
@@ -207,9 +209,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       onUserTranscription: (text) {
         if (!mounted) return;
         // Display only. The microphone audio already reached the model, so this
-        // text must never be re-submitted as a new text turn.
+        // text must never be re-submitted as a new text turn. Rendered with a
+        // voice-over icon (see _isVoiceTranscript) instead of the old emoji.
         setState(() {
-          _liveTranscription = '🗣️ "$text"';
+          _liveTranscription = '"$text"';
         });
       },
       onAudioPcmChunk: (base64Pcm) {
@@ -480,7 +483,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         } else {
           _lastInterimTranscript = text;
           setState(() {
-            _liveTranscription = '🗣️ "$text"';
+            _liveTranscription = '"$text"';
           });
         }
       },
@@ -896,82 +899,114 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     } else if (actionType == 'reset_home') {
       AppSettingsController.instance.resetHomeScreenLayout();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Home screen layout reset to defaults.'),
-          backgroundColor: Color(0xFF15803D),
+        SnackBar(
+          content: const Text('Home screen layout reset to defaults.'),
+          backgroundColor: AppTheme.colors(context).statusSuccess,
         ),
       );
     }
   }
 
+  /// True while [_liveTranscription] is a display-only voice transcript
+  /// ('"…"'). Those render with a small voice-over icon before the quoted
+  /// text instead of the old 🗣️ emoji prefix.
+  bool get _isVoiceTranscript =>
+      _liveTranscription.startsWith('"') && _liveTranscription.endsWith('"');
+
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B101D),
+        backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white, size: 28),
+          icon: Icon(Icons.close, color: colors.textPrimary, size: 28),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF007AFF), Color(0xFF38BDF8)],
+        // Horizontal scroll keeps the badge row reflow-safe at large text
+        // scales (real text, no FittedBox, no clamping).
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
                 ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.auto_awesome, color: Colors.white, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'GEMINI LIVE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      letterSpacing: 1.1,
-                    ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colors.actionPrimary, colors.actionSecondary],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      color: colors.onActionPrimary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'GEMINI LIVE',
+                      style: TextStyle(
+                        color: colors.onActionPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _liveService.isLiveApiKeyConfigured
-                    ? const Color(0xFF16A34A).withValues(alpha: 0.2)
-                    : const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
                   color: _liveService.isLiveApiKeyConfigured
-                      ? const Color(0xFF22C55E)
-                      : const Color(0xFF94A3B8),
+                      ? colors.statusSuccess.withValues(alpha: 0.2)
+                      : colors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  border: Border.all(
+                    color: _liveService.isLiveApiKeyConfigured
+                        ? colors.statusSuccess
+                        : colors.textSecondary,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (AppSettingsController
+                        .instance.geminiApiKey.isNotEmpty) ...[
+                      Icon(Icons.bolt, size: 16, color: colors.statusSuccess),
+                      const SizedBox(width: 2),
+                    ],
+                    Text(
+                      AppSettingsController.instance.geminiApiKey.isNotEmpty
+                          ? 'GEMINI LIVE'
+                          : 'NOT CONNECTED',
+                      style: TextStyle(
+                        color: AppSettingsController
+                                .instance.geminiApiKey.isNotEmpty
+                            ? colors.statusSuccess
+                            : colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Text(
-                AppSettingsController.instance.geminiApiKey.isNotEmpty ? '⚡ GEMINI LIVE' : 'NOT CONNECTED',
-                style: TextStyle(
-                  color: AppSettingsController.instance.geminiApiKey.isNotEmpty
-                      ? const Color(0xFF4ADE80)
-                      : const Color(0xFF94A3B8),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.vpn_key, color: Color(0xFF38BDF8), size: 22),
+            icon: Icon(Icons.vpn_key, color: colors.actionSecondary, size: 22),
             tooltip: 'Gemini Live API Settings',
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             onPressed: _showApiKeyDialog,
@@ -988,18 +1023,18 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 child: InkWell(
                   onTap: _showApiKeyDialog,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: AppSettingsController.instance.geminiApiKey.isEmpty
-                          ? const Color(0xFF1E293B)
-                          : const Color(0xFF16A34A).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
+                          ? colors.surface
+                          : colors.statusSuccess.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       border: Border.all(
                         color: AppSettingsController.instance.geminiApiKey.isEmpty
-                            ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
-                            : const Color(0xFF22C55E).withValues(alpha: 0.5),
+                            ? colors.actionSecondary.withValues(alpha: 0.3)
+                            : colors.statusSuccess.withValues(alpha: 0.5),
                       ),
                     ),
                     child: Row(
@@ -1009,8 +1044,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               ? Icons.vpn_key
                               : Icons.check_circle_outline,
                           color: AppSettingsController.instance.geminiApiKey.isEmpty
-                              ? const Color(0xFF38BDF8)
-                              : const Color(0xFF4ADE80),
+                              ? colors.actionSecondary
+                              : colors.statusSuccess,
                           size: 18,
                         ),
                         const SizedBox(width: 10),
@@ -1021,8 +1056,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                                 : 'Gemini Live Active (${AppSettingsController.instance.geminiModel.replaceAll('models/', '')}) • $_liveStatus',
                             style: TextStyle(
                               color: AppSettingsController.instance.geminiApiKey.isEmpty
-                                  ? const Color(0xFF94A3B8)
-                                  : const Color(0xFF4ADE80),
+                                  ? colors.textSecondary
+                                  : colors.statusSuccess,
                               fontSize: 12,
                               fontWeight: AppSettingsController.instance.geminiApiKey.isEmpty
                                   ? FontWeight.w500
@@ -1032,14 +1067,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ),
                         Text(
                           AppSettingsController.instance.geminiApiKey.isEmpty ? 'Connect' : 'Change',
-                          style: const TextStyle(
-                            color: Color(0xFF38BDF8),
+                          style: TextStyle(
+                            color: colors.actionSecondary,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(width: 2),
-                        const Icon(Icons.chevron_right, color: Color(0xFF38BDF8), size: 16),
+                        Icon(Icons.chevron_right, color: colors.actionSecondary, size: 16),
                       ],
                     ),
                   ),
@@ -1066,12 +1101,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111C33),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF007AFF).withValues(alpha: 0.4)),
+                      color: colors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      border: Border.all(color: colors.actionPrimary.withValues(alpha: 0.4)),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF007AFF).withValues(alpha: 0.15),
+                          color: colors.actionPrimary.withValues(alpha: 0.15),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -1084,15 +1119,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           children: [
                             Icon(
                               _isSpeaking ? Icons.volume_up : Icons.graphic_eq,
-                              color: const Color(0xFF38BDF8),
+                              color: colors.actionSecondary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _isSpeaking ? 'GEMINI SPEAKING' : 'AUDIO RESPONSE',
-                                style: const TextStyle(
-                                  color: Color(0xFF38BDF8),
+                                style: TextStyle(
+                                  color: colors.actionSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.0,
@@ -1100,7 +1135,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.volume_up, color: Color(0xFF38BDF8), size: 20),
+                              icon: Icon(Icons.volume_up, color: colors.actionSecondary, size: 20),
                               tooltip: 'Voice response powered by Gemini Live',
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                               padding: EdgeInsets.zero,
@@ -1119,8 +1154,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ExcludeSemantics(
                           child: Text(
                             _spokenOutput,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
@@ -1128,12 +1163,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                           ),
                         ),
                         if (_lastResponse?.displayText != null) ...[
-                          const Divider(color: Color(0xFF1E293B), height: 20),
+                          Divider(color: colors.surface, height: 20),
                           ExcludeSemantics(
                             child: Text(
                               _lastResponse!.displayText,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: colors.textSecondary,
                                 fontSize: 13,
                                 height: 1.3,
                               ),
@@ -1146,10 +1181,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             constraints: const BoxConstraints(minWidth: double.infinity, minHeight: 48),
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF007AFF),
+                                backgroundColor: colors.actionPrimary,
                                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                 ),
                               ),
                               onPressed: () => _executeAction(_lastResponse!.actionType!),
@@ -1186,15 +1221,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFF007AFF),
-                            const Color(0xFF38BDF8).withValues(alpha: alpha),
+                            colors.actionPrimary,
+                            colors.actionSecondary.withValues(alpha: alpha),
                             Colors.transparent,
                           ],
                           stops: const [0.4, 0.8, 1.0],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF007AFF).withValues(alpha: 0.6),
+                            color: colors.actionPrimary.withValues(alpha: 0.6),
                             blurRadius: 28,
                             spreadRadius: 6,
                           ),
@@ -1241,8 +1276,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                                         ? Icons.graphic_eq
                                         : Icons.mic_off,
                                 color: _isListening
-                                    ? const Color(0xFF007AFF)
-                                    : const Color(0xFF64748B),
+                                    ? colors.actionPrimary
+                                    : colors.textMuted,
                                 size: 32,
                               ),
                             ),
@@ -1268,19 +1303,19 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                         margin: const EdgeInsets.only(bottom: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                          color: colors.statusSuccess.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          border: Border.all(color: colors.statusSuccess.withValues(alpha: 0.4)),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.mic, size: 13, color: Color(0xFF10B981)),
-                            SizedBox(width: 4),
+                            Icon(Icons.mic, size: 13, color: colors.statusSuccess),
+                            const SizedBox(width: 4),
                             Text(
                               'Continuous Mic Active',
                               style: TextStyle(
-                                color: Color(0xFF10B981),
+                                color: colors.statusSuccess,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.2,
@@ -1295,21 +1330,21 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                          color: colors.statusError.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(color: colors.statusError, width: 1.5),
                         ),
                         child: Column(
                           children: [
-                            const Row(
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.mic_off, color: Color(0xFFF87171), size: 20),
-                                SizedBox(width: 8),
+                                Icon(Icons.mic_off, color: colors.statusError, size: 20),
+                                const SizedBox(width: 8),
                                 Text(
                                   'Microphone Permission Blocked',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: colors.textPrimary,
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1317,11 +1352,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               ],
                             ),
                             const SizedBox(height: 6),
-                            const Text(
+                            Text(
                               'Microphone access is blocked. Allow microphone access in your browser or device settings, then tap Try Again.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Color(0xFFE2E8F0),
+                                color: colors.textPrimary,
                                 fontSize: 13,
                               ),
                             ),
@@ -1330,10 +1365,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                               constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: colors.actionPrimary,
+                                  foregroundColor: colors.onActionPrimary,
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
                                 ),
                                 onPressed: () {
                                   _startMicrophoneListening(playChimeTone: true);
@@ -1346,15 +1383,44 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ),
                       ),
                     ] else ...[
-                      Text(
-                        _liveTranscription,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                      if (_isVoiceTranscript)
+                        // Voice transcript marker: a real icon instead of the
+                        // 🗣️ emoji, so the marker renders identically at every
+                        // text scale. The quote marks stay around the text.
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.record_voice_over,
+                                size: 16,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _liveTranscription,
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          _liveTranscription,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
                     ],
                   ],
                 ),
@@ -1388,16 +1454,16 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   Expanded(
                     child: TextField(
                       controller: _textController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: colors.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Or type your question...',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                        hintStyle: TextStyle(color: colors.textSecondary),
                         filled: true,
-                        fillColor: const Color(0xFF111C33),
+                        fillColor: colors.surfaceSubtle,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
-                          borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                          borderSide: BorderSide(color: colors.surface),
                         ),
                       ),
                       onSubmitted: (val) {
@@ -1410,10 +1476,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   const SizedBox(width: 10),
                   IconButton.filled(
                     style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFF007AFF),
+                      backgroundColor: colors.actionPrimary,
                       padding: const EdgeInsets.all(14),
                     ),
-                    icon: const Icon(Icons.send, color: Colors.white),
+                    icon: Icon(Icons.send, color: colors.onActionPrimary),
                     onPressed: () {
                       _audioEngine.unlockAudio();
                       _handleVoiceInput(_textController.text, isUserTap: true);
@@ -1432,22 +1498,36 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 }
 
   Widget _buildPromptChip(String prompt) {
+    final colors = AppTheme.colors(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ActionChip(
-        backgroundColor: const Color(0xFF111C33),
-        side: const BorderSide(color: Color(0xFF1E293B)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        avatar: const Icon(Icons.mic, color: Color(0xFF38BDF8), size: 16),
-        label: Text(
-          prompt,
-          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+      // 48dp tap-target floor (the default ActionChip renders ~32dp).
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
         ),
-        onPressed: () {
-          _audioEngine.unlockAudio();
-          _audioEngine.playChime(isListening: false);
-          _handleVoiceInput(prompt, isUserTap: true);
-        },
+        child: ActionChip(
+          backgroundColor: colors.surfaceSubtle,
+          side: BorderSide(color: colors.surface),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          ),
+          avatar: Icon(Icons.mic, color: colors.actionSecondary, size: 16),
+          label: Text(
+            prompt,
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onPressed: () {
+            _audioEngine.unlockAudio();
+            _audioEngine.playChime(isListening: false);
+            _handleVoiceInput(prompt, isUserTap: true);
+          },
+        ),
       ),
     );
   }
@@ -1544,17 +1624,20 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return AlertDialog(
-      backgroundColor: const Color(0xFF111C33),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: colors.surfaceSubtle,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      ),
       title: Row(
-        children: const [
-          Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 24),
-          SizedBox(width: 10),
+        children: [
+          Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 24),
+          const SizedBox(width: 10),
           Text(
             'Gemini Multimodal Live Setup',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
@@ -1566,15 +1649,15 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Connected to Google AI Studio Gemini Multimodal Live API (https://aistudio.google.com/live-api) for low-latency bidirectional voice and audio streaming.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+              style: TextStyle(color: colors.textSecondary, fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Official Live Voice:',
               style: TextStyle(
-                color: Color(0xFF38BDF8),
+                color: colors.actionSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -1583,21 +1666,21 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(color: colors.actionSecondary.withValues(alpha: 0.4)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedVoice,
                   isExpanded: true,
-                  dropdownColor: const Color(0xFF1E293B),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  dropdownColor: colors.surface,
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
+                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
                   items: _voiceOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -1615,10 +1698,10 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Live Model:',
               style: TextStyle(
-                color: Color(0xFF38BDF8),
+                color: colors.actionSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -1627,21 +1710,21 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(color: colors.actionSecondary.withValues(alpha: 0.4)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedModel,
                   isExpanded: true,
-                  dropdownColor: const Color(0xFF1E293B),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  dropdownColor: colors.surface,
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF38BDF8)),
+                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
                   items: _modelOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -1661,15 +1744,15 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _textCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 labelText: 'Google AI Studio API Key',
-                labelStyle: const TextStyle(color: Color(0xFF38BDF8)),
+                labelStyle: TextStyle(color: colors.actionSecondary),
                 hintText: 'Paste key from AI Studio',
-                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                hintStyle: TextStyle(color: colors.textSecondary),
                 filled: true,
-                fillColor: const Color(0xFF1E293B),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                fillColor: colors.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
               ),
             ),
           ],
@@ -1683,11 +1766,17 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
               Navigator.pop(context);
               widget.onSaved('');
             },
-            child: const Text('Clear Key', style: TextStyle(color: Color(0xFFEF4444))),
+            child: Text(
+              'Clear Key',
+              style: TextStyle(color: colors.statusError),
+            ),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: colors.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -1699,12 +1788,17 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
             widget.onSaved(newKey);
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF007AFF),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: colors.actionPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            ),
           ),
-          child: const Text(
+          child: Text(
             'Save & Connect',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: colors.onActionPrimary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

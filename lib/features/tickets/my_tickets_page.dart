@@ -107,7 +107,8 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: colors.surface,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(color: colors.border),
                         ),
                         child: Row(
@@ -126,7 +127,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       priority: AnnouncementPriority.low,
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   child: Container(
                                     constraints: const BoxConstraints(
                                       minHeight: AppSpacing.minTouchTarget,
@@ -138,7 +139,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       color: _selectedTabIndex == 0
                                           ? colors.actionPrimary
                                           : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
@@ -169,7 +170,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       priority: AnnouncementPriority.low,
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   child: Container(
                                     constraints: const BoxConstraints(
                                       minHeight: AppSpacing.minTouchTarget,
@@ -181,7 +182,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       color: _selectedTabIndex == 1
                                           ? colors.actionPrimary
                                           : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(
@@ -237,22 +238,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           ),
                         );
                       },
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                       child: Container(
                         height: 60,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFFDC2626,
-                              ).withValues(alpha: 0.4),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          color: colors.actionPrimary,
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
                         ),
                         child: Row(
                           children: [
@@ -260,12 +253,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: colors.onActionPrimary.withValues(
+                                  alpha: 0.2,
+                                ),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.mic,
-                                color: Colors.white,
+                                color: colors.onActionPrimary,
                                 size: 22,
                               ),
                             ),
@@ -274,10 +269,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Ask BusBuddy',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: colors.onActionPrimary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -286,8 +281,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                   _selectedTabIndex == 0
                                       ? 'Show my ticket, check ticket status, etc.'
                                       : 'Get details about a previous ticket',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary.withValues(
+                                      alpha: 0.8,
+                                    ),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -309,30 +306,31 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
 
   // ── Current Ticket Tab View ──────────────────────────────────────────────
   Widget _buildCurrentTicketTab(Ticket? activeTicket) {
+    final colors = AppTheme.colors(context);
     if (activeTicket == null) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(
               Icons.confirmation_number_outlined,
-              color: Color(0xFF64748B),
+              color: colors.textMuted,
               size: 48,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'No Active Ticket',
               style: TextStyle(
-                color: Colors.white,
+                color: colors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Book a ticket to view active pass details and live tracking.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+              style: TextStyle(color: colors.textMuted, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ],
@@ -343,12 +341,12 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       children: [
-        // Mint Active Ticket Card (Matching Image 1)
+        // Active Ticket Card (status-tinted surface, matches image reference)
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFE6F4EA), // Light mint green background
-            borderRadius: BorderRadius.circular(24),
+            color: colors.statusSuccessBg,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,9 +356,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.directions_bus,
-                        color: Color(0xFF0F172A),
+                        color: colors.textPrimary,
                         size: 32,
                       ),
                       const SizedBox(width: 12),
@@ -369,16 +367,16 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         children: [
                           Text(
                             activeTicket.busId,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
+                            style: TextStyle(
+                              color: colors.textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                           Text(
                             '${activeTicket.origin.name} → ${activeTicket.destination.name}',
-                            style: const TextStyle(
-                              color: Color(0xFF475569),
+                            style: TextStyle(
+                              color: colors.textSecondary,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -393,13 +391,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A),
-                      borderRadius: BorderRadius.circular(16),
+                      color: colors.statusSuccessBg,
+                      borderRadius:
+                          BorderRadius.circular(AppSpacing.radiusSm),
                     ),
-                    child: const Text(
+                    child: Text(
                       'ACTIVE',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.statusSuccess,
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
@@ -409,7 +408,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Divider(color: Color(0xFFCBD5E1), height: 1),
+              Divider(color: colors.border, height: 1),
               const SizedBox(height: 16),
 
               // Detail Rows
@@ -425,7 +424,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
               const SizedBox(height: 10),
               _buildTicketDetailRow(
                 Icons.currency_rupee,
-                '₹${activeTicket.fareAmount.toStringAsFixed(0)}',
+                activeTicket.fareQuote.formattedAmount,
               ),
               const SizedBox(height: 10),
               _buildTicketDetailRow(
@@ -434,7 +433,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
               ),
 
               const SizedBox(height: 16),
-              const Divider(color: Color(0xFFCBD5E1), height: 1),
+              Divider(color: colors.border, height: 1),
               const SizedBox(height: 16),
 
               // Valid Ticket Status Banner
@@ -442,24 +441,24 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF16A34A),
+                    decoration: BoxDecoration(
+                      color: colors.statusSuccess,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onError,
                       size: 16,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Valid Ticket',
                         style: TextStyle(
-                          color: Color(0xFF0F172A),
+                          color: colors.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                         ),
@@ -467,7 +466,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       Text(
                         'Show this ticket while boarding',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: colors.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -495,35 +494,35 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         ),
                       );
                     },
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.qr_code_2,
-                      color: Colors.white,
+                      color: colors.onActionPrimary,
                       size: 22,
                     ),
                     label: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Text(
                           'View Ticket',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.onActionPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Icon(
                           Icons.chevron_right,
-                          color: Colors.white,
+                          color: colors.onActionPrimary,
                           size: 20,
                         ),
                       ],
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007AFF),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
                       ),
                     ),
                   ),
@@ -570,39 +569,45 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                       ),
                                     );
                                   },
+                                  // Destructive confirmation: semantic error
+                                  // role, on-error foreground from the theme.
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFDC2626),
+                                    backgroundColor: colors.statusError,
+                                    foregroundColor:
+                                        Theme.of(context).colorScheme.onError,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusMd,
+                                      ),
+                                    ),
                                   ),
-                                  child: const Text(
-                                    'Cancel Ticket',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                                  child: const Text('Cancel Ticket'),
                                 ),
                               ],
                             ),
                           ),
                         );
                       },
-                      icon: const Icon(
+                      // Destructive accent: colors.statusError (never raw
+                      // hex, never the SOS red) on a neutral outline.
+                      icon: Icon(
                         Icons.cancel_outlined,
-                        color: Color(0xFFDC2626),
+                        color: colors.statusError,
                         size: 22,
                       ),
-                      label: const Text(
+                      label: Text(
                         'Cancel Ticket',
                         style: TextStyle(
-                          color: Color(0xFFDC2626),
+                          color: colors.statusError,
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color(0xFFDC2626),
-                          width: 1.5,
-                        ),
+                        side: BorderSide(color: colors.statusError),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
                         ),
                       ),
                     ),
@@ -615,10 +620,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
         const SizedBox(height: 20),
 
         // Quick Actions Section
-        const Text(
+        Text(
           'Quick Actions',
           style: TextStyle(
-            color: Colors.white,
+            color: colors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w800,
           ),
@@ -685,14 +690,15 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
   }
 
   Widget _buildTicketDetailRow(IconData icon, String text) {
+    final colors = AppTheme.colors(context);
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF334155), size: 18),
+        Icon(icon, color: colors.textSecondary, size: 18),
         const SizedBox(width: 12),
         Text(
           text,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
+          style: TextStyle(
+            color: colors.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w800,
           ),
@@ -707,29 +713,30 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final colors = AppTheme.colors(context);
     return Semantics(
       button: true,
       label: '$title. $subtitle.',
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF111C33),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF1E293B)),
+            color: colors.surfaceSubtle,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: colors.border),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1E293B),
+                decoration: BoxDecoration(
+                  color: colors.surface,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: Colors.white, size: 20),
+                child: Icon(icon, color: colors.textPrimary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -738,8 +745,8 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -747,8 +754,8 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        color: colors.textMuted,
                         fontSize: 11,
                       ),
                     ),
@@ -764,26 +771,27 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
 
   // ── Previous Tickets Tab View (Matching Image 3) ─────────────────────────
   Widget _buildPreviousTicketsTab(List<Ticket> pastTickets) {
+    final colors = AppTheme.colors(context);
     if (pastTickets.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.history, color: Color(0xFF64748B), size: 48),
-            SizedBox(height: 16),
+          children: [
+            Icon(Icons.history, color: colors.textMuted, size: 48),
+            const SizedBox(height: 16),
             Text(
               'No Previous Tickets',
               style: TextStyle(
-                color: Colors.white,
+                color: colors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Your completed and past bus travel passes will appear here.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+              style: TextStyle(color: colors.textMuted, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ],
@@ -801,7 +809,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           child: Semantics(
             button: true,
             label:
-                '${ticket.busId}, ${ticket.routeName}, ${ticket.fareAmount} rupees.',
+                '${ticket.busId}, ${ticket.routeName}, Fare ${ticket.fareQuote.formattedAmount}.',
             excludeSemantics: true,
             child: InkWell(
               onTap: () {
@@ -813,19 +821,19 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                   ),
                 );
               },
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111C33),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  color: colors.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.directions_bus,
-                      color: Colors.white,
+                      color: colors.textPrimary,
                       size: 28,
                     ),
                     const SizedBox(width: 16),
@@ -835,8 +843,8 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         children: [
                           Text(
                             ticket.busId,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colors.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
@@ -844,24 +852,24 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           const SizedBox(height: 2),
                           Text(
                             ticket.routeName,
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
+                            style: TextStyle(
+                              color: colors.textSecondary,
                               fontSize: 13,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.calendar_today_outlined,
-                                color: Color(0xFF64748B),
+                                color: colors.textMuted,
                                 size: 14,
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 _formatTimestamp(ticket.issuedAt),
-                                style: const TextStyle(
-                                  color: Color(0xFF94A3B8),
+                                style: TextStyle(
+                                  color: colors.textMuted,
                                   fontSize: 12,
                                 ),
                               ),
@@ -870,15 +878,15 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.currency_rupee,
-                                color: Color(0xFF64748B),
+                                color: colors.textMuted,
                                 size: 14,
                               ),
                               Text(
-                                ticket.fareAmount.toStringAsFixed(0),
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                ticket.fareQuote.formattedAmount,
+                                style: TextStyle(
+                                  color: colors.textPrimary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -888,9 +896,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         ],
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.chevron_right,
-                      color: Color(0xFF64748B),
+                      color: colors.textMuted,
                       size: 22,
                     ),
                   ],

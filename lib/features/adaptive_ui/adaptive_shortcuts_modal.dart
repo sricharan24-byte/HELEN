@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import 'adaptive_ui_service.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../data/models/adaptive_shortcut.dart';
 
 /// Modal bottom sheet allowing commuters to review, accept, dismiss, and reset
@@ -14,9 +16,9 @@ class AdaptiveShortcutsModal extends StatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
       builder: (_) => const AdaptiveShortcutsModal(),
     );
@@ -47,11 +49,12 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
 
   void _accept(AdaptiveShortcut shortcut) {
     _adaptiveService.acceptShortcut(shortcut.id);
+    final colors = AppTheme.colors(context);
     unawaited(SemanticsService.sendAnnouncement(View.of(context), '${shortcut.title} accepted and pinned to home screen shortcuts.', TextDirection.ltr));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Pinned "${shortcut.title}" to your home shortcuts.'),
-        backgroundColor: const Color(0xFF15803D),
+        backgroundColor: colors.statusSuccess,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -77,10 +80,10 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
     _adaptiveService.resetAllLearningData();
     unawaited(SemanticsService.sendAnnouncement(View.of(context), 'All learning data and shortcuts cleared.', TextDirection.ltr));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('All adaptive shortcuts and learning history cleared.'),
-        backgroundColor: Color(0xFF15803D),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: const Text('All adaptive shortcuts and learning history cleared.'),
+        backgroundColor: AppTheme.colors(context).statusSuccess,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -88,33 +91,37 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
   void _confirmClearAll() {
     unawaited(showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Clear all learned shortcuts?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        content: const Text(
-          'This will reset your transit habits and remove all suggested shortcuts.',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+      builder: (ctx) {
+        final colors = AppTheme.colors(context);
+        return AlertDialog(
+          backgroundColor: colors.surface,
+          title: Text('Clear all learned shortcuts?', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800)),
+          content: Text(
+            'This will reset your transit habits and remove all suggested shortcuts.',
+            style: TextStyle(color: colors.textSecondary),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _clearAll();
-            },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _clearAll();
+              },
+              style: FilledButton.styleFrom(backgroundColor: colors.statusError),
+              child: const Text('Clear All'),
+            ),
+          ],
+        );
+      },
     ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     final shortcuts = _adaptiveService.allShortcuts
         .where((s) => s.status != AdaptiveShortcutStatus.dismissed)
         .toList();
@@ -136,7 +143,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF475569),
+                  color: colors.textMuted,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -148,24 +155,24 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'Adaptive Shortcuts',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'Review and govern AI-learned habits',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      style: TextStyle(color: colors.textSecondary, fontSize: 12),
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: Icon(Icons.close, color: colors.textSecondary),
                   tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -179,22 +186,22 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(16),
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 child: Column(
-                  children: const [
-                    Icon(Icons.lightbulb_outline, color: Color(0xFF94A3B8), size: 36),
-                    SizedBox(height: 10),
+                  children: [
+                    Icon(Icons.lightbulb_outline, color: colors.textSecondary, size: 36),
+                    const SizedBox(height: 10),
                     Text(
                       'No adaptive shortcuts yet',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'As you use BusBuddy, frequent journeys will appear here.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      style: TextStyle(color: colors.textSecondary, fontSize: 12),
                     ),
                   ],
                 ),
@@ -218,9 +225,9 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                   child: OutlinedButton.icon(
                     onPressed: _confirmClearAll,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFF7F1D1D)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: colors.statusError,
+                      side: BorderSide(color: colors.statusError.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     icon: const Icon(Icons.delete_outline, size: 18),
@@ -232,9 +239,9 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                   child: FilledButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      backgroundColor: colors.actionPrimary,
+                      foregroundColor: colors.onActionPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -250,14 +257,15 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
 
   Widget _buildShortcutTile(AdaptiveShortcut shortcut) {
     final isAccepted = shortcut.isAccepted;
+    final colors = AppTheme.colors(context);
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF111C33),
-        borderRadius: BorderRadius.circular(16),
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
-          color: isAccepted ? const Color(0xFF16A34A).withValues(alpha: 0.5) : const Color(0xFF1E293B),
+          color: isAccepted ? colors.statusSuccess.withValues(alpha: 0.5) : colors.border,
         ),
       ),
       child: Row(
@@ -265,10 +273,10 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: shortcut.color.withValues(alpha: 0.2),
+              color: colors.actionPrimary.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(shortcut.icon, color: shortcut.color, size: 20),
+            child: Icon(shortcut.icon, color: colors.actionPrimary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -280,7 +288,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                     Flexible(
                       child: Text(
                         shortcut.title,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: colors.textPrimary, fontSize: 14, fontWeight: FontWeight.w700),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -288,13 +296,13 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isAccepted ? const Color(0xFF14532D) : const Color(0xFF1E3A8A),
-                        borderRadius: BorderRadius.circular(6),
+                        color: isAccepted ? colors.statusSuccessBg : colors.statusInfoBg,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       ),
                       child: Text(
                         isAccepted ? 'Pinned' : 'Suggested',
                         style: TextStyle(
-                          color: isAccepted ? const Color(0xFF86EFAC) : const Color(0xFF93C5FD),
+                          color: isAccepted ? colors.statusSuccess : colors.statusInfo,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),
@@ -305,7 +313,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
                 const SizedBox(height: 2),
                 Text(
                   shortcut.subtitle,
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 11),
                 ),
               ],
             ),
@@ -316,7 +324,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
               label: 'Pin ${shortcut.title}',
               excludeSemantics: true,
               child: IconButton(
-                icon: const Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 22),
+                icon: Icon(Icons.check_circle_outline, color: colors.statusSuccess, size: 22),
                 tooltip: 'Pin Shortcut',
                 onPressed: () => _accept(shortcut),
               ),
@@ -326,7 +334,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
               label: 'Dismiss ${shortcut.title}',
               excludeSemantics: true,
               child: IconButton(
-                icon: const Icon(Icons.cancel_outlined, color: Color(0xFF94A3B8), size: 22),
+                icon: Icon(Icons.cancel_outlined, color: colors.textSecondary, size: 22),
                 tooltip: 'Dismiss',
                 onPressed: () => _dismiss(shortcut),
               ),
@@ -337,7 +345,7 @@ class _AdaptiveShortcutsModalState extends State<AdaptiveShortcutsModal> {
               label: 'Remove ${shortcut.title}',
               excludeSemantics: true,
               child: IconButton(
-                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                icon: Icon(Icons.delete_outline, color: colors.statusError, size: 20),
                 tooltip: 'Remove',
                 onPressed: () => _remove(shortcut),
               ),

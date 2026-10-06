@@ -8,6 +8,7 @@ import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
+import '../../core/tokens/app_spacing.dart';
 
 /// Voice Assistant settings page matching BusBuddy UI design screenshot 3.
 class VoiceAssistantSettingsPage extends StatefulWidget {
@@ -57,7 +58,9 @@ class _VoiceAssistantSettingsPageState
         context: context,
         backgroundColor: colors.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Padding(
@@ -113,7 +116,9 @@ class _VoiceAssistantSettingsPageState
         context: context,
         backgroundColor: colors.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Padding(
@@ -191,7 +196,9 @@ class _VoiceAssistantSettingsPageState
         context: context,
         backgroundColor: colors.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Padding(
@@ -295,38 +302,11 @@ class _VoiceAssistantSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Bus',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-                Text(
-                  'Buddy',
-                  style: TextStyle(
-                    color: colors.actionSecondary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              'Voice Assistant',
-              style: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        // Single reflow-safe title: the two-line brand Column overflowed at
+        // large text scales; the descriptive hero below carries the details.
+        title: Text(
+          'Voice Assistant',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         centerTitle: true,
       ),
@@ -341,7 +321,7 @@ class _VoiceAssistantSettingsPageState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: colors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                     border: Border.all(color: colors.border),
                   ),
                   child: Row(
@@ -349,15 +329,15 @@ class _VoiceAssistantSettingsPageState
                       Container(
                         width: 48,
                         height: 48,
-                        // Brand voice badge: constant saturated purple keeps the
-                        // white mic icon at passing contrast in every theme.
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF7C3AED),
+                        // One accent per app: the mic badge uses the same
+                        // actionPrimary as every other action surface.
+                        decoration: BoxDecoration(
+                          color: colors.actionPrimary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.mic,
-                          color: Colors.white,
+                          color: colors.onActionPrimary,
                           size: 28,
                         ),
                       ),
@@ -479,23 +459,7 @@ class _VoiceAssistantSettingsPageState
                 ),
                 const SizedBox(height: 12),
 
-                // ── Light Card 5: Floating AI Assistant Bubble ───────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.bubble_chart_outlined,
-                  title: 'Floating AI Assistant Bubble',
-                  subtitle:
-                      'Movable assistant bubble across all screens with mic & chat window',
-                  trailing: Switch(
-                    value: _settings.floatingAssistantEnabled,
-                    activeThumbColor: colors.onActionPrimary,
-                    activeTrackColor: colors.statusSuccess,
-                    onChanged: _settings.updateFloatingAssistantEnabled,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 6: Gemini Live Voice Selection ────────────
+                // ── Light Card 5: Gemini Live Voice Selection ────────────
                 _buildLightCard(
                   colors: colors,
                   icon: Icons.record_voice_over_outlined,
@@ -524,7 +488,7 @@ class _VoiceAssistantSettingsPageState
                 ),
                 const SizedBox(height: 12),
 
-                // ── Light Card 7: Google AI Studio Live API Key ──────────
+                // ── Light Card 6: Google AI Studio Live API Key ──────────
                 _buildLightCard(
                   colors: colors,
                   icon: Icons.vpn_key_outlined,
@@ -544,20 +508,36 @@ class _VoiceAssistantSettingsPageState
                           color: _settings.geminiApiKey.isNotEmpty
                               ? colors.statusSuccessBg
                               : colors.surfaceSubtle,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                         ),
-                        child: Text(
-                          _settings.geminiApiKey.isNotEmpty
-                              ? '⚡ GEMINI LIVE'
-                              : 'NOT CONNECTED',
-                          style: TextStyle(
-                            color: _settings.geminiApiKey.isNotEmpty
-                                ? colors.statusSuccess
-                                : colors.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                        child: _settings.geminiApiKey.isNotEmpty
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.bolt,
+                                    size: 16,
+                                    color: colors.statusSuccess,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'GEMINI LIVE',
+                                    style: TextStyle(
+                                      color: colors.statusSuccess,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'NOT CONNECTED',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
@@ -579,7 +559,8 @@ class _VoiceAssistantSettingsPageState
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       side: BorderSide(color: colors.actionPrimary, width: 1.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
                       ),
                     ),
                     onPressed: () {
@@ -677,6 +658,9 @@ class _VoiceAssistantSettingsPageState
             ),
 
             // ── Sticky Bottom Ask BusBuddy Action Bar ─────────────────────
+            // Single actionPrimary accent (red is reserved for Emergency SOS).
+            // minHeight instead of a fixed height so two-line content reflows
+            // at 300% text scale instead of overflowing.
             Positioned(
               left: 16,
               right: 16,
@@ -685,63 +669,64 @@ class _VoiceAssistantSettingsPageState
                 button: true,
                 label: 'Ask BusBuddy. Test the voice assistant.',
                 excludeSemantics: true,
-                child: InkWell(
-                  onTap: _openAskBusBuddy,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    height: 60,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      // Brand CTA red kept constant: white text on #DC2626
-                      // measures 4.83:1 (WCAG AA) in every theme.
-                      color: const Color(0xFFDC2626),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFDC2626).withValues(alpha: 0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.mic,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Ask BusBuddy',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                child: Material(
+                  color: colors.actionPrimary,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  child: InkWell(
+                    onTap: _openAskBusBuddy,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colors.onActionPrimary.withValues(
+                                alpha: 0.2,
                               ),
+                              shape: BoxShape.circle,
                             ),
-                            Text(
-                              'Test the voice assistant.',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
+                            child: Icon(
+                              Icons.mic,
+                              color: colors.onActionPrimary,
+                              size: 22,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ask BusBuddy',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  'Test the voice assistant.',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -881,7 +866,9 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
     final colors = AppTheme.colors(context);
     return AlertDialog(
       backgroundColor: colors.surfaceSubtle,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      ),
       title: Row(
         children: [
           Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 24),
@@ -923,7 +910,7 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: colors.surface,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 border: Border.all(
                   color: colors.actionSecondary.withValues(alpha: 0.4),
                 ),
@@ -969,7 +956,7 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: colors.surface,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 border: Border.all(
                   color: colors.actionSecondary.withValues(alpha: 0.4),
                 ),
@@ -1013,7 +1000,7 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
                 filled: true,
                 fillColor: colors.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
               ),
             ),
@@ -1051,7 +1038,7 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
           style: ElevatedButton.styleFrom(
             backgroundColor: colors.actionPrimary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
           ),
           child: Text(

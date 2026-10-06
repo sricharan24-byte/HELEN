@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
@@ -172,7 +173,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         context: context,
         backgroundColor: colors.background,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Material(
@@ -288,7 +291,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         context: context,
         backgroundColor: colors.background,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Material(
@@ -530,6 +535,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   /// session resets and the movement engine is torn down.
   Future<void> _cancelActiveTicket() async {
     if (_tripActionInFlight || !mounted) return;
+    final dialogColors = AppTheme.colors(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -545,11 +551,11 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: dialogColors.actionPrimary,
             ),
-            child: const Text(
+            child: Text(
               'Cancel Ticket',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: dialogColors.onActionPrimary),
             ),
           ),
         ],
@@ -586,6 +592,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   void _confirmEndTrip({required bool arrived}) {
     if (_tripActionInFlight) return;
+    final dialogColors = AppTheme.colors(context);
     unawaited(
       showDialog<void>(
         context: context,
@@ -607,11 +614,11 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 unawaited(_endTrip(arrived: arrived));
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF16A34A),
+                backgroundColor: dialogColors.actionPrimary,
               ),
-              child: const Text(
+              child: Text(
                 'End Trip',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: dialogColors.onActionPrimary),
               ),
             ),
           ],
@@ -669,10 +676,13 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.colors(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B101D),
+      backgroundColor: colors.background,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(widget.showTopPrototypeTabs ? 116 : 56),
+        // 48dp step tabs + the 56dp sub app bar need 120dp; a little slack
+        // keeps the taller accessible tabs from clipping in the app bar.
+        preferredSize: Size.fromHeight(widget.showTopPrototypeTabs ? 124 : 56),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -680,7 +690,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               // Top Prototype Header Tabs (1. Booking | 2. Results | 3. Active Trip)
               if (widget.showTopPrototypeTabs)
                 Container(
-                  color: const Color(0xFF080D18),
+                  color: colors.background,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 8,
@@ -704,19 +714,19 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: Icon(Icons.arrow_back, color: colors.textPrimary),
                       onPressed: () {
                         unawaited(Navigator.of(context).maybePop());
                       },
                     ),
                     const SizedBox(width: 8),
                     RichText(
-                      text: const TextSpan(
+                      text: TextSpan(
                         children: [
                           TextSpan(
                             text: 'Bus',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: colors.textPrimary,
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
                             ),
@@ -724,7 +734,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           TextSpan(
                             text: 'Buddy',
                             style: TextStyle(
-                              color: Color(0xFF007AFF),
+                              color: colors.actionPrimary,
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
                             ),
@@ -739,8 +749,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           : _activeStepIndex == 1
                           ? 'Available Buses'
                           : 'My Journey',
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        color: colors.textSecondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -766,6 +776,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   Widget _buildStepTab(int index, String label) {
+    final colors = AppTheme.colors(context);
     final isActive = _activeStepIndex == index;
     return Expanded(
       child: Semantics(
@@ -776,18 +787,20 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           onTap: () => setState(() => _activeStepIndex = index),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: isActive
-                  ? const Color(0xFF007AFF)
-                  : const Color(0xFF111C33),
-              borderRadius: BorderRadius.circular(16),
+              color: isActive ? colors.actionPrimary : colors.surfaceSubtle,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
             child: Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: isActive ? colors.onActionPrimary : colors.textPrimary,
                 fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                 fontSize: 13,
               ),
@@ -800,24 +813,25 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   // ── Step 1: Booking Form (Image 1) ─────────────────────────────────────────
   Widget _buildBookingStepView() {
+    final colors = AppTheme.colors(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Where would you like to go?',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.textPrimary,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Select your starting point and destination to find buses and book a ticket.',
             style: TextStyle(
-              color: Color(0xFF94A3B8),
+              color: colors.textSecondary,
               fontSize: 14,
               height: 1.4,
             ),
@@ -827,25 +841,25 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           // FROM Card
           InkWell(
             onTap: _openOriginPicker,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF111C33),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: colors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.location_on,
-                      color: Colors.white,
+                      color: colors.textPrimary,
                       size: 20,
                     ),
                   ),
@@ -854,10 +868,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'FROM',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textMuted,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
@@ -867,8 +881,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           _isCurrentLocation
                               ? 'Current Location'
                               : _origin.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
@@ -876,17 +890,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         if (_isCurrentLocation)
                           Text(
                             _origin.name,
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
+                            style: TextStyle(
+                              color: colors.textSecondary,
                               fontSize: 12,
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.my_location,
-                    color: Colors.white70,
+                    color: colors.textSecondary,
                     size: 22,
                   ),
                 ],
@@ -898,25 +912,25 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           // TO Card
           InkWell(
             onTap: _openDestinationPicker,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF111C33),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: colors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.location_on_outlined,
-                      color: Colors.white,
+                      color: colors.textPrimary,
                       size: 20,
                     ),
                   ),
@@ -925,10 +939,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'TO',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textMuted,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
@@ -936,8 +950,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         const SizedBox(height: 2),
                         Text(
                           _destination.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
@@ -945,9 +959,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: Colors.white70,
+                    color: colors.textSecondary,
                     size: 24,
                   ),
                 ],
@@ -959,25 +973,25 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           // DATE Card
           InkWell(
             onTap: _openDatePicker,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF111C33),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: colors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.calendar_today_outlined,
-                      color: Colors.white,
+                      color: colors.textPrimary,
                       size: 20,
                     ),
                   ),
@@ -986,10 +1000,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'DATE',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textMuted,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
@@ -997,8 +1011,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         const SizedBox(height: 2),
                         Text(
                           _selectedDateText,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1006,9 +1020,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: Colors.white70,
+                    color: colors.textSecondary,
                     size: 24,
                   ),
                 ],
@@ -1031,19 +1045,19 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 );
                 setState(() => _activeStepIndex = 1);
               },
-              icon: const Icon(Icons.search, color: Colors.white, size: 22),
-              label: const Text(
+              icon: Icon(Icons.search, color: colors.onActionPrimary, size: 22),
+              label: Text(
                 'Find Buses',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: colors.onActionPrimary,
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF007AFF),
+                backgroundColor: colors.actionPrimary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 elevation: 4,
               ),
@@ -1067,43 +1081,43 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       ),
                     );
                   },
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   child: Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111C33),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      color: colors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1E293B),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.star,
-                            color: Colors.white,
+                            color: colors.textPrimary,
                             size: 20,
                           ),
                         ),
                         const SizedBox(height: 14),
-                        const Text(
+                        Text(
                           'Saved Places',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'Home, College etc.',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textMuted,
                             fontSize: 12,
                           ),
                         ),
@@ -1118,43 +1132,43 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   onTap: () {
                     setState(() => _activeStepIndex = 1);
                   },
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   child: Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111C33),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      color: colors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1E293B),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.access_time_filled,
-                            color: Colors.white,
+                            color: colors.textPrimary,
                             size: 20,
                           ),
                         ),
                         const SizedBox(height: 14),
-                        const Text(
+                        Text(
                           'Recent Trips',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'View history',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textMuted,
                             fontSize: 12,
                           ),
                         ),
@@ -1172,16 +1186,18 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   // ── Step 2: Available Buses Results (Image 2) ──────────────────────────────
   Widget _buildResultsStepView() {
+    final colors = AppTheme.colors(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Route Summary White Card
+          // Route Summary Card
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: colors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1196,17 +1212,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.radio_button_checked,
-                                color: Color(0xFF007AFF),
+                                color: colors.actionPrimary,
                                 size: 16,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _origin.name,
-                                  style: const TextStyle(
-                                    color: Color(0xFF0F172A),
+                                  style: TextStyle(
+                                    color: colors.textPrimary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -1219,22 +1235,22 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                             child: Container(
                               width: 2,
                               height: 16,
-                              color: const Color(0xFFCBD5E1),
+                              color: colors.border,
                             ),
                           ),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.location_on,
-                                color: Color(0xFF0F172A),
+                                color: colors.textPrimary,
                                 size: 16,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _destination.name,
-                                  style: const TextStyle(
-                                    color: Color(0xFF0F172A),
+                                  style: TextStyle(
+                                    color: colors.textPrimary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -1248,10 +1264,12 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     ElevatedButton(
                       onPressed: () => setState(() => _activeStepIndex = 0),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E293B),
-                        foregroundColor: Colors.white,
+                        backgroundColor: colors.surfaceSubtle,
+                        foregroundColor: colors.textPrimary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1266,20 +1284,20 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(color: Color(0xFFE2E8F0)),
+                Divider(color: colors.border),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calendar_today,
-                      color: Color(0xFF64748B),
+                      color: colors.textMuted,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       _selectedDateText,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
+                      style: TextStyle(
+                        color: colors.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1309,11 +1327,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
               return Column(
                 children: [
-                  // Bus Card 1 (Highlighted Mint Card - Bus 18B)
+                  // Bus Card 1 (Arriving Soon — success-tinted emphasis, Bus 18B)
                   _buildAvailableBusCard(
                     busId: '18B',
                     badgeText: 'Arriving Soon',
-                    badgeColor: const Color(0xFF16A34A),
                     routeName: summaryRouteName,
                     fareText: dynamicQuote.formattedAmount,
                     statusText: '4 minutes away',
@@ -1333,7 +1350,6 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   _buildAvailableBusCard(
                     busId: '12A',
                     badgeText: 'In 12 min',
-                    badgeColor: const Color(0xFF007AFF),
                     routeName: summaryRouteName,
                     fareText: dynamicQuote.formattedAmount,
                     statusText: '12 minutes away',
@@ -1353,7 +1369,6 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   _buildAvailableBusCard(
                     busId: '20C',
                     badgeText: 'In 18 min',
-                    badgeColor: const Color(0xFF007AFF),
                     routeName: summaryRouteName,
                     fareText: dynamicQuote.formattedAmount,
                     statusText: '18 minutes away',
@@ -1379,7 +1394,6 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   Widget _buildAvailableBusCard({
     required String busId,
     required String badgeText,
-    required Color badgeColor,
     required String routeName,
     required String fareText,
     required String statusText,
@@ -1388,11 +1402,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     required bool isHighlighted,
     required VoidCallback onSelect,
   }) {
+    final colors = AppTheme.colors(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isHighlighted ? const Color(0xFFE6F4EA) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        // "Selected/arriving" emphasis is a subtle success tint with a success
+        // border — never an inverted light card inside the dark page.
+        color: isHighlighted ? colors.statusSuccessBg : colors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(
+          color: isHighlighted ? colors.statusSuccess : colors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1402,16 +1422,16 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.directions_bus,
-                    color: Color(0xFF0F172A),
+                    color: colors.textPrimary,
                     size: 28,
                   ),
                   const SizedBox(width: 10),
                   Text(
                     busId,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                     ),
@@ -1424,15 +1444,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isHighlighted ? badgeColor : const Color(0xFFE0F2FE),
-                  borderRadius: BorderRadius.circular(12),
+                  color: isHighlighted
+                      ? colors.statusSuccessBg
+                      : colors.statusInfoBg,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 child: Text(
                   badgeText,
                   style: TextStyle(
                     color: isHighlighted
-                        ? Colors.white
-                        : const Color(0xFF0369A1),
+                        ? colors.statusSuccess
+                        : colors.actionPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -1444,18 +1466,20 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                routeName,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
+              Expanded(
+                child: Text(
+                  routeName,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               Text(
                 fareText,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
+                style: TextStyle(
+                  color: colors.textPrimary,
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1467,15 +1491,15 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
             statusText,
             style: TextStyle(
               color: isHighlighted
-                  ? const Color(0xFF16A34A)
-                  : const Color(0xFF334155),
+                  ? colors.statusSuccess
+                  : colors.textSecondary,
               fontWeight: FontWeight.w800,
               fontSize: 14,
             ),
           ),
           Text(
             serviceNote,
-            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+            style: TextStyle(color: colors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -1484,12 +1508,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
             child: ElevatedButton(
               onPressed: onSelect,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isHighlighted
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFF007AFF),
-                foregroundColor: Colors.white,
+                backgroundColor: colors.actionPrimary,
+                foregroundColor: colors.onActionPrimary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 elevation: 0,
               ),
@@ -1509,23 +1531,25 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   // ── Step 3: Active Trip Tracker (Image 3) ──────────────────────────────────
   Widget _buildActiveTripStepView() {
+    final colors = AppTheme.colors(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Green Destination Banner (arrival state once the bus terminates)
+          // Destination Banner (arrival state once the bus terminates)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF16A34A),
-              borderRadius: BorderRadius.circular(20),
+              color: colors.statusSuccessBg,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: colors.statusSuccess),
             ),
             child: Row(
               children: [
                 Icon(
                   _hasArrived ? Icons.check_circle : Icons.location_on,
-                  color: Colors.white,
+                  color: colors.statusSuccess,
                   size: 22,
                 ),
                 const SizedBox(width: 12),
@@ -1537,8 +1561,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         _hasArrived
                             ? 'Reached the destination'
                             : 'You are going to',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: colors.textSecondary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1546,17 +1570,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       const SizedBox(height: 2),
                       Text(
                         _destination.name,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.textPrimary,
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       if (_hasArrived)
-                        const Text(
+                        Text(
                           'You have reached. Tap End Trip below — your ticket will expire.',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1564,7 +1588,11 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.white, size: 26),
+                Icon(
+                  Icons.chevron_right,
+                  color: colors.textSecondary,
+                  size: 26,
+                ),
               ],
             ),
           ),
@@ -1622,8 +1650,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               return Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1633,16 +1662,16 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       children: [
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.directions_bus,
-                              color: Color(0xFF0F172A),
+                              color: colors.textPrimary,
                               size: 28,
                             ),
                             const SizedBox(width: 10),
                             Text(
                               'Bus $_selectedBusId',
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
+                              style: TextStyle(
+                                color: colors.textPrimary,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -1655,13 +1684,15 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(12),
+                            color: colors.statusSuccessBg,
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'On Track',
                             style: TextStyle(
-                              color: Color(0xFF16A34A),
+                              color: colors.statusSuccess,
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
                             ),
@@ -1672,8 +1703,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     const SizedBox(height: 2),
                     Text(
                       '${_origin.name.replaceAll(' Main Gate', '')} → ${_destination.name.replaceAll(' Railway Station', '')}',
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
+                      style: TextStyle(
+                        color: colors.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1688,44 +1719,40 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                             children: [
                               Text(
                                 '$remainingStops',
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
+                                style: TextStyle(
+                                  color: colors.textPrimary,
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              const Text(
+                              Text(
                                 'Stops Remaining',
                                 style: TextStyle(
-                                  color: Color(0xFF64748B),
+                                  color: colors.textMuted,
                                   fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: const Color(0xFFE2E8F0),
-                        ),
+                        Container(width: 1, height: 40, color: colors.border),
                         Expanded(
                           child: Column(
                             children: [
                               Text(
                                 '$etaMinutes min',
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
+                                style: TextStyle(
+                                  color: colors.textPrimary,
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              const Text(
+                              Text(
                                 'Estimated Arrival',
                                 style: TextStyle(
-                                  color: Color(0xFF64748B),
+                                  color: colors.textMuted,
                                   fontSize: 12,
                                 ),
                               ),
@@ -1744,21 +1771,23 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F2FE),
-                        borderRadius: BorderRadius.circular(14),
+                        color: colors.statusInfoBg,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.directions_bus,
-                            color: Color(0xFF007AFF),
+                            color: colors.actionPrimary,
                             size: 20,
                           ),
                           const SizedBox(width: 10),
-                          const Text(
+                          Text(
                             'Next Stop ',
                             style: TextStyle(
-                              color: Color(0xFF007AFF),
+                              color: colors.actionPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1766,8 +1795,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           Expanded(
                             child: Text(
                               nextStop,
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
+                              style: TextStyle(
+                                color: colors.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -1775,8 +1804,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                           ),
                           Text(
                             nextStopEta,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
+                            style: TextStyle(
+                              color: colors.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
                             ),
@@ -1788,7 +1817,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
                     // Interactive Real Map of the passenger's own route segment
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       child: LiveLocationMapWidget(
                         stops: _activeRouteStops,
                         currentLocation: live,
@@ -1810,25 +1839,29 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 _isAnnouncementsOn = !_isAnnouncementsOn;
               });
             },
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             child: Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF007AFF),
-                borderRadius: BorderRadius.circular(20),
+                color: colors.actionPrimary,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.volume_up, color: Colors.white, size: 26),
+                  Icon(
+                    Icons.volume_up,
+                    color: colors.onActionPrimary,
+                    size: 26,
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Journey Assistant',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.onActionPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1836,17 +1869,19 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         const SizedBox(height: 2),
                         Text(
                           'Announcements are ${_isAnnouncementsOn ? 'ON' : 'OFF'}',
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: colors.onActionPrimary.withValues(
+                              alpha: 0.8,
+                            ),
                             fontSize: 13,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: Colors.white,
+                    color: colors.onActionPrimary,
                     size: 26,
                   ),
                 ],
@@ -1862,8 +1897,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 child: _buildQuickActionButton(
                   icon: Icons.map_outlined,
                   label: 'View Live Map',
-                  bgColor: const Color(0xFF111C33),
-                  textColor: Colors.white,
+                  bgColor: colors.surfaceSubtle,
+                  textColor: colors.textPrimary,
                   onTap: () {
                     final ticket =
                         widget.ticketController.activeTicket ??
@@ -1917,8 +1952,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 child: _buildQuickActionButton(
                   icon: Icons.published_with_changes,
                   label: 'Repeat Last Instruction',
-                  bgColor: const Color(0xFF111C33),
-                  textColor: Colors.white,
+                  bgColor: colors.surfaceSubtle,
+                  textColor: colors.textPrimary,
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -1935,29 +1970,33 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 child: _buildQuickActionButton(
                   icon: Icons.warning_amber_rounded,
                   label: 'Emergency Help',
-                  bgColor: const Color(0xFFFECDD3),
-                  textColor: const Color(0xFF991B1B),
-                  iconColor: const Color(0xFFDC2626),
+                  // Emergency SOS keeps the reserved error-red role.
+                  bgColor: colors.statusAlertBg,
+                  textColor: colors.statusError,
+                  iconColor: colors.statusError,
                   onTap: () {
+                    final sosColors = AppTheme.colors(context);
                     unawaited(
                       showDialog<void>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          backgroundColor: const Color(0xFF0B101D),
-                          title: const Text(
+                          backgroundColor: sosColors.background,
+                          title: Text(
                             'Broadcast Emergency SOS?',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(color: sosColors.textPrimary),
                           ),
-                          content: const Text(
+                          content: Text(
                             'This will alert your trusted emergency contacts and transport help desk with live GPS location.',
-                            style: TextStyle(color: Color(0xFF94A3B8)),
+                            style: TextStyle(color: sosColors.textSecondary),
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
-                              child: const Text(
+                              child: Text(
                                 'Cancel',
-                                style: TextStyle(color: Color(0xFF94A3B8)),
+                                style: TextStyle(
+                                  color: sosColors.textSecondary,
+                                ),
                               ),
                             ),
                             ElevatedButton(
@@ -1976,11 +2015,13 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFDC2626),
+                                backgroundColor: sosColors.statusError,
                               ),
-                              child: const Text(
+                              child: Text(
                                 'SEND SOS NOW',
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: sosColors.onActionPrimary,
+                                ),
                               ),
                             ),
                           ],
@@ -2019,10 +2060,12 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
+                        backgroundColor: colors.actionPrimary,
+                        foregroundColor: colors.onActionPrimary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
@@ -2049,13 +2092,14 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFDC2626),
-                        side: const BorderSide(
-                          color: Color(0xFFDC2626),
-                          width: 1.5,
-                        ),
+                        // Red is reserved exclusively for Emergency SOS — the
+                        // destructive (non-SOS) cancel action stays neutral.
+                        foregroundColor: colors.textPrimary,
+                        side: BorderSide(color: colors.border, width: 1.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
@@ -2070,6 +2114,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }
 
   Widget _buildProgressTimeline([BusLocation? live]) {
+    final colors = AppTheme.colors(context);
     // Timeline labels come from the passenger's real route segment: the
     // boarding stop, the next stop after boarding, a mid-journey stop, and
     // the alighting stop.
@@ -2087,26 +2132,22 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
       label(stops.length > 2 ? stops.length - 2 : 0, 'Via'),
       label(stops.length - 1, 'Destination'),
     ];
-    final labelStyles = const [
-      TextStyle(
-        fontSize: 10,
+    final labelStyles = [
+      Theme.of(context).textTheme.labelSmall?.copyWith(
         fontWeight: FontWeight.w700,
-        color: Color(0xFF475569),
+        color: colors.textSecondary,
       ),
-      TextStyle(
-        fontSize: 10,
+      Theme.of(context).textTheme.labelSmall?.copyWith(
         fontWeight: FontWeight.w800,
-        color: Color(0xFF0F172A),
+        color: colors.textPrimary,
       ),
-      TextStyle(
-        fontSize: 10,
+      Theme.of(context).textTheme.labelSmall?.copyWith(
         fontWeight: FontWeight.w600,
-        color: Color(0xFF94A3B8),
+        color: colors.textMuted,
       ),
-      TextStyle(
-        fontSize: 10,
+      Theme.of(context).textTheme.labelSmall?.copyWith(
         fontWeight: FontWeight.w600,
-        color: Color(0xFF94A3B8),
+        color: colors.textMuted,
       ),
     ];
 
@@ -2135,8 +2176,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               child: Container(
                 height: 4,
                 color: activeNodeIndex > 0
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFFCBD5E1),
+                    ? colors.statusSuccess
+                    : colors.border,
               ),
             ),
             _buildTimelineNode(
@@ -2147,8 +2188,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               child: Container(
                 height: 4,
                 color: activeNodeIndex > 1
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFFCBD5E1),
+                    ? colors.statusSuccess
+                    : colors.border,
               ),
             ),
             _buildTimelineNode(
@@ -2159,8 +2200,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               child: Container(
                 height: 4,
                 color: activeNodeIndex > 2
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFFCBD5E1),
+                    ? colors.statusSuccess
+                    : colors.border,
               ),
             ),
             _buildTimelineNode(
@@ -2190,12 +2231,13 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     required bool isCompleted,
     required bool isActive,
   }) {
+    final colors = AppTheme.colors(context);
     if (isCompleted) {
       return Container(
         width: 18,
         height: 18,
-        decoration: const BoxDecoration(
-          color: Color(0xFF16A34A),
+        decoration: BoxDecoration(
+          color: colors.statusSuccess,
           shape: BoxShape.circle,
         ),
       );
@@ -2204,9 +2246,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         width: 22,
         height: 22,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF16A34A), width: 4),
+          border: Border.all(color: colors.statusSuccess, width: 4),
         ),
       );
     } else {
@@ -2214,9 +2256,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         width: 18,
         height: 18,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFCBD5E1), width: 3),
+          border: Border.all(color: colors.border, width: 3),
         ),
       );
     }
@@ -2232,13 +2274,16 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: Container(
-        height: 105,
+        // minHeight instead of a fixed height so the label can reflow and
+        // wrap at large text scales instead of overflowing.
+        constraints: const BoxConstraints(minHeight: 105),
         padding: const EdgeInsets.all(12),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -2262,6 +2307,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   // Sticky Bottom Ask BusBuddy Action Bar
   Widget _buildStickyAskBusBuddyBar() {
+    final colors = AppTheme.colors(context);
     final prompts = [
       'Speak your destination',
       'Select a bus or ask for schedule',
@@ -2277,9 +2323,9 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           child: ElevatedButton(
             onPressed: _openAiAssistant,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: colors.actionPrimary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               ),
               elevation: 4,
             ),
@@ -2287,11 +2333,15 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white24,
+                  decoration: BoxDecoration(
+                    color: colors.onActionPrimary.withValues(alpha: 0.24),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.mic, color: Colors.white, size: 20),
+                  child: Icon(
+                    Icons.mic,
+                    color: colors.onActionPrimary,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -2299,18 +2349,18 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Ask BusBuddy',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colors.onActionPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       Text(
                         activePrompt,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: colors.onActionPrimary.withValues(alpha: 0.8),
                           fontSize: 12,
                         ),
                       ),

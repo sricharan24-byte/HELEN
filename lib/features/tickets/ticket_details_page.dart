@@ -51,196 +51,217 @@ class TicketDetailsPage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
             // ── Main Ticket Boarding Pass Card with Side Notches ─────────
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC), // Light ticket card background
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    children: [
-                      // Top Green Banner
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF16A34A),
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            Container(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
+              ),
+              child: Column(
+                children: [
+                  // Top Status Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: colors.statusSuccessBg,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppSpacing.radiusLg),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: colors.statusSuccess,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.check,
+                            color: Theme.of(context).colorScheme.onError,
+                            size: 20,
+                          ),
                         ),
-                        child: Row(
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
+                            Text(
+                              'Valid Ticket',
+                              style: TextStyle(
+                                color: colors.statusSuccess,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                               ),
-                              child: const Icon(Icons.check, color: Color(0xFF16A34A), size: 20),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Show this ticket while boarding',
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Ticket Details Body
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.directions_bus, color: colors.textPrimary, size: 36),
                             const SizedBox(width: 14),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Valid Ticket',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Show this ticket while boarding',
-                                  style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Ticket Details Body
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
                               children: [
-                                const Icon(Icons.directions_bus, color: Color(0xFF0F172A), size: 36),
-                                const SizedBox(width: 14),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      ticket.busId,
-                                      style: const TextStyle(
-                                        color: Color(0xFF0F172A),
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${ticket.origin.name} → ${ticket.destination.name}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF475569),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  ticket.busId,
+                                  style: TextStyle(
+                                    color: colors.textPrimary,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  '${ticket.origin.name} → ${ticket.destination.name}',
+                                  style: TextStyle(
+                                    color: colors.textSecondary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
-
-                            _buildPassDetailRow(Icons.calendar_today_outlined, _formatDate(ticket.issuedAt)),
-                            const SizedBox(height: 12),
-                            _buildPassDetailRow(Icons.access_time_outlined, _formatTime(ticket.issuedAt)),
-                            const SizedBox(height: 12),
-                            _buildPassDetailRow(Icons.currency_rupee, '₹${ticket.fareAmount.toStringAsFixed(0)}'),
-                            const SizedBox(height: 12),
-                            _buildPassDetailRow(Icons.confirmation_number_outlined, 'Ticket ID: ${ticket.id}'),
-                            const SizedBox(height: 12),
-                            _buildPassDetailRow(Icons.person_outline, 'Passenger: ${ticket.passengerName}'),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 20),
 
-                      // Dashed Perforation Line
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: List.generate(
-                            30,
-                            (index) => Expanded(
-                              child: Container(
-                                color: index % 2 == 0 ? const Color(0xFFCBD5E1) : Colors.transparent,
-                                height: 2,
+                        _buildPassDetailRow(context, Icons.calendar_today_outlined, _formatDate(ticket.issuedAt)),
+                        const SizedBox(height: 12),
+                        _buildPassDetailRow(context, Icons.access_time_outlined, _formatTime(ticket.issuedAt)),
+                        const SizedBox(height: 12),
+                        _buildPassDetailRow(context, Icons.currency_rupee, ticket.fareQuote.formattedAmount),
+                        const SizedBox(height: 12),
+                        _buildPassDetailRow(context, Icons.confirmation_number_outlined, 'Ticket ID: ${ticket.id}'),
+                        const SizedBox(height: 12),
+                        _buildPassDetailRow(context, Icons.person_outline, 'Passenger: ${ticket.passengerName}'),
+                      ],
+                    ),
+                  ),
+
+                  // Dashed Perforation Line with cutout notches vertically
+                  // centered on the line itself (never a magic top offset).
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      height: 2,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Row(
+                            children: List.generate(
+                              30,
+                              (index) => Expanded(
+                                child: Container(
+                                  color: index % 2 == 0
+                                      ? colors.border
+                                      : Colors.transparent,
+                                  height: 2,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                          Positioned(
+                            left: -30,
+                            child: CircleAvatar(
+                              radius: 14,
+                              backgroundColor: colors.background,
+                            ),
+                          ),
+                          Positioned(
+                            right: -30,
+                            child: CircleAvatar(
+                              radius: 14,
+                              backgroundColor: colors.background,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                  ),
 
-                      // QR Code Display Section
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: CustomPaint(
-                                size: const Size(180, 180),
-                                painter: _QrCodePainter(data: ticket.qrCodeData),
-                              ),
+                  // QR Code Display Section
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceSubtle,
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusLg),
+                            border: Border.all(color: colors.border),
+                          ),
+                          child: CustomPaint(
+                            size: const Size(180, 180),
+                            painter: _QrCodePainter(
+                              data: ticket.qrCodeData,
+                              color: colors.textPrimary,
+                              background: colors.surfaceSubtle,
                             ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Scan this QR code while boarding',
-                              style: TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEBF3FF),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                ticket.id,
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        Text(
+                          'Scan this QR code while boarding',
+                          style: TextStyle(
+                            color: colors.textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: colors.statusInfoBg,
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusLg),
+                          ),
+                          child: Text(
+                            ticket.id,
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-
-                // Left Cutout Notch
-                Positioned(
-                  left: -14,
-                  top: 250,
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: colors.background,
-                  ),
-                ),
-
-                // Right Cutout Notch
-                Positioned(
-                  right: -14,
-                  top: 250,
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: colors.background,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
-            // ── Dark Important Guidance Card ─────────────────────────────
+            // ── Important Guidance Card ─────────────────────────────────
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: colors.surface,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 border: Border.all(color: colors.border),
               ),
               child: Row(
@@ -280,15 +301,16 @@ class TicketDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPassDetailRow(IconData icon, String text) {
+  Widget _buildPassDetailRow(BuildContext context, IconData icon, String text) {
+    final colors = AppTheme.colors(context);
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF475569), size: 18),
+        Icon(icon, color: colors.textSecondary, size: 18),
         const SizedBox(width: 12),
         Text(
           text,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
+          style: TextStyle(
+            color: colors.textPrimary,
             fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
@@ -314,15 +336,24 @@ class TicketDetailsPage extends StatelessWidget {
 }
 
 /// Vector QR code pattern painter for clean boarding pass rendering.
+///
+/// Decorative prototype pattern (not a scannable QR payload — see the
+/// boarding instruction copy); colors come from the active theme tokens.
 class _QrCodePainter extends CustomPainter {
-  _QrCodePainter({required this.data});
+  _QrCodePainter({
+    required this.data,
+    required this.color,
+    required this.background,
+  });
 
   final String data;
+  final Color color;
+  final Color background;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0F172A)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     // Draw position detection finder squares (3 corners)
@@ -367,7 +398,7 @@ class _QrCodePainter extends CustomPainter {
     );
 
     canvas.drawRRect(outerRect, paint);
-    canvas.drawRRect(innerClearRect, Paint()..color = Colors.white);
+    canvas.drawRRect(innerClearRect, Paint()..color = background);
     canvas.drawRRect(centerRect, paint);
   }
 

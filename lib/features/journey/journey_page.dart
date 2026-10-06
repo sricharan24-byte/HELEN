@@ -167,10 +167,29 @@ class JourneyPage extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          'No active journey. Start a journey from the route details screen.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colors.textPrimary),
-          textAlign: TextAlign.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Decorative empty-state icon — no semantics, the text below
+            // already describes the state.
+            Icon(Icons.route_outlined, size: 48, color: colors.textMuted),
+            const SizedBox(height: 16),
+            Text(
+              'No active journey. Start a journey from the route details screen.',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Pick your stops, review the route, then start the trip.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

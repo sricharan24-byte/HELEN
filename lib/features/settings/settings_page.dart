@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../data/repositories/emergency_contact_repository.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../safety/safety_sharing_page.dart';
 import '../tickets/ticket_controller.dart';
@@ -12,55 +14,59 @@ import 'voice_assistant_settings_page.dart';
 
 /// Settings hub — theme-aware cards for accessibility, personalization,
 /// voice, and emergency configuration.
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, this.repository, this.ticketController});
 
   final TransportRepository? repository;
   final TicketController? ticketController;
 
   @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  @override
+  void initState() {
+    super.initState();
+    AppSettingsController.instance.addListener(_onSettingsChanged);
+  }
+
+  @override
+  void dispose() {
+    AppSettingsController.instance.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
+    final settings = AppSettingsController.instance;
+    final emergencyCount =
+        EmergencyContactRepository.instance.contacts.length;
 
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
         backgroundColor: colors.background,
         elevation: 0,
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Bus',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-                Text(
-                  'Buddy',
-                  style: TextStyle(
-                    color: colors.actionSecondary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-              ],
+        // Single-scale title: the previous two-line brand Column overflowed
+        // the 56dp toolbar at large accessibility text scales.
+        title: Semantics(
+          headingLevel: 1,
+          child: Text(
+            'Settings & Preferences',
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
             ),
-            Text(
-              'Settings & Preferences',
-              style: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: SafeArea(
         child: ListView(
@@ -70,18 +76,19 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
-              iconColor: const Color(0xFF3B82F6),
+              iconColor: colors.actionPrimary,
               icon: Icons.accessibility_new,
               title: 'Accessibility Settings',
               subtitle: 'Text size, high contrast, talkback, & haptics',
-              trailingText: 'Large · On',
+              trailingText:
+                  '${settings.textSize} · Contrast ${settings.highContrast}',
               onTap: () {
                 unawaited(
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => AccessibilitySettingsPage(
-                        repository: repository,
-                        ticketController: ticketController,
+                        repository: widget.repository,
+                        ticketController: widget.ticketController,
                       ),
                     ),
                   ),
@@ -94,18 +101,19 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
-              iconColor: const Color(0xFF16A34A),
+              iconColor: colors.actionPrimary,
               icon: Icons.home,
               title: 'Personalization Settings',
               subtitle: 'Customize home screen, adaptive UI, & layout',
-              trailingText: 'Adaptive On',
+              trailingText:
+                  'Adaptive ${settings.adaptiveUi ? 'On' : 'Off'}',
               onTap: () {
                 unawaited(
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => PersonalizationSettingsPage(
-                        repository: repository,
-                        ticketController: ticketController,
+                        repository: widget.repository,
+                        ticketController: widget.ticketController,
                       ),
                     ),
                   ),
@@ -118,18 +126,18 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
               context: context,
-              iconColor: const Color(0xFF7C3AED),
+              iconColor: colors.actionPrimary,
               icon: Icons.mic,
               title: 'Voice Assistant Settings',
               subtitle: 'Preferred language, voice speed, & Gemini AI',
-              trailingText: 'English',
+              trailingText: settings.preferredLanguage,
               onTap: () {
                 unawaited(
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => VoiceAssistantSettingsPage(
-                        repository: repository,
-                        ticketController: ticketController,
+                        repository: widget.repository,
+                        ticketController: widget.ticketController,
                       ),
                     ),
                   ),
@@ -141,12 +149,15 @@ class SettingsPage extends StatelessWidget {
             _buildSectionHeader(context, 'EMERGENCY & TRUSTED CONTACTS'),
             const SizedBox(height: AppSpacing.sm),
             _buildHubCard(
+              // Red is reserved for Emergency SOS surfaces — this card opens
+              // the SOS configuration, so the reserved statusError token (not
+              // the app accent) marks it.
               context: context,
-              iconColor: const Color(0xFFDC2626),
+              iconColor: colors.statusError,
               icon: Icons.shield_outlined,
               title: 'Emergency Contacts & SOS',
               subtitle: 'Configure 1-tap location alerts & sharing links',
-              trailingText: 'Active',
+              trailingText: '$emergencyCount Contacts',
               onTap: () {
                 unawaited(
                   Navigator.of(context).push(
@@ -233,7 +244,7 @@ class SettingsPage extends StatelessWidget {
                     color: iconColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, color: Colors.white, size: 24),
+                  child: Icon(icon, color: colors.onActionPrimary, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

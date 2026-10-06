@@ -17,7 +17,7 @@ import '../journey/journey_page.dart';
 /// Displays route details for a selected route with real-time live bus tracking.
 /// Fully conforms to Astra Step 2.3 with semantic tokens, announcement coordinator,
 /// and responsive reflow for elevated text scaling.
-class RouteDetailsPage extends StatelessWidget {
+class RouteDetailsPage extends StatefulWidget {
   const RouteDetailsPage({
     super.key,
     required this.controller,
@@ -28,13 +28,23 @@ class RouteDetailsPage extends StatelessWidget {
   final TransportRepository repository;
 
   @override
+  State<RouteDetailsPage> createState() => _RouteDetailsPageState();
+}
+
+class _RouteDetailsPageState extends State<RouteDetailsPage> {
+  /// The next-stop name already announced over the screen reader. Telemetry
+  /// streams tick every couple of seconds; announcing on every tick floods
+  /// TalkBack, so an announcement only fires when the next stop CHANGES.
+  String? _lastAnnouncedNextStop;
+
+  @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
 
     return ListenableBuilder(
-      listenable: controller,
+      listenable: widget.controller,
       builder: (context, _) {
-        final state = controller.state;
+        final state = widget.controller.state;
         final route = state.selectedRoute;
 
         // ── Missing data recovery ─────────────────────────────────────
@@ -59,7 +69,8 @@ class RouteDetailsPage extends StatelessWidget {
 
         // ── Resolve stops ─────────────────────────────────────────────
         final stops = <models.Stop?>[
-          for (final stopId in route.orderedStopIds) repository.getStop(stopId),
+          for (final stopId in route.orderedStopIds)
+            widget.repository.getStop(stopId),
         ];
 
         final boardingStop =
@@ -86,27 +97,32 @@ class RouteDetailsPage extends StatelessWidget {
                 children: [
                   // ── Real-Time Live Bus GPS Header Card ────────────────
                   StreamBuilder<models.BusLocation>(
-                    stream: repository.streamBusLocation(busId, route.id),
+                    stream: widget.repository.streamBusLocation(
+                      busId,
+                      route.id,
+                    ),
                     builder: (context, snapshot) {
+                      final hasLive = snapshot.hasData && snapshot.data != null;
                       final live = snapshot.data;
-                      final speed = live != null
-                          ? live.speedKmh.toStringAsFixed(0)
-                          : '32';
-                      final nextStop =
-                          live?.nextStopName ??
-                          (stops.length > 1
-                              ? stops[1]?.name ?? 'Next Stop'
-                              : 'Gandhi Nagar');
-                      final eta = live != null
-                          ? '${live.etaMinutes} mins'
-                          : '4 mins';
-                      final progress = live?.progressPercentage ?? 0.25;
+                      final speed = hasLive
+                          ? live!.speedKmh.toStringAsFixed(0)
+                          : null;
+                      final eta = hasLive ? '${live!.etaMinutes} mins' : null;
+                      final nextStop = hasLive
+                          ? live!.nextStopName
+                          : (stops.length > 1 ? stops[1]?.name : null);
 
-                      // Announce live telemetry via coordinator
-                      if (live != null) {
+                      // Announce the next stop only when it actually changes —
+                      // the telemetry stream ticks too often to announce every
+                      // snapshot (that flooded TalkBack).
+                      if (hasLive &&
+                          live!.nextStopName.isNotEmpty &&
+                          live.nextStopName != _lastAnnouncedNextStop) {
+                        _lastAnnouncedNextStop = live.nextStopName;
                         WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
                           AnnouncementCoordinator.instance.announce(
-                            'Bus approaching $nextStop, estimated arrival in $eta at $speed km/h.',
+                            'Bus approaching ${live.nextStopName}, estimated arrival in ${live.etaMinutes} mins at ${live.speedKmh.toStringAsFixed(0)} km/h.',
                             routeId: route.id,
                             priority: AnnouncementPriority.normal,
                           );
@@ -116,26 +132,14 @@ class RouteDetailsPage extends StatelessWidget {
                       return Container(
                         padding: AppSpacing.cardPadding,
                         decoration: BoxDecoration(
-                          color: colors.isHighContrast
-                              ? colors.surface
-                              : const Color(0xFF002B7F),
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(
                             AppSpacing.radiusLg,
                           ),
-                          border: colors.isHighContrast
-                              ? Border.all(color: colors.border, width: 2)
-                              : null,
-                          boxShadow: colors.isHighContrast
-                              ? null
-                              : [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF002B7F,
-                                    ).withValues(alpha: 0.2),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
+                          border: Border.all(
+                            color: colors.border,
+                            width: colors.isHighContrast ? 2 : 1,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,14 +153,13 @@ class RouteDetailsPage extends StatelessWidget {
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.15,
-                                          ),
+                                          color: colors.actionPrimary
+                                              .withValues(alpha: 0.15),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.directions_bus,
-                                          color: Colors.white,
+                                          color: colors.actionPrimary,
                                           size: 22,
                                         ),
                                       ),
@@ -168,136 +171,153 @@ class RouteDetailsPage extends StatelessWidget {
                                           children: [
                                             Text(
                                               busId,
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                              style: TextStyle(
+                                                color: colors.textPrimary,
                                                 fontWeight: FontWeight.w800,
                                                 fontSize: 16,
                                               ),
                                             ),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  StatusLevel.info.icon,
-                                                  size: 13,
-                                                  color: const Color(
-                                                    0xFF38BDF8,
+                                            if (hasLive)
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    StatusLevel.info.icon,
+                                                    size: 13,
+                                                    color: colors.statusInfo,
                                                   ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Flexible(
-                                                  child: Text(
-                                                    'Speed: $speed km/h',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF38BDF8),
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 12,
+                                                  const SizedBox(width: 4),
+                                                  Flexible(
+                                                    child: Text(
+                                                      'Speed: $speed km/h',
+                                                      style: TextStyle(
+                                                        color:
+                                                            colors.statusInfo,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize: 12,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
+                                                ],
+                                              ),
                                           ],
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFF10B981,
-                                    ).withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: const Color(0xFF10B981),
+                                if (hasLive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.statusSuccessBg,
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusLg,
+                                      ),
+                                      border: Border.all(
+                                        color: colors.statusSuccess,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.fiber_manual_record,
+                                          size: 8,
+                                          color: colors.statusSuccess,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'LIVE GPS',
+                                          style: TextStyle(
+                                            color: colors.statusSuccess,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Divider(color: colors.border),
+                            const SizedBox(height: 12),
+                            if (hasLive)
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                runSpacing: 8,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Icon(
-                                        Icons.fiber_manual_record,
-                                        size: 8,
-                                        color: Color(0xFF10B981),
-                                      ),
-                                      SizedBox(width: 4),
                                       Text(
-                                        'LIVE GPS',
+                                        'Next Stop',
                                         style: TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 11,
+                                          color: colors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        nextStop ?? 'Next Stop',
+                                        style: TextStyle(
+                                          color: colors.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
                                         ),
                                       ),
                                     ],
                                   ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Est. Arrival',
+                                        style: TextStyle(
+                                          color: colors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        eta!,
+                                        style: TextStyle(
+                                          color: colors.statusInfo,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            else
+                              // Honest waiting state — no fabricated speed,
+                              // ETA or progress until the stream delivers data.
+                              Text(
+                                'Waiting for live GPS data…',
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            const Divider(color: Colors.white24),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              runSpacing: 8,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Next Stop',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      nextStop,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    const Text(
-                                      'Est. Arrival',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      eta,
-                                      style: const TextStyle(
-                                        color: Color(0xFF38BDF8),
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                              ),
                             const SizedBox(height: 14),
                             // Last-updated timestamp from telemetry (plain text:
                             // the stream ticks often and must not flood TalkBack).
                             Builder(
                               builder: (_) {
-                                final ts = live?.receivedTimestamp ?? live?.timestamp;
-                                String two(int n) => n.toString().padLeft(2, '0');
+                                final ts =
+                                    live?.receivedTimestamp ??
+                                    live?.timestamp;
+                                String two(int n) =>
+                                    n.toString().padLeft(2, '0');
                                 final label = ts != null
                                     ? 'Updated ${two(ts.hour)}:${two(ts.minute)}:${two(ts.second)}'
                                     : 'Waiting for live data…';
@@ -308,8 +328,8 @@ class RouteDetailsPage extends StatelessWidget {
                                   excludeSemantics: true,
                                   child: Text(
                                     label,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
+                                    style: TextStyle(
+                                      color: colors.textMuted,
                                       fontSize: 11,
                                     ),
                                   ),
@@ -318,13 +338,19 @@ class RouteDetailsPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 10),
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusSm,
+                              ),
                               child: LinearProgressIndicator(
-                                value: progress,
+                                // Indeterminate while waiting for telemetry;
+                                // determinate from real progress only.
+                                value: hasLive
+                                    ? live!.progressPercentage
+                                    : null,
                                 minHeight: 6,
-                                backgroundColor: Colors.white24,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF38BDF8),
+                                backgroundColor: colors.surfaceSubtle,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  colors.actionPrimary,
                                 ),
                               ),
                             ),
@@ -404,10 +430,12 @@ class RouteDetailsPage extends StatelessWidget {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.location_on_outlined,
                                   size: 18,
-                                  color: Color(0xFFE11D48),
+                                  // Accent, not SOS red — red is reserved
+                                  // exclusively for Emergency SOS.
+                                  color: colors.actionPrimary,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -453,7 +481,6 @@ class RouteDetailsPage extends StatelessWidget {
                         'Unknown stop (${route.orderedStopIds[index]})';
                     final stopArea = stop?.area ?? '';
                     final isFirst = index == 0;
-                    final isLast = index == stops.length - 1;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -471,12 +498,12 @@ class RouteDetailsPage extends StatelessWidget {
                         color: Colors.transparent,
                         child: ListTile(
                           leading: CircleAvatar(
+                            // First stop = boarding accent; the last stop keeps
+                            // a neutral subtle avatar (SOS red is not decorative).
                             backgroundColor: isFirst
                                 ? colors.actionPrimary
-                                : isLast
-                                ? const Color(0xFFE11D48)
                                 : colors.surfaceSubtle,
-                            foregroundColor: isFirst || isLast
+                            foregroundColor: isFirst
                                 ? colors.onActionPrimary
                                 : colors.textPrimary,
                             child: Text(
@@ -515,7 +542,7 @@ class RouteDetailsPage extends StatelessWidget {
                       constraints: const BoxConstraints(minHeight: 54),
                       child: FilledButton.icon(
                         onPressed: () {
-                          controller.startJourney();
+                          widget.controller.startJourney();
                           AnnouncementCoordinator.instance.announce(
                             'Journey started on ${route.displayName} towards ${destinationStop?.name ?? 'destination'}.',
                             routeId: route.id,
@@ -524,8 +551,9 @@ class RouteDetailsPage extends StatelessWidget {
                           unawaited(
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    JourneyPage(controller: controller),
+                                builder: (_) => JourneyPage(
+                                  controller: widget.controller,
+                                ),
                               ),
                             ),
                           );

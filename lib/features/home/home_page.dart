@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/adaptive_shortcut.dart';
 import '../../data/models/home_screen_item.dart';
@@ -400,10 +401,16 @@ class _HomePageState extends State<HomePage> {
                   // ── Greeting Banner ──────────────────────────────────────
                   Row(
                     children: [
-                      Text(
-                        hasActiveTicket ? '☀️ ' : '👋 ',
-                        style: const TextStyle(fontSize: 22),
+                      Icon(
+                        hasActiveTicket
+                            ? Icons.wb_sunny_outlined
+                            : Icons.waving_hand_outlined,
+                        color: hasActiveTicket
+                            ? colors.statusWarning
+                            : colors.actionSecondary,
+                        size: 24,
                       ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,34 +457,29 @@ class _HomePageState extends State<HomePage> {
                         builder: (context) {
                           final heroBg = colors.isHighContrast
                               ? colors.surface
-                              : colors.statusSuccess.withValues(alpha: 0.14);
+                              : colors.statusSuccessBg;
                           final heroBorder = colors.isHighContrast
                               ? colors.border
                               : colors.statusSuccess.withValues(alpha: 0.55);
-                          final heroTitle = colors.isHighContrast
-                              ? colors.textPrimary
-                              : const Color(0xFF14532D);
+                          final heroTitle = colors.textPrimary;
                           final heroBody = colors.isHighContrast
                               ? colors.textSecondary
-                              : const Color(0xFF15803D);
-                          final chipBg = colors.isHighContrast
-                              ? colors.statusSuccess
-                              : const Color(0xFF15803D);
-                          final chipFg = colors.isHighContrast
-                              ? colors.onActionPrimary
-                              : Colors.white;
+                              : colors.statusSuccess;
+                          final chipBg = colors.statusSuccess;
+                          final chipFg = colors.onActionPrimary;
                           final iconBg = colors.isHighContrast
                               ? colors.surfaceSubtle
-                              : const Color(0xFFBBF7D0);
+                              : colors.statusSuccessBg;
                           final divider = colors.isHighContrast
                               ? colors.border
-                              : const Color(0xFF86EFAC);
+                              : colors.statusSuccess.withValues(alpha: 0.4);
 
                           return Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: heroBg,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusLg),
                               border: Border.all(
                                 color: heroBorder,
                                 width: colors.isHighContrast ? 2 : 1.5,
@@ -501,9 +503,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                             child: Icon(
                                               Icons.directions_bus,
-                                              color: colors.isHighContrast
-                                                  ? colors.statusSuccess
-                                                  : const Color(0xFF15803D),
+                                              color: colors.statusSuccess,
                                               size: 24,
                                             ),
                                           ),
@@ -525,11 +525,7 @@ class _HomePageState extends State<HomePage> {
                                                 Text(
                                                   '${activeTicket.busId} → ${activeTicket.destination.name}',
                                                   style: TextStyle(
-                                                    color: colors.isHighContrast
-                                                        ? colors.statusSuccess
-                                                        : const Color(
-                                                            0xFF15803D,
-                                                          ),
+                                                    color: heroBody,
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w900,
                                                   ),
@@ -676,17 +672,15 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     },
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: colors.isHighContrast
-                                          ? colors.actionPrimary
-                                          : const Color(0xFF15803D),
-                                      foregroundColor: colors.isHighContrast
-                                          ? colors.onActionPrimary
-                                          : Colors.white,
+                                      backgroundColor: colors.actionPrimary,
+                                      foregroundColor: colors.onActionPrimary,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(
+                                          AppSpacing.radiusMd,
+                                        ),
                                       ),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
@@ -694,16 +688,16 @@ class _HomePageState extends State<HomePage> {
                                           child: Text(
                                             'View Journey Details',
                                             style: TextStyle(
-                                              color: Colors.white,
+                                              color: colors.onActionPrimary,
                                               fontSize: 15,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
                                         ),
-                                        SizedBox(width: 6),
+                                        const SizedBox(width: 6),
                                         Icon(
                                           Icons.chevron_right,
-                                          color: Colors.white,
+                                          color: colors.onActionPrimary,
                                           size: 20,
                                         ),
                                       ],

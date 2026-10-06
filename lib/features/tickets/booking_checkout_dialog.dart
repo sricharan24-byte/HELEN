@@ -70,7 +70,8 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   }
 
   int _resolveHops() {
-    if (widget.initialFareQuote != null && widget.initialFareQuote!.hopCount > 0) {
+    if (widget.initialFareQuote != null &&
+        widget.initialFareQuote!.hopCount > 0) {
       return widget.initialFareQuote!.hopCount;
     }
     final dataSource = AppServiceLocator.instance.transportDataSource;
@@ -113,10 +114,13 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
       travelDay.year,
       travelDay.month,
       travelDay.day,
-      23, 59, 59,
+      23,
+      59,
+      59,
     );
-    final finalizedValidUntil =
-        dayEnd.isBefore(now) ? now.add(const Duration(hours: 4)) : dayEnd;
+    final finalizedValidUntil = dayEnd.isBefore(now)
+        ? now.add(const Duration(hours: 4))
+        : dayEnd;
 
     final passengerName = _passengerNameController.text.trim().isEmpty
         ? 'Passenger'
@@ -167,11 +171,12 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
 
-
     return Container(
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusLg),
+        ),
         border: Border.all(color: colors.border),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -227,25 +232,34 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       ),
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: colors.surface,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
                           border: Border.all(color: colors.border),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.science_outlined, size: 12, color: colors.textSecondary),
+                            Icon(
+                              Icons.science_outlined,
+                              size: 12,
+                              color: colors.textSecondary,
+                            ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
                                 'DEMO MODE • Simulated UPI Gateway',
-                                style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colors.textSecondary,
+                                    ),
                               ),
                             ),
                           ],
@@ -280,12 +294,18 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _passengerNameController,
-              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
               decoration: InputDecoration(
                 prefixIcon: Icon(Icons.person, color: colors.actionPrimary),
                 filled: true,
                 fillColor: colors.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 hintText: 'Enter passenger name',
                 hintStyle: TextStyle(color: colors.textSecondary),
                 border: OutlineInputBorder(
@@ -321,24 +341,31 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 const SizedBox(width: 8),
                 if (_selectedPassengerType != PassengerType.general)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colors.statusSuccessBg,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       border: Border.all(color: colors.statusSuccess),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(StatusLevel.success.icon, size: 10, color: colors.statusSuccess),
+                        Icon(
+                          StatusLevel.success.icon,
+                          size: 10,
+                          color: colors.statusSuccess,
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           '40% CONCESSION',
-                          style: TextStyle(
-                            color: colors.statusSuccess,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: colors.statusSuccess,
+                              ),
                         ),
                       ],
                     ),
@@ -352,7 +379,9 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.general,
                     label: 'General',
-                    sublabel: _quoteForType(PassengerType.general).formattedAmount,
+                    sublabel: _quoteForType(
+                      PassengerType.general,
+                    ).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -361,7 +390,9 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.student,
                     label: 'Student',
-                    sublabel: _quoteForType(PassengerType.student).formattedAmount,
+                    sublabel: _quoteForType(
+                      PassengerType.student,
+                    ).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -370,7 +401,9 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                   child: _buildPassengerChip(
                     type: PassengerType.senior,
                     label: 'Senior',
-                    sublabel: _quoteForType(PassengerType.senior).formattedAmount,
+                    sublabel: _quoteForType(
+                      PassengerType.senior,
+                    ).formattedAmount,
                     colors: colors,
                   ),
                 ),
@@ -463,9 +496,15 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                                 color: colors.actionPrimaryText,
                               ),
                             )
-                          : Icon(Icons.check_circle_outline, color: colors.actionPrimaryText, size: 20),
+                          : Icon(
+                              Icons.check_circle_outline,
+                              color: colors.actionPrimaryText,
+                              size: 20,
+                            ),
                       label: Text(
-                        _isIssuing ? 'Processing...' : 'Pay ${_currentFareQuote.formattedAmount} & Issue',
+                        _isIssuing
+                            ? 'Processing...'
+                            : 'Pay ${_currentFareQuote.formattedAmount} & Issue',
                         style: TextStyle(
                           color: colors.actionPrimaryText,
                           fontSize: 15,
@@ -474,9 +513,16 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colors.actionPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
                         elevation: 2,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         minimumSize: const Size(120, 48),
                       ),
                     ),
@@ -546,43 +592,55 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required AppSemanticColors colors,
   }) {
     final isSelected = _selectedPassengerType == type;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => setState(() => _selectedPassengerType = type),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-          decoration: BoxDecoration(
-            color: isSelected ? colors.actionPrimary.withValues(alpha: 0.15) : colors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? colors.actionPrimary : colors.border,
-              width: isSelected ? 2 : 1,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _selectedPassengerType = type),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: Container(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? colors.actionPrimary : colors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 13,
-                ),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? colors.actionPrimary.withValues(alpha: 0.15)
+                  : colors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(
+                color: isSelected ? colors.actionPrimary : colors.border,
+                width: isSelected ? 2 : 1,
               ),
-              const SizedBox(height: 2),
-              Text(
-                sublabel,
-                style: TextStyle(
-                  color: isSelected ? colors.actionPrimary : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? colors.actionPrimary
+                        : colors.textPrimary,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  sublabel,
+                  style: TextStyle(
+                    color: isSelected
+                        ? colors.actionPrimary
+                        : colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -597,55 +655,75 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     required AppSemanticColors colors,
   }) {
     final isSelected = _selectedPaymentMethod == method;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => setState(() => _selectedPaymentMethod = method),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? colors.actionPrimary.withValues(alpha: 0.1) : colors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? colors.actionPrimary : colors.border,
-              width: isSelected ? 1.5 : 1,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      checked: isSelected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _selectedPaymentMethod = method),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: Container(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? colors.actionPrimary : colors.textSecondary,
-                size: 22,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? colors.actionPrimary.withValues(alpha: 0.1)
+                  : colors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(
+                color: isSelected ? colors.actionPrimary : colors.border,
+                width: isSelected ? 1.5 : 1,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: TextStyle(color: colors.textSecondary, fontSize: 11),
-                    ),
-                  ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected
+                      ? colors.actionPrimary
+                      : colors.textSecondary,
+                  size: 22,
                 ),
-              ),
-              Icon(
-                isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                color: isSelected ? colors.actionPrimary : colors.textSecondary,
-                size: 20,
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: isSelected
+                      ? colors.actionPrimary
+                      : colors.textSecondary,
+                  size: 20,
+                ),
+              ],
+            ),
           ),
         ),
       ),

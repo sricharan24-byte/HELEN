@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
+import '../../core/tokens/app_spacing.dart';
 import '../adaptive_ui/adaptive_shortcuts_modal.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -57,7 +58,9 @@ class _PersonalizationSettingsPageState
         context: context,
         backgroundColor: colors.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
         ),
         builder: (context) {
           return Padding(
@@ -110,10 +113,10 @@ class _PersonalizationSettingsPageState
 
   void _resetLayout() {
     final colors = AppTheme.colors(context);
-    setState(() {
-      _settings.resetHomeScreenLayout();
-      _settings.resetToDefaults();
-    });
+    // Narrow action: only the home screen layout is reset. This button must
+    // not wipe every other preference (voice, accessibility, API key…), so
+    // resetToDefaults() deliberately stays out of this path.
+    setState(_settings.resetHomeScreenLayout);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Home layout reset to default settings.'),
@@ -151,38 +154,11 @@ class _PersonalizationSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Bus',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-                Text(
-                  'Buddy',
-                  style: TextStyle(
-                    color: colors.actionSecondary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              'Personalization',
-              style: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        // Single reflow-safe title: the two-line brand Column overflowed at
+        // large text scales; the descriptive hero below carries the details.
+        title: Text(
+          'Personalization',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         centerTitle: true,
       ),
@@ -197,7 +173,8 @@ class _PersonalizationSettingsPageState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: colors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.radiusLg),
                     border: Border.all(color: colors.border),
                   ),
                   child: Row(
@@ -206,12 +183,12 @@ class _PersonalizationSettingsPageState
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: colors.statusSuccess,
+                          color: colors.actionPrimary,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.home,
-                          color: colors.background,
+                          color: colors.onActionPrimary,
                           size: 28,
                         ),
                       ),
@@ -373,7 +350,7 @@ class _PersonalizationSettingsPageState
                   colors: colors,
                   icon: Icons.refresh_rounded,
                   title: 'Reset My Layout',
-                  subtitle: 'Restore default settings',
+                  subtitle: 'Restore the default home screen layout',
                   trailing: Icon(
                     Icons.chevron_right,
                     color: colors.textPrimary,
@@ -385,6 +362,9 @@ class _PersonalizationSettingsPageState
             ),
 
             // ── Sticky Bottom Ask BusBuddy Action Bar ─────────────────────
+            // Single actionPrimary accent (red is reserved for Emergency SOS).
+            // minHeight instead of a fixed height so two-line content reflows
+            // at 300% text scale instead of overflowing.
             Positioned(
               left: 16,
               right: 16,
@@ -393,63 +373,64 @@ class _PersonalizationSettingsPageState
                 button: true,
                 label: 'Ask BusBuddy. Customize my home screen.',
                 excludeSemantics: true,
-                child: InkWell(
-                  onTap: _openAskBusBuddy,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    height: 60,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      // Brand CTA red kept constant: white text on #DC2626
-                      // measures 4.83:1 (WCAG AA) in every theme.
-                      color: const Color(0xFFDC2626),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFDC2626).withValues(alpha: 0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.mic,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Ask BusBuddy',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                child: Material(
+                  color: colors.actionPrimary,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  child: InkWell(
+                    onTap: _openAskBusBuddy,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colors.onActionPrimary.withValues(
+                                alpha: 0.2,
                               ),
+                              shape: BoxShape.circle,
                             ),
-                            Text(
-                              'Customize my home screen.',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
+                            child: Icon(
+                              Icons.mic,
+                              color: colors.onActionPrimary,
+                              size: 22,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ask BusBuddy',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  'Customize my home screen.',
+                                  style: TextStyle(
+                                    color: colors.onActionPrimary
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

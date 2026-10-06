@@ -85,9 +85,20 @@ class FareQuote {
   double get amount => finalPaise / 100.0;
   double get baseFare => basePaise / 100.0;
   double get effectiveDiscountAmount => discountPaise / 100.0;
-  String get formattedAmount => '$currency${(finalPaise / 100).toStringAsFixed(0)}';
-  String get formattedBaseFare => '$currency${(basePaise / 100).toStringAsFixed(0)}';
-  String get formattedSavings => '$currency${(discountPaise / 100).toStringAsFixed(0)}';
+  /// Exact rupee string formatted from integer paise — no floating-point
+  /// arithmetic (repository invariant). Whole rupees render without decimals
+  /// ("₹20"); odd paise render with two ("₹19.50").
+  String get formattedAmount => _formatPaise(finalPaise);
+  String get formattedBaseFare => _formatPaise(basePaise);
+  String get formattedSavings => _formatPaise(discountPaise);
+
+  String _formatPaise(int paise) {
+    final rupees = paise ~/ 100;
+    final remainder = paise % 100;
+    return remainder == 0
+        ? '$currency$rupees'
+        : '$currency$rupees.${remainder.toString().padLeft(2, '0')}';
+  }
 
   Map<String, Object?> toJson() => {
         'basePaise': basePaise,

@@ -20,8 +20,8 @@ void main() {
       await tester.pumpWidget(testCustomizationApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Bus'), findsOneWidget);
-      expect(find.text('Buddy'), findsOneWidget);
+      // App bar is a single reflow-safe page title (the two-line
+      // 'Bus'+'Buddy' brand Column overflowed at 300% text scale).
       expect(find.text('Customize Home Screen'), findsOneWidget);
       expect(find.text('Customize Your Home'), findsOneWidget);
       expect(find.textContaining('Drag cards using ≡ to reorder'), findsOneWidget);
