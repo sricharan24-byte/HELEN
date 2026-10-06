@@ -158,7 +158,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   _spokenOutput = 'Here are the transit details for your journey.';
               }
             } else {
-              _spokenOutput = 'I am here to assist your bus journey.';
+              // No text and no tool call. With outputAudioTranscription now
+              // requested this should not happen, and when it does we must not
+              // invent a reply: claiming to "assist with your journey" while
+              // saying nothing about what was asked is the same class of lie
+              // as the microphone flag in BUS-P1-08. Say plainly that the
+              // answer could not be read out.
+              _spokenOutput =
+                  'I received a reply but could not read it aloud. '
+                  'Please try asking again, or type your question.';
             }
           }
         });
@@ -283,7 +291,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _liveSession.connect();
     }
 
-    // Unlock audio context
+    // Prime the audio context, but do not rely on this to unlock it: initState
+    // runs *after* the tap that pushed this screen, so Chrome's autoplay policy
+    // leaves the context suspended here. The real unlock happens on the mic-orb
+    // and prompt-chip gestures, which each call unlockAudio() directly. The
+    // bridge also keeps global gesture listeners installed for the same reason.
     _audioEngine.unlockAudio();
 
     // Register audio completion callback so _isSpeaking resets cleanly and

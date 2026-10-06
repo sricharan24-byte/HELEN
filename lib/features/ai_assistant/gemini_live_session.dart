@@ -250,6 +250,16 @@ CRITICAL CONVERSATIONAL RULES:
         'model': modelToUse,
         'generationConfig': {
           'responseModalities': ['AUDIO'],
+          // Asked for explicitly because the model answers in AUDIO only: with
+          // no output transcription the server sends no text, so the on-screen
+          // transcript stayed empty AND the TTS fallback had nothing to speak —
+          // it substituted a generic filler line and the real reply was never
+          // spoken. Deleted in e6657ae, which was harmless while web PCM played
+          // unconditionally, and fatal once it did not.
+          'outputAudioTranscription': <String, dynamic>{},
+          // Same reasoning for the passenger's own voice on the Android
+          // audio-in path: without this, `inputTranscription` never arrives.
+          'inputAudioTranscription': <String, dynamic>{},
           'speechConfig': {
             'voiceConfig': {
               'prebuiltVoiceConfig': {

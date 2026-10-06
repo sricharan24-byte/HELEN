@@ -36,7 +36,27 @@ bool _jsBridgeInitialized = false;
 ///    synchronously in the same tick — a known Chrome bug swallows the new
 ///    utterance (it never plays and never fires onend/onerror). The speak is
 ///    now deferred a tick after a cancel.
-const int kJsBridgeVersion = 7;
+///
+/// v8: restore the pre-v6 web PCM path that actually produced sound. v6
+/// rewrote the decoder and v7 then gated it, and together they made every
+/// Chrome reply silent:
+///
+/// 1. **base64 was fed to `atob` raw.** The Live API commonly emits unpadded
+///    and/or URL-safe base64, which `atob` throws on. The pre-v6 code stripped
+///    whitespace, mapped `-`/`_` back to `+`/`/`, and padded to a multiple of
+///    4; that sanitization was deleted and is restored.
+/// 2. **the odd-byte carryover was deleted.** A chunk boundary can split one
+///    PCM16 sample; decoding a half sample shifts every later sample by a byte
+///    and turns the reply into noise. `__bb_model_audio_tail` carries it.
+/// 3. **v7's "return false while suspended" is reverted to resume-then-schedule.**
+///    Scheduling on a suspended context is valid — the buffers play once
+///    `resume()` completes — and it is how the build that *was* audible
+///    worked. Because the audio unlock runs in `initState`, i.e. after the tap
+///    that opened the screen, the context is suspended on nearly every turn,
+///    so the bail-out meant "never plays". It routed to a TTS fallback that had
+///    no text to speak (see the handshake in `gemini_live_session.dart`), which
+///    is why the turn was silent rather than merely robotic.
+const int kJsBridgeVersion = 8;
 
 int _pageBridgeVersion() {
   try {
@@ -252,6 +272,11 @@ void _ensureJsBridge() {
         // back to back (start times chained off __bb_model_audio_next) so a
         // streamed reply plays as one continuous utterance, not as gaps.
         window.__bb_model_audio_rate = 24000;
+        // Odd trailing byte carried between chunks. A chunk boundary can fall
+        // between the two bytes of one PCM16 sample; decoding it alone would
+        // shift every following sample by one byte and turn the reply into
+        // noise. (Restored in v8 — dropping it was part of the v6 rewrite.)
+        window.__bb_model_audio_tail = "";
 
         window.__bb_schedule_model_audio_drain = function() {
           var ctx = window.__bb_get_audio_ctx();
@@ -279,18 +304,49 @@ void _ensureJsBridge() {
               console.warn("[BusBuddy ModelAudio] no AudioContext yet; reply stays silent");
               return false;
             }
-            // Chrome autoplay policy: a context created before the first
-            // gesture stays suspended, and audio scheduled on it never plays
-            // (currentTime is frozen, so queued chunks would also all pile up
-            // at t≈0 and overlap on resume). Returning false here routes the
-            // whole turn to the TTS fallback instead of a silent reply.
+            // Chrome autoplay policy keeps a context created outside a user
+            // gesture suspended. Scheduling on a suspended context is valid —
+            // the queued buffers play once resume() completes — which is how
+            // the pre-v6 build produced audible replies. v7 bailed out here
+            // instead, and because the unlock in initState runs after the tap
+            // that opened the screen, the context was suspended on essentially
+            // every turn: "plays slightly late" became "never plays". The TTS
+            // fallback it routed to had no text either (outputAudioTranscription
+            // was never requested), so the reply was silent.
+            //
+            // So: resume, then schedule anyway. resume() is async but the
+            // context starts advancing on its own; the queued sources play.
             if (ctx.state !== "running") {
               try { ctx.resume(); } catch (e) {}
-              console.warn("[BusBuddy ModelAudio] AudioContext not running (" + ctx.state +
-                "); falling back to TTS for this chunk");
+            }
+
+            // Normalise the payload before decoding. The Live API commonly
+            // emits unpadded and/or URL-safe base64, and atob() throws on
+            // both — which used to abort the whole turn (v6/v7 fed the raw
+            // string straight to atob).
+            var clean = (b64 || "").replace(/\\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+            while (clean.length % 4 !== 0) { clean += "="; }
+            if (!clean) return false;
+
+            var bin;
+            try {
+              bin = window.atob(clean);
+            } catch (err) {
+              console.warn("[BusBuddy ModelAudio] base64 decode failed:", err);
               return false;
             }
-            var bin = window.atob(b64);
+
+            // Keep an odd trailing byte for the next chunk so samples never
+            // straddle a chunk boundary.
+            if (window.__bb_model_audio_tail) {
+              bin = window.__bb_model_audio_tail + bin;
+              window.__bb_model_audio_tail = "";
+            }
+            if (bin.length % 2 !== 0) {
+              window.__bb_model_audio_tail = bin.charAt(bin.length - 1);
+              bin = bin.substring(0, bin.length - 1);
+            }
+
             var frames = Math.floor(bin.length / 2);
             if (frames <= 0) return false;
 
@@ -335,6 +391,7 @@ void _ensureJsBridge() {
             }
             window.__bb_model_audio_sources = [];
             window.__bb_model_audio_next = 0;
+            window.__bb_model_audio_tail = "";
           } catch (e) {}
         };
 
