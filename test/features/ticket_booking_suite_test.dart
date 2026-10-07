@@ -133,6 +133,10 @@ void main() {
       expect(find.text('Student'), findsOneWidget);
       expect(find.text('Senior'), findsOneWidget);
 
+      // Enter required passenger name
+      await tester.enterText(find.byType(TextField), 'Pavan K');
+      await tester.pumpAndSettle();
+
       // Tap Pay & Issue button to complete booking
       await tester.tap(find.textContaining('& Issue'));
       await tester.pumpAndSettle();

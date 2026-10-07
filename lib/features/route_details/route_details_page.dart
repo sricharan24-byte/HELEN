@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
@@ -36,6 +37,7 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
   /// streams tick every couple of seconds; announcing on every tick floods
   /// TalkBack, so an announcement only fires when the next stop CHANGES.
   String? _lastAnnouncedNextStop;
+  AnnouncementScopeToken? _scopeToken;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +52,13 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
         // ── Missing data recovery ─────────────────────────────────────
         if (route == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Route Details')),
+            appBar: AppBar(
+              title: const BusBuddyLogo(
+                fontSize: 20,
+                subtitle: 'Route Details',
+              ),
+              centerTitle: true,
+            ),
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -64,8 +72,11 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
           );
         }
 
-        // ── Inform coordinator of active route ────────────────────────
-        AnnouncementCoordinator.instance.setActiveRoute(route.id);
+        // ── Inform coordinator of active route scope ──────────────────
+        if (_scopeToken?.scopeId != route.id) {
+          _scopeToken?.dispose();
+          _scopeToken = AnnouncementCoordinator.instance.registerScope(route.id);
+        }
 
         // ── Resolve stops ─────────────────────────────────────────────
         final stops = <models.Stop?>[
@@ -82,7 +93,10 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
         return Scaffold(
           backgroundColor: colors.background,
           appBar: AppBar(
-            title: const Text('Route Details & Live GPS'),
+            title: const BusBuddyLogo(
+              fontSize: 20,
+              subtitle: 'Route Details & Live GPS',
+            ),
             centerTitle: true,
             backgroundColor: colors.background,
             foregroundColor: colors.textPrimary,
@@ -594,5 +608,12 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _scopeToken?.dispose();
+    _scopeToken = null;
+    super.dispose();
   }
 }

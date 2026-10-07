@@ -56,7 +56,8 @@ bool _jsBridgeInitialized = false;
 ///    so the bail-out meant "never plays". It routed to a TTS fallback that had
 ///    no text to speak (see the handshake in `gemini_live_session.dart`), which
 ///    is why the turn was silent rather than merely robotic.
-const int kJsBridgeVersion = 8;
+/// v9: setup handshake schema alignment and robust AudioContext priming.
+const int kJsBridgeVersion = 9;
 
 int _pageBridgeVersion() {
   try {
@@ -166,21 +167,27 @@ void _ensureJsBridge() {
         window.__bb_unlock_audio = function() {
           try {
             var ctx = window.__bb_get_audio_ctx();
+            var primeHw = function(audioCtx) {
+              try {
+                if (audioCtx && audioCtx.state === "running") {
+                  var sBuf = audioCtx.createBuffer(1, 1, 22050);
+                  var sSrc = audioCtx.createBufferSource();
+                  sSrc.buffer = sBuf;
+                  sSrc.connect(audioCtx.destination);
+                  sSrc.start(0);
+                }
+              } catch (_) {}
+            };
+
             if (ctx && ctx.state === "suspended") {
               ctx.resume().then(function() {
                 console.log("[BusBuddy Audio] AudioContext unlocked (" + ctx.sampleRate + "Hz)");
+                primeHw(ctx);
                 window.__bb_remove_unlock_listeners();
               });
             } else if (ctx && ctx.state === "running") {
+              primeHw(ctx);
               window.__bb_remove_unlock_listeners();
-            }
-            // Prime browser audio hardware with a microscopic silent buffer
-            if (ctx && ctx.state === "running") {
-              var sBuf = ctx.createBuffer(1, 1, 22050);
-              var sSrc = ctx.createBufferSource();
-              sSrc.buffer = sBuf;
-              sSrc.connect(ctx.destination);
-              sSrc.start(0);
             }
             if (window.speechSynthesis && window.speechSynthesis.paused) {
               window.speechSynthesis.resume();
@@ -370,6 +377,12 @@ void _ensureJsBridge() {
             source.start(startAt);
             window.__bb_model_audio_next = startAt + buffer.duration;
             window.__bb_model_audio_sources.push(source);
+            source.onended = function() {
+              if (window.__bb_model_audio_sources) {
+                var idx = window.__bb_model_audio_sources.indexOf(source);
+                if (idx !== -1) window.__bb_model_audio_sources.splice(idx, 1);
+              }
+            };
             window.__bb_schedule_model_audio_drain();
             return true;
           } catch (e) {

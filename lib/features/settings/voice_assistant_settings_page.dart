@@ -5,10 +5,12 @@ import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../tickets/ticket_controller.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 
 /// Voice Assistant settings page matching BusBuddy UI design screenshot 3.
 class VoiceAssistantSettingsPage extends StatefulWidget {
@@ -302,11 +304,9 @@ class _VoiceAssistantSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // Single reflow-safe title: the two-line brand Column overflowed at
-        // large text scales; the descriptive hero below carries the details.
-        title: Text(
-          'Voice Assistant',
-          style: Theme.of(context).textTheme.titleMedium,
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Voice Assistant',
         ),
         centerTitle: true,
       ),
@@ -438,7 +438,14 @@ class _VoiceAssistantSettingsPageState
                     value: _wakePhrase,
                     activeThumbColor: colors.onActionPrimary,
                     activeTrackColor: colors.statusSuccess,
-                    onChanged: _settings.updateWakePhrase,
+                    onChanged: (val) {
+                      _settings.updateWakePhrase(val);
+                      AnnouncementCoordinator.instance.announce(
+                        val
+                            ? 'Wake phrase "Hey BusBuddy" enabled'
+                            : 'Wake phrase disabled',
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -495,7 +502,7 @@ class _VoiceAssistantSettingsPageState
                   title: 'Gemini Live API',
                   subtitle: _settings.geminiApiKey.isEmpty
                       ? 'Tap to connect key from aistudio.google.com/live-api'
-                      : 'Connected (${_settings.geminiModel.replaceAll('models/', '')}) • Live streaming active',
+                      : 'Key saved (${_settings.geminiModel.replaceAll('models/', '')}) • Ready for live voice',
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1028,11 +1035,12 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
         ),
         ElevatedButton(
           onPressed: () {
+            final newKey = _textCtrl.text
+                .replaceAll(RegExp(r'''['"\s]'''), '')
+                .trim();
             AppSettingsController.instance.updateGeminiModel(_selectedModel);
             AppSettingsController.instance.updateGeminiVoice(_selectedVoice);
-            AppSettingsController.instance.updateGeminiApiKey(
-              _textCtrl.text.trim(),
-            );
+            AppSettingsController.instance.updateGeminiApiKey(newKey);
             Navigator.pop(context);
           },
           style: ElevatedButton.styleFrom(

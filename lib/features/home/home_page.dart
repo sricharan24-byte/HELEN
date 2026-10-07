@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../data/models/adaptive_shortcut.dart';
 import '../../data/models/home_screen_item.dart';
@@ -47,10 +48,11 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.ticketController.addListener(_onStateChanged);
     AppSettingsController.instance.addListener(_onStateChanged);
     AdaptiveUiService.instance.addListener(_onStateChanged);
@@ -58,10 +60,19 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.ticketController.removeListener(_onStateChanged);
     AppSettingsController.instance.removeListener(_onStateChanged);
     AdaptiveUiService.instance.removeListener(_onStateChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.ticketController.refresh();
+      if (mounted) setState(() {});
+    }
   }
 
   void _onStateChanged() {
@@ -96,7 +107,12 @@ class _HomePageState extends State<HomePage> {
                 showTopPrototypeTabs: false,
               ),
             ),
-          ),
+          ).then((_) {
+            if (mounted) {
+              widget.ticketController.refresh();
+              setState(() {});
+            }
+          }),
         );
         break;
 
@@ -151,7 +167,12 @@ class _HomePageState extends State<HomePage> {
                 ticketController: widget.ticketController,
               ),
             ),
-          ),
+          ).then((_) {
+            if (mounted) {
+              widget.ticketController.refresh();
+              setState(() {});
+            }
+          }),
         );
         break;
 
@@ -166,7 +187,12 @@ class _HomePageState extends State<HomePage> {
                 showTopPrototypeTabs: false,
               ),
             ),
-          ),
+          ).then((_) {
+            if (mounted) {
+              widget.ticketController.refresh();
+              setState(() {});
+            }
+          }),
         );
         break;
 
@@ -242,18 +268,24 @@ class _HomePageState extends State<HomePage> {
             showTopPrototypeTabs: false,
           ),
         ),
-      ),
+      ).then((_) {
+        if (mounted) {
+          widget.ticketController.refresh();
+          setState(() {});
+        }
+      }),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    widget.ticketController.checkExpiry();
     final colors = AppTheme.colors(context);
     final textTheme = Theme.of(context).textTheme;
     final activeTicket = widget.ticketController.activeTicket;
     final hasActiveTicket = activeTicket != null;
     final visibleItems = AppSettingsController.instance.homeScreenItems
-        .where((e) => e.isVisible)
+        .where((e) => e.isVisible && e.id != HomeScreenItem.idAlerts)
         .toList();
 
     final customCards = <Widget>[];
@@ -298,26 +330,9 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Semantics(
                               headingLevel: 1,
-                              child: Wrap(
-                                spacing: 2,
-                                children: [
-                                  Text(
-                                    'Bus',
-                                    style: textTheme.headlineSmall?.copyWith(
-                                      color: colors.textPrimary,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 26,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Buddy',
-                                    style: textTheme.headlineSmall?.copyWith(
-                                      color: colors.actionSecondary,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 26,
-                                    ),
-                                  ),
-                                ],
+                              child: const BusBuddyLogo(
+                                fontSize: 26,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -332,50 +347,22 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Semantics(
-                            button: true,
-                            label: 'Corridor Alerts',
-                            excludeSemantics: true,
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.notifications_outlined,
-                                color: colors.textPrimary,
-                                size: 24,
-                              ),
-                              tooltip: 'Corridor Alerts',
-                              onPressed: () {
-                                unawaited(
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const AlertsPage(),
-                                    ),
-                                  ),
-                                );
-                              },
+                      Semantics(
+                        button: true,
+                        label: 'User Profile',
+                        excludeSemantics: true,
+                        child: Tooltip(
+                          message: 'User Profile',
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: colors.surface,
+                            child: Icon(
+                              Icons.person,
+                              color: colors.textPrimary,
+                              size: 24,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Semantics(
-                            button: true,
-                            label: 'User Profile',
-                            excludeSemantics: true,
-                            child: Tooltip(
-                              message: 'User Profile',
-                              child: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: colors.surface,
-                                child: Icon(
-                                  Icons.person,
-                                  color: colors.textPrimary,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -640,19 +627,88 @@ class _HomePageState extends State<HomePage> {
                                           routes.first,
                                         );
                                       }
+                                      final origin =
+                                          widget.controller.state.origin ??
+                                          (routes.isNotEmpty
+                                              ? widget.repository.getStop(
+                                                  routes.first.orderedStopIds.first,
+                                                )
+                                              : null) ??
+                                          const Stop(
+                                            id: 'vit_main_gate',
+                                            name: 'VIT Main Gate',
+                                            area: 'Vellore',
+                                            latitude: 12.9692,
+                                            longitude: 79.1559,
+                                          );
+                                      final destination =
+                                          widget.controller.state.destination ??
+                                          (routes.isNotEmpty
+                                              ? widget.repository.getStop(
+                                                  routes.first.orderedStopIds.last,
+                                                )
+                                              : null) ??
+                                          const Stop(
+                                            id: 'katpadi_railway_station',
+                                            name: 'Katpadi Railway Station',
+                                            area: 'Katpadi',
+                                            latitude: 12.9790,
+                                            longitude: 79.1368,
+                                          );
+                                      final ticketToTrack = activeTicket ??
+                                          widget.ticketController.activeTicket ??
+                                          Ticket(
+                                            id: 'BB-ACTIVE-18B',
+                                            routeId: routes.isNotEmpty
+                                                ? routes.first.id
+                                                : 'vit-to-katpadi',
+                                            routeName: routes.isNotEmpty
+                                                ? routes.first.displayName
+                                                : 'VIT → Katpadi',
+                                            origin: origin,
+                                            destination: destination,
+                                            busId: '18B',
+                                            passengerName: 'Pavan',
+                                            passengerType: PassengerType.general,
+                                            fareQuote:
+                                                FareEngine.calculateCorridorFare(
+                                                  PassengerType.general,
+                                                ),
+                                            paymentMethod: PaymentMethod.upi,
+                                            issuedAt: DateTime.now(),
+                                            validUntil: DateTime.now().add(
+                                              const Duration(hours: 4),
+                                            ),
+                                            status: TicketStatus.active,
+                                            qrCodeData: Ticket.buildQrPayload(
+                                              ticketId: 'BB-ACTIVE-18B',
+                                              originId: origin.id,
+                                              destinationId: destination.id,
+                                              busId: '18B',
+                                              farePaise: 2000,
+                                              validUntil: DateTime.now().add(
+                                                const Duration(hours: 4),
+                                              ),
+                                              isDemo: true,
+                                            ),
+                                            isDemo: true,
+                                          );
                                       unawaited(
                                         Navigator.of(context).push(
                                           MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                TicketBookingSuitePage(
-                                                  ticketController:
-                                                      widget.ticketController,
-                                                  journeyController:
-                                                      widget.controller,
-                                                  initialStepIndex: 2,
-                                                ),
+                                            builder: (_) => LiveLocationScreen(
+                                              ticket: ticketToTrack,
+                                              repository: widget.repository,
+                                              ticketController:
+                                                  widget.ticketController,
+                                            ),
                                           ),
-                                        ),
+                                        ).then((_) {
+                                          if (mounted) {
+                                            widget.ticketController.refresh();
+                                            setState(() {});
+                                          }
+                                        }),
                                       );
                                     },
                                     style: FilledButton.styleFrom(
@@ -668,6 +724,12 @@ class _HomePageState extends State<HomePage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
+                                        Icon(
+                                          Icons.map_outlined,
+                                          color: colors.onActionPrimary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
                                         Flexible(
                                           child: Text(
                                             'View Journey Details',
@@ -846,7 +908,12 @@ class _HomePageState extends State<HomePage> {
                   builder: (_) =>
                       MyTicketsPage(ticketController: widget.ticketController),
                 ),
-              ),
+              ).then((_) {
+                if (mounted) {
+                  widget.ticketController.refresh();
+                  setState(() {});
+                }
+              }),
             );
           },
         );
@@ -874,20 +941,7 @@ class _HomePageState extends State<HomePage> {
         );
 
       case HomeScreenItem.idAlerts:
-        return _buildTaskActionCard(
-          color: item.color,
-          icon: item.icon,
-          title: item.title,
-          subtitle: item.subtitle,
-          semanticLabel: '${item.title}. ${item.subtitle}.',
-          onTap: () {
-            unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const AlertsPage()),
-              ),
-            );
-          },
-        );
+        return const SizedBox.shrink();
 
       case HomeScreenItem.idSafety:
         return _buildTaskActionCard(

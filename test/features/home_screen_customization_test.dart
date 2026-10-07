@@ -30,17 +30,17 @@ void main() {
           find.textContaining('Drag cards using ≡ to reorder'),
           findsOneWidget,
         );
-        expect(find.textContaining('6 of 6 visible'), findsOneWidget);
+        expect(find.textContaining('5 of 5 visible'), findsOneWidget);
 
-        // Verify all 6 default items are displayed (Saved Places moved to the
-        // booking pickers; My Journey and Live Bus Map removed earlier)
+        // Verify all 5 default items are displayed (Saved Places moved to the
+        // booking pickers; My Journey, Live Bus Map, and Corridor Alerts removed)
         expect(find.text('Find a Place'), findsOneWidget);
         expect(find.text('My Tickets'), findsOneWidget);
         expect(find.text('Saved Places'), findsNothing);
         expect(find.text('Ask BusBuddy'), findsOneWidget);
         expect(find.text('My Journey'), findsNothing);
         expect(find.text('Live Bus Map'), findsNothing);
-        expect(find.text('Corridor Alerts'), findsOneWidget);
+        expect(find.text('Corridor Alerts'), findsNothing);
         expect(find.text('Emergency SOS'), findsOneWidget);
         expect(find.text('Settings'), findsOneWidget);
 
@@ -128,14 +128,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // Modify order and hide an item
-      AppSettingsController.instance.reorderHomeScreenItem(0, 4);
+      AppSettingsController.instance.reorderHomeScreenItem(0, 3);
       AppSettingsController.instance.toggleHomeScreenItemVisibility(
-        HomeScreenItem.idAlerts,
+        HomeScreenItem.idMyTickets,
         false,
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('5 of 6 visible'), findsOneWidget);
+      expect(find.textContaining('4 of 5 visible'), findsOneWidget);
 
       // Tap reset layout button
       await tester.tap(find.text('Reset Layout'));
@@ -144,7 +144,7 @@ void main() {
       final items = AppSettingsController.instance.homeScreenItems;
       expect(items[0].id, HomeScreenItem.idRouteSearch);
       expect(items.every((e) => e.isVisible), isTrue);
-      expect(find.textContaining('6 of 6 visible'), findsOneWidget);
+      expect(find.textContaining('5 of 5 visible'), findsOneWidget);
     });
 
     testWidgets('tapping Done button pops the screen', (tester) async {

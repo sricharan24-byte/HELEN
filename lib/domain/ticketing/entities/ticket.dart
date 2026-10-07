@@ -75,6 +75,7 @@ class Ticket {
     required this.validUntil,
     this.status = TicketStatus.active,
     required this.qrCodeData,
+    this.seatNumber,
     String? idempotencyKey,
     List<TicketLedgerEntry>? ledger,
     this.isDemo = true,
@@ -104,9 +105,28 @@ class Ticket {
   final DateTime validUntil;
   final TicketStatus status;
   final String qrCodeData;
+  final String? seatNumber;
   final String idempotencyKey;
   final List<TicketLedgerEntry> ledger;
   final bool isDemo;
+
+  /// Display seat assignment (e.g. '14A' or allocated).
+  String get seatAllocation {
+    if (seatNumber != null && seatNumber!.trim().isNotEmpty) {
+      return seatNumber!.trim();
+    }
+    final number = (id.hashCode.abs() % 28) + 1;
+    final column = ['A', 'B', 'C', 'D'][id.hashCode.abs() % 4];
+    return '$number$column';
+  }
+
+  /// Seat type description (e.g. Window / Aisle, Lower Deck).
+  String get seatType {
+    final seat = seatAllocation;
+    final lastChar = seat.isNotEmpty ? seat[seat.length - 1].toUpperCase() : 'A';
+    final isWindow = lastChar == 'A' || lastChar == 'D';
+    return isWindow ? 'Window Seat • Lower Deck' : 'Aisle Seat • Lower Deck';
+  }
 
   /// Presentation getter for integer paise.
   int get farePaise => fareQuote.finalPaise;
@@ -219,6 +239,7 @@ class Ticket {
     DateTime? validUntil,
     TicketStatus? status,
     String? qrCodeData,
+    String? seatNumber,
     String? idempotencyKey,
     List<TicketLedgerEntry>? ledger,
     bool? isDemo,
@@ -238,6 +259,7 @@ class Ticket {
       validUntil: validUntil ?? this.validUntil,
       status: status ?? this.status,
       qrCodeData: qrCodeData ?? this.qrCodeData,
+      seatNumber: seatNumber ?? this.seatNumber,
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       ledger: ledger ?? this.ledger,
       isDemo: isDemo ?? this.isDemo,
@@ -259,6 +281,7 @@ class Ticket {
     DateTime? validUntil,
     TicketStatus? status,
     String? qrCodeData,
+    String? seatNumber,
     String? idempotencyKey,
     List<TicketLedgerEntry>? ledger,
     bool? isDemo,
@@ -278,6 +301,7 @@ class Ticket {
       validUntil: validUntil,
       status: status,
       qrCodeData: qrCodeData,
+      seatNumber: seatNumber,
       idempotencyKey: idempotencyKey,
       ledger: ledger,
       isDemo: isDemo,
@@ -371,6 +395,7 @@ class Ticket {
       'validUntil': validUntil.toIso8601String(),
       'status': status.name,
       'qrCodeData': qrCodeData,
+      'seatNumber': seatAllocation,
       'idempotencyKey': idempotencyKey,
       'ledger': ledger.map((e) => e.toJson()).toList(),
       'isDemo': isDemo,
@@ -484,6 +509,7 @@ class Ticket {
       validUntil: validUntil,
       status: enumValue('status', TicketStatus.values),
       qrCodeData: text(json, 'qrCodeData'),
+      seatNumber: json['seatNumber'] as String?,
       idempotencyKey: json['idempotencyKey'] as String?,
       ledger: ledgerList.isNotEmpty ? ledgerList : null,
       isDemo: json['isDemo'] as bool? ?? true,

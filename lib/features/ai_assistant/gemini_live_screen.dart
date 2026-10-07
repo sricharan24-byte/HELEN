@@ -15,6 +15,7 @@ import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../domain/assistant/assistant_command.dart';
 import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
@@ -24,6 +25,7 @@ import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
 import 'gemini_live_transport.dart';
 import 'model_voice_player.dart';
+import 'wake_word_service.dart';
 
 /// Full-Screen & Modal Interactive Gemini Live Conversational Overlay Screen.
 class GeminiLiveScreen extends StatefulWidget {
@@ -95,6 +97,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   @override
   void initState() {
     super.initState();
+    // Pause background wake word detection while this assistant screen is open
+    // to strictly preserve the single-speaker / single-microphone session contract.
+    WakeWordService.instance.pause();
     _repository =
         widget.repository ?? AppServiceLocator.instance.transportRepository;
     _ticketController =
@@ -413,6 +418,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _connectGeneration++;
     runDisposeSteps([
       (name: 'aiControlGlow', run: AiControlGlow.instance.idle),
+      (name: 'wakeWordResume', run: WakeWordService.instance.resume),
       (name: 'continuousListening', run: () => _continuousListening = false),
       (
         name: 'settingsListener',
@@ -1085,6 +1091,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
+              const BusBuddyLogo(fontSize: 18),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -2039,7 +2047,9 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            final newKey = _textCtrl.text.trim();
+            final newKey = _textCtrl.text
+                .replaceAll(RegExp(r'''['"\s]'''), '')
+                .trim();
             AppSettingsController.instance.updateGeminiModel(_selectedModel);
             AppSettingsController.instance.updateGeminiVoice(_selectedVoice);
             AppSettingsController.instance.updateGeminiApiKey(newKey);

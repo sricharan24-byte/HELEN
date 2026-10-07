@@ -7,6 +7,7 @@ import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
@@ -96,7 +97,11 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
         return Scaffold(
           backgroundColor: colors.background,
           appBar: AppBar(
-            title: const Text('Route Search'),
+            title: const BusBuddyLogo(
+              fontSize: 20,
+              subtitle: 'Route Search',
+            ),
+            centerTitle: true,
             backgroundColor: colors.background,
             foregroundColor: colors.textPrimary,
             elevation: 0,

@@ -75,5 +75,37 @@ void main() {
       expect(announced, isFalse);
       expect(coordinator.visualStatusText.value, 'Approaching stop'); // Visual accessible fallback preserved
     });
+
+    test('vocalizes announcement via speechSpeaker when speech is enabled', () {
+      final spoken = <String>[];
+      coordinator.speechSpeaker = (msg) => spoken.add(msg);
+
+      final success = coordinator.announce('Next stop: Katpadi Station');
+      expect(success, isTrue);
+      expect(spoken, ['Next stop: Katpadi Station']);
+    });
+
+    test('announceEtaUpdate announces stop transitions and arrival', () {
+      final spoken = <String>[];
+      coordinator.speechSpeaker = (msg) => spoken.add(msg);
+
+      // Stop transition with 5 minutes ETA
+      final first = coordinator.announceEtaUpdate(
+        routeId: 'route-1',
+        stopName: 'Green Circle',
+        etaMinutes: 5,
+      );
+      expect(first, isTrue);
+      expect(spoken.last, 'Next stop Green Circle in 5 minutes.');
+
+      // Approaching with 1 min ETA
+      final second = coordinator.announceEtaUpdate(
+        routeId: 'route-1',
+        stopName: 'Green Circle',
+        etaMinutes: 1,
+      );
+      expect(second, isTrue);
+      expect(spoken.last, 'Bus arriving at Green Circle now.');
+    });
   });
 }

@@ -135,7 +135,9 @@ void main() {
       expect(find.text('Live Bus Map'), findsNothing);
     });
 
-    testWidgets('tapping Corridor Alerts opens AlertsPage', (tester) async {
+    testWidgets('Corridor Alerts card is removed from the home page', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 2400);
       addTearDown(() {
@@ -146,13 +148,7 @@ void main() {
       await tester.pumpWidget(testHomePageApp());
       await tester.pumpAndSettle();
 
-      final alertsFinder = find.text('Corridor Alerts');
-      await tester.ensureVisible(alertsFinder);
-      await tester.pumpAndSettle();
-      await tester.tap(alertsFinder);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.text('Corridor Alerts'), findsNothing);
     });
 
     testWidgets('tapping Emergency SOS opens SafetySharingPage', (

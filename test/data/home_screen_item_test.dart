@@ -4,24 +4,24 @@ import 'package:busbuddy/data/models/home_screen_item.dart';
 void main() {
   group('HomeScreenItem Model', () {
     test(
-      'defaultItems contains all 6 required core home screen components',
+      'defaultItems contains all 5 required core home screen components',
       () {
         final items = HomeScreenItem.defaultItems;
-        expect(items.length, 6);
+        expect(items.length, 5);
 
         final ids = items.map((e) => e.id).toList();
         expect(ids, contains(HomeScreenItem.idRouteSearch));
         expect(ids, contains(HomeScreenItem.idMyTickets));
         expect(ids, contains(HomeScreenItem.idVoiceAssistant));
-        expect(ids, contains(HomeScreenItem.idAlerts));
         expect(ids, contains(HomeScreenItem.idSafety));
         expect(ids, contains(HomeScreenItem.idSettings));
         // Removed options must no longer appear in the default home layout.
         // Saved places moved into the booking and route-search pickers as
-        // one-tap chips instead of a home option.
+        // one-tap chips instead of a home option. Corridor alerts removed from home.
         expect(ids, isNot(contains('saved_places')));
         expect(ids, isNot(contains('my_journey')));
         expect(ids, isNot(contains('live_tracking')));
+        expect(ids, isNot(contains(HomeScreenItem.idAlerts)));
       },
     );
 

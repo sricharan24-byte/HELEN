@@ -51,6 +51,8 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   PassengerType _selectedPassengerType = PassengerType.general;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.upi;
   late TextEditingController _passengerNameController;
+  final FocusNode _passengerNameFocusNode = FocusNode();
+  String? _passengerNameError;
   bool _isIssuing = false;
 
   @override
@@ -66,6 +68,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
   @override
   void dispose() {
     _passengerNameController.dispose();
+    _passengerNameFocusNode.dispose();
     super.dispose();
   }
 
@@ -105,6 +108,20 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
 
   void _issueTicket() {
     if (_isIssuing) return;
+
+    final passengerName = _passengerNameController.text.trim();
+    if (passengerName.isEmpty) {
+      setState(() {
+        _passengerNameError = 'Passenger name is required';
+      });
+      _passengerNameFocusNode.requestFocus();
+      AnnouncementCoordinator.instance.announce(
+        'Passenger name is required to book a ticket.',
+        priority: AnnouncementPriority.high,
+      );
+      return;
+    }
+
     setState(() => _isIssuing = true);
 
     final now = DateTime.now();
@@ -121,10 +138,6 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     final finalizedValidUntil = dayEnd.isBefore(now)
         ? now.add(const Duration(hours: 4))
         : dayEnd;
-
-    final passengerName = _passengerNameController.text.trim().isEmpty
-        ? 'Passenger'
-        : _passengerNameController.text.trim();
 
     final quote = _currentFareQuote;
     final qrPayload = Ticket.buildQrPayload(
@@ -281,19 +294,56 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             ),
             const SizedBox(height: 20),
 
-            // Passenger Name Input
-            Text(
-              'PASSENGER NAME',
-              style: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
-              ),
+            // Passenger Name Input (Required)
+            Row(
+              children: [
+                Text(
+                  'PASSENGER NAME',
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '*',
+                  style: TextStyle(
+                    color: colors.statusError,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colors.statusError.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: Text(
+                    'REQUIRED',
+                    style: TextStyle(
+                      color: colors.statusError,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _passengerNameController,
+              focusNode: _passengerNameFocusNode,
+              textCapitalization: TextCapitalization.words,
+              onChanged: (value) {
+                if (_passengerNameError != null && value.trim().isNotEmpty) {
+                  setState(() => _passengerNameError = null);
+                }
+              },
               style: TextStyle(
                 color: colors.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -308,17 +358,35 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 ),
                 hintText: 'Enter passenger name',
                 hintStyle: TextStyle(color: colors.textSecondary),
+                errorText: _passengerNameError,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   borderSide: BorderSide(color: colors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  borderSide: BorderSide(color: colors.border),
+                  borderSide: BorderSide(
+                    color: _passengerNameError != null
+                        ? colors.statusError
+                        : colors.border,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  borderSide: BorderSide(color: colors.actionPrimary, width: 2),
+                  borderSide: BorderSide(
+                    color: _passengerNameError != null
+                        ? colors.statusError
+                        : colors.actionPrimary,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  borderSide: BorderSide(color: colors.statusError, width: 2),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  borderSide: BorderSide(color: colors.statusError, width: 2),
                 ),
               ),
             ),

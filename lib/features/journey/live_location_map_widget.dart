@@ -15,12 +15,18 @@ class LiveLocationMapWidget extends StatefulWidget {
     this.currentLocation,
     this.originStopId,
     this.destinationStopId,
+    this.height,
+    this.isFullScreen = false,
+    this.onToggleFullScreen,
   });
 
   final List<Stop> stops;
   final BusLocation? currentLocation;
   final String? originStopId;
   final String? destinationStopId;
+  final double? height;
+  final bool isFullScreen;
+  final VoidCallback? onToggleFullScreen;
 
   /// Test seam: widget tests replace the network tile provider so pumpAndSettle
   /// never races against tile HTTP responses (the test binding answers every
@@ -213,22 +219,29 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
       );
     }
 
+    final mapHeight =
+        widget.isFullScreen ? double.infinity : (widget.height ?? 260.0);
+    final borderRadius =
+        widget.isFullScreen ? BorderRadius.zero : BorderRadius.circular(20);
+
     return Container(
-      height: 260,
+      height: mapHeight,
       width: double.infinity,
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: borderRadius,
+        boxShadow: widget.isFullScreen
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: borderRadius,
         child: Stack(
           children: [
             // Real Interactive OpenStreetMap Engine Canvas
@@ -329,20 +342,70 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF007AFF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Next: $nextStopName',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007AFF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Next: $nextStopName',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (widget.onToggleFullScreen != null) ...[
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: widget.isFullScreen
+                              ? 'Exit full screen map'
+                              : 'Expand map to full screen',
+                          child: Material(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: widget.onToggleFullScreen,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white30),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      widget.isFullScreen
+                                          ? Icons.fullscreen_exit
+                                          : Icons.fullscreen,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      widget.isFullScreen ? 'Exit' : 'Expand',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

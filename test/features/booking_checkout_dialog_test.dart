@@ -49,6 +49,10 @@ void main() {
     await tester.tap(find.text('BusBuddy Wallet'));
     await tester.pumpAndSettle();
 
+    // Enter passenger name (required for booking)
+    await tester.enterText(find.byType(TextField), 'Pavan K');
+    await tester.pumpAndSettle();
+
     // Tap Pay & Issue button
     await tester.tap(find.textContaining('& Issue'));
     await tester.pumpAndSettle();
@@ -59,10 +63,63 @@ void main() {
     // 1200 paise (₹12) regardless of the advisory baseFare hint.
     expect(bookedTicket, isNotNull);
     expect(bookedTicket!.busId, equals('18B'));
+    expect(bookedTicket!.passengerName, equals('Pavan K'));
     expect(bookedTicket!.passengerType, equals(PassengerType.student));
     expect(bookedTicket!.paymentMethod, equals(PaymentMethod.wallet));
     expect(bookedTicket!.fareAmount, equals(12.0));
     expect(bookedTicket!.farePaise, equals(1200));
     expect(bookedTicket!.status, equals(TicketStatus.active));
+  });
+
+  testWidgets('BookingCheckoutDialog requires passenger name and blocks issue when empty', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    Ticket? bookedTicket;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookingCheckoutDialog(
+            busId: '18B',
+            routeName: 'VIT → Katpadi',
+            origin: origin,
+            destination: destination,
+            baseFare: 25.0,
+            onTicketBooked: (t) {
+              bookedTicket = t;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify REQUIRED badge is shown
+    expect(find.text('REQUIRED'), findsOneWidget);
+
+    // Tap Pay & Issue without entering passenger name
+    await tester.tap(find.textContaining('& Issue'));
+    await tester.pumpAndSettle();
+
+    // Verify ticket was NOT booked and error text is shown
+    expect(bookedTicket, isNull);
+    expect(find.text('Passenger name is required'), findsOneWidget);
+
+    // Enter name
+    await tester.enterText(find.byType(TextField), 'Aarav Sharma');
+    await tester.pumpAndSettle();
+
+    // Error text should disappear
+    expect(find.text('Passenger name is required'), findsNothing);
+
+    // Tap Pay & Issue now
+    await tester.tap(find.textContaining('& Issue'));
+    await tester.pumpAndSettle();
+
+    // Verify ticket is now booked with entered name
+    expect(bookedTicket, isNotNull);
+    expect(bookedTicket!.passengerName, equals('Aarav Sharma'));
   });
 }

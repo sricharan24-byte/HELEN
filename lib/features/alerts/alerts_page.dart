@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 
 /// Live Corridor Alerts page with multi-modal indicators (WCAG 1.4.1)
@@ -40,7 +41,10 @@ class AlertsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text('Live Corridor Alerts'),
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Live Corridor Alerts',
+        ),
         centerTitle: true,
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,

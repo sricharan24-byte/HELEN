@@ -5,6 +5,7 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../adaptive_ui/adaptive_shortcuts_modal.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -154,11 +155,9 @@ class _PersonalizationSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // Single reflow-safe title: the two-line brand Column overflowed at
-        // large text scales; the descriptive hero below carries the details.
-        title: Text(
-          'Personalization',
-          style: Theme.of(context).textTheme.titleMedium,
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Personalization',
         ),
         centerTitle: true,
       ),

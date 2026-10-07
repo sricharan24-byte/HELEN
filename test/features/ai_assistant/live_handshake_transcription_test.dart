@@ -47,38 +47,49 @@ void main() {
 
     test('requests outputAudioTranscription so the reply has text', () async {
       final setup = await captureSetupFrame();
+      final setupMap = setup['setup'] as Map<String, dynamic>;
       final generationConfig =
-          (setup['setup'] as Map<String, dynamic>)['generationConfig']
-              as Map<String, dynamic>;
+          setupMap['generationConfig'] as Map<String, dynamic>;
 
       expect(
         generationConfig.containsKey('outputAudioTranscription'),
+        isFalse,
+        reason:
+            'outputAudioTranscription must NOT be inside generationConfig. '
+            'Google Live API rejects the setup frame and closes the socket if unknown fields are present in generationConfig.',
+      );
+      expect(
+        setupMap.containsKey('outputAudioTranscription'),
         isTrue,
         reason:
-            'Without outputAudioTranscription the Live service sends audio with '
-            'no text. The transcript stays empty and the TTS fallback has '
-            'nothing to say, so the reply is never spoken.',
+            'BidiGenerateContentSetup proto field 11 expects outputAudioTranscription at the top level of setup.',
       );
       // An empty object is what requests it; a truthy non-empty value would be
       // sent to the server as configuration it does not understand.
-      expect(generationConfig['outputAudioTranscription'], isEmpty);
+      expect(setupMap['outputAudioTranscription'], isEmpty);
     });
 
     test('requests inputAudioTranscription for the Android audio-in path',
         () async {
       final setup = await captureSetupFrame();
+      final setupMap = setup['setup'] as Map<String, dynamic>;
       final generationConfig =
-          (setup['setup'] as Map<String, dynamic>)['generationConfig']
-              as Map<String, dynamic>;
+          setupMap['generationConfig'] as Map<String, dynamic>;
 
       expect(
         generationConfig.containsKey('inputAudioTranscription'),
+        isFalse,
+        reason:
+            'inputAudioTranscription must NOT be inside generationConfig. '
+            'Google Live API rejects the setup frame and closes the socket if unknown fields are present in generationConfig.',
+      );
+      expect(
+        setupMap.containsKey('inputAudioTranscription'),
         isTrue,
         reason:
-            'Without it the service never sends inputTranscription, so the '
-            "passenger's \"I heard you say\" line can never appear.",
+            'BidiGenerateContentSetup proto field 10 expects inputAudioTranscription at the top level of setup.',
       );
-      expect(generationConfig['inputAudioTranscription'], isEmpty);
+      expect(setupMap['inputAudioTranscription'], isEmpty);
     });
 
     test('still requests AUDIO and a prebuilt voice', () async {

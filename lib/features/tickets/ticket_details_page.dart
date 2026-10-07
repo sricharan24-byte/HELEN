@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/ticket_model.dart';
 
 /// Digital Ticket Pass details screen matching Image 2 reference UI with QR code and ticket perforation notches.
@@ -29,20 +30,9 @@ class TicketDetailsPage extends StatelessWidget {
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Bus', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-                Text('Buddy', style: TextStyle(color: colors.actionPrimary, fontWeight: FontWeight.w900, fontSize: 20)),
-              ],
-            ),
-            Text(
-              'Ticket Details',
-              style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-          ],
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Ticket Details',
         ),
         centerTitle: true,
       ),

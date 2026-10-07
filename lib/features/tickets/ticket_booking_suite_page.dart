@@ -5,6 +5,7 @@ import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
@@ -66,6 +67,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   String _selectedBusId = '18B';
   bool _isCurrentLocation = true;
   String? _lastAnnouncedStop;
+  bool _hasAnnouncedCurrentStopArrival = false;
+  AnnouncementScopeToken? _scopeToken;
 
   /// Saved places resolved against the loaded stops, in the passenger's saved
   /// order. Unknown IDs (e.g. a stop removed from fixtures) are skipped so a
@@ -770,28 +773,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       },
                     ),
                     const SizedBox(width: 8),
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Bus',
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Buddy',
-                            style: TextStyle(
-                              color: colors.actionPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const BusBuddyLogo(fontSize: 20),
                     const Spacer(),
                     Text(
                       _activeStepIndex == 0
@@ -1650,13 +1632,39 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               if (live != null &&
                   live.nextStopName.isNotEmpty &&
                   live.nextStopName != _lastAnnouncedStop) {
-                if (_isAnnouncementsOn && _lastAnnouncedStop != null) {
-                  AnnouncementCoordinator.instance.announce(
-                    'Approaching ${live.nextStopName}. Estimated arrival in ${live.etaMinutes} minutes.',
-                    routeId: _resolveRouteId(),
-                  );
+                final nextStop = live.nextStopName;
+                final eta = live.etaMinutes;
+                _lastAnnouncedStop = nextStop;
+                _hasAnnouncedCurrentStopArrival = false;
+                if (_isAnnouncementsOn) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted || !_isAnnouncementsOn || _hasArrived) return;
+                    final msg = eta <= 1
+                        ? 'Arriving at $nextStop now.'
+                        : 'Next stop: $nextStop. Estimated arrival in $eta minutes.';
+                    AnnouncementCoordinator.instance.announce(
+                      msg,
+                      routeId: _resolveRouteId(),
+                      priority: AnnouncementPriority.high,
+                    );
+                  });
                 }
-                _lastAnnouncedStop = live.nextStopName;
+              } else if (live != null &&
+                  live.nextStopName.isNotEmpty &&
+                  live.etaMinutes <= 1 &&
+                  !_hasAnnouncedCurrentStopArrival &&
+                  !_hasArrived) {
+                _hasAnnouncedCurrentStopArrival = true;
+                if (_isAnnouncementsOn) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted || !_isAnnouncementsOn || _hasArrived) return;
+                    AnnouncementCoordinator.instance.announce(
+                      'Arriving at ${live.nextStopName} now.',
+                      routeId: _resolveRouteId(),
+                      priority: AnnouncementPriority.high,
+                    );
+                  });
+                }
               }
 
               final remainingStops = _calculateRemainingStops(live);
@@ -1858,7 +1866,15 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
             onTap: () {
               setState(() {
                 _isAnnouncementsOn = !_isAnnouncementsOn;
+                AnnouncementCoordinator.instance.isSpeechEnabled = _isAnnouncementsOn;
               });
+              AnnouncementCoordinator.instance.announce(
+                _isAnnouncementsOn
+                    ? 'Journey announcements turned ON'
+                    : 'Journey announcements muted',
+                priority: AnnouncementPriority.high,
+                routeId: _resolveRouteId(),
+              );
             },
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             child: Container(
@@ -2395,5 +2411,12 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scopeToken?.dispose();
+    _scopeToken = null;
+    super.dispose();
   }
 }

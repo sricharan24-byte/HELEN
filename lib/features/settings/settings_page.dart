@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/repositories/emergency_contact_repository.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../safety/safety_sharing_page.dart';
@@ -53,18 +54,10 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         backgroundColor: colors.background,
         elevation: 0,
-        // Single-scale title: the previous two-line brand Column overflowed
-        // the 56dp toolbar at large accessibility text scales.
-        title: Semantics(
-          headingLevel: 1,
-          child: Text(
-            'Settings & Preferences',
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-            ),
-          ),
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Settings & Preferences',
+          crossAxisAlignment: CrossAxisAlignment.start,
         ),
         centerTitle: false,
       ),

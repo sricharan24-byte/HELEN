@@ -10,6 +10,7 @@ import 'data/repositories/emergency_contact_repository.dart';
 import 'data/models/transport_models.dart' as models;
 import 'data/repositories/transport_repository.dart';
 import 'features/ai_assistant/ai_control_glow.dart';
+import 'features/ai_assistant/wake_word_service.dart';
 import 'features/home/home_page.dart';
 import 'features/journey/journey_controller.dart';
 import 'features/route_details/route_details_page.dart';
@@ -40,20 +41,44 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
-  MyApp({
+class MyApp extends StatefulWidget {
+  const MyApp({
     super.key,
     required this.journeyController,
     required this.repository,
     required this.ticketController,
+    this.navigatorKey,
   });
 
   final JourneyController journeyController;
   final TransportRepository repository;
   final TicketController ticketController;
+  final GlobalKey<NavigatorState>? navigatorKey;
 
-  // Stable navigator key — created once for the lifetime of MyApp.
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final GlobalKey<NavigatorState> _navigatorKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _navigatorKey = widget.navigatorKey ?? GlobalKey<NavigatorState>();
+    WakeWordService.instance.initialize(
+      navigatorKey: _navigatorKey,
+      ticketController: widget.ticketController,
+      repository: widget.repository,
+      journeyController: widget.journeyController,
+    );
+  }
+
+  @override
+  void dispose() {
+    WakeWordService.instance.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,43 +113,43 @@ class MyApp extends StatelessWidget {
               ),
             );
           },
-      home: HomePage(
-        controller: journeyController,
-        repository: repository,
-        ticketController: ticketController,
-        onRouteSelected: (routeId) {
-          // Resolve the route from the repository and push the details page.
-          final originId = journeyController.state.origin?.id;
-          final destinationId = journeyController.state.destination?.id;
-          if (originId == null || destinationId == null) return;
+          home: HomePage(
+            controller: widget.journeyController,
+            repository: widget.repository,
+            ticketController: widget.ticketController,
+            onRouteSelected: (routeId) {
+              // Resolve the route from the repository and push the details page.
+              final originId = widget.journeyController.state.origin?.id;
+              final destinationId = widget.journeyController.state.destination?.id;
+              if (originId == null || destinationId == null) return;
 
-          final routes = repository.findRoutes(
-            originId: originId,
-            destinationId: destinationId,
-          );
-          models.Route? resolved;
-          for (final r in routes) {
-            if (r.id == routeId) {
-              resolved = r;
-              break;
-            }
-          }
-          resolved ??= routes.isNotEmpty ? routes.first : null;
-          if (resolved == null) return;
+              final routes = widget.repository.findRoutes(
+                originId: originId,
+                destinationId: destinationId,
+              );
+              models.Route? resolved;
+              for (final r in routes) {
+                if (r.id == routeId) {
+                  resolved = r;
+                  break;
+                }
+              }
+              resolved ??= routes.isNotEmpty ? routes.first : null;
+              if (resolved == null) return;
 
-          journeyController.selectRoute(resolved);
+              widget.journeyController.selectRoute(resolved);
 
-          unawaited(_navigatorKey.currentState?.push(
-            MaterialPageRoute<void>(
-              builder: (_) => RouteDetailsPage(
-                controller: journeyController,
-                repository: repository,
-              ),
-            ),
-          ));
-        },
-      ),
-    );
+              unawaited(_navigatorKey.currentState?.push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RouteDetailsPage(
+                    controller: widget.journeyController,
+                    repository: widget.repository,
+                  ),
+                ),
+              ));
+            },
+          ),
+        );
       },
     );
   }

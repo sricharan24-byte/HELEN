@@ -137,12 +137,6 @@ class HomeScreenItem {
       isVisible: true,
     ),
     const HomeScreenItem(
-      id: idAlerts,
-      title: 'Corridor Alerts',
-      subtitle: 'Delay & schedule updates',
-      isVisible: true,
-    ),
-    const HomeScreenItem(
       id: idSettings,
       title: 'Settings',
       subtitle: 'Customize your experience',

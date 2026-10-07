@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/adaptive_shortcut.dart';
@@ -238,7 +239,10 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text('Safety & Emergency Sharing'),
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Safety & Emergency Sharing',
+        ),
         centerTitle: true,
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,

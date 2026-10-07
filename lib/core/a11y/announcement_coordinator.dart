@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/semantics.dart';
 
+import '../../features/ai_assistant/audio_speech_engine.dart';
+
 /// Announcement priority levels per Astra Section 2.4.
 enum AnnouncementPriority {
   /// Safety, SOS, emergency notifications. Always announced immediately.
@@ -94,6 +96,13 @@ class AnnouncementCoordinator {
   /// Whether spoken accessibility announcements are enabled by the user.
   bool isSpeechEnabled = true;
 
+  AudioSpeechEngine? _speechEngine;
+  AudioSpeechEngine get speechEngine => _speechEngine ??= AudioSpeechEngine();
+  set speechEngine(AudioSpeechEngine? engine) => _speechEngine = engine;
+
+  /// Test hook to observe or intercept spoken voice announcements.
+  void Function(String message)? speechSpeaker;
+
   /// Default text direction for announcements.
   TextDirection textDirection = TextDirection.ltr;
 
@@ -117,6 +126,9 @@ class AnnouncementCoordinator {
   AnnouncementScopeToken registerScope(String scopeId) {
     _activeScopeToken?.dispose();
     _activeRouteId = scopeId;
+    _lastEtaStop = null;
+    _lastEtaMinutes = null;
+    _lastEtaAnnouncedTime = null;
     final token = AnnouncementScopeToken._(scopeId, this);
     _activeScopeToken = token;
     return token;
@@ -126,6 +138,9 @@ class AnnouncementCoordinator {
     if (_activeScopeToken == token) {
       _activeScopeToken = null;
       _activeRouteId = null;
+      _lastEtaStop = null;
+      _lastEtaMinutes = null;
+      _lastEtaAnnouncedTime = null;
     }
   }
 
@@ -240,6 +255,18 @@ class AnnouncementCoordinator {
     _lastAnnouncedTimestamp = timestamp;
 
     try {
+      if (isSpeechEnabled) {
+        if (speechSpeaker != null) {
+          speechSpeaker!(message);
+        } else if (testAnnounceHandler == null && semanticsAnnounceHandler == null) {
+          try {
+            speechEngine.speak(message);
+          } catch (e) {
+            debugPrint('[AnnouncementCoordinator] Failed to speak: $e');
+          }
+        }
+      }
+
       if (testAnnounceHandler != null) {
         testAnnounceHandler!(message, priority);
         _lastAnnouncedMessage = message;
@@ -300,6 +327,8 @@ class AnnouncementCoordinator {
     onUrgentAlertTriggered = null;
     semanticsAnnounceHandler = null;
     testAnnounceHandler = null;
+    speechSpeaker = null;
+    _speechEngine = null;
     _queue.clear();
     _lastEtaStop = null;
     _lastEtaMinutes = null;

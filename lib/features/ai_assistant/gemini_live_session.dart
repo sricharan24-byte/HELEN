@@ -109,13 +109,18 @@ class GeminiLiveSession {
   static Future<String?> validateApiKey(String key) async {
     final override = testValidateOverride;
     if (override != null) return override(key);
-    final trimmed = key.trim();
+    final trimmed = key.replaceAll(RegExp(r'''['"\s]'''), '').trim();
     if (trimmed.isEmpty) return 'The API key is empty.';
     try {
       final uri = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=$trimmed',
       );
-      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      final res = await http.get(
+        uri,
+        headers: {
+          'x-goog-api-key': trimmed,
+        },
+      ).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) return null;
       return 'Gemini API error (${res.statusCode}): ${_shortBody(res.body)}';
     } on TimeoutException {
@@ -171,7 +176,9 @@ CRITICAL CONVERSATIONAL RULES:
 
   /// Connects to Google AI Studio's Gemini Live API WebSocket endpoint.
   void connect({String? customApiKey}) {
-    final apiKey = (customApiKey ?? effectiveApiKey).trim();
+    final apiKey = (customApiKey ?? effectiveApiKey)
+        .replaceAll(RegExp(r'''['"\s]'''), '')
+        .trim();
     if (apiKey.isEmpty) {
       onStatusChanged?.call('API Key Needed', false);
       return;
@@ -313,22 +320,24 @@ CRITICAL CONVERSATIONAL RULES:
         'model': modelToUse,
         'generationConfig': {
           'responseModalities': ['AUDIO'],
-          // Asked for explicitly because the model answers in AUDIO only: with
-          // no output transcription the server sends no text, so the on-screen
-          // transcript stayed empty AND the TTS fallback had nothing to speak —
-          // it substituted a generic filler line and the real reply was never
-          // spoken. Deleted in e6657ae, which was harmless while web PCM played
-          // unconditionally, and fatal once it did not.
-          'outputAudioTranscription': <String, dynamic>{},
-          // Same reasoning for the passenger's own voice on the Android
-          // audio-in path: without this, `inputTranscription` never arrives.
-          'inputAudioTranscription': <String, dynamic>{},
           'speechConfig': {
             'voiceConfig': {
               'prebuiltVoiceConfig': {'voiceName': voiceToUse},
             },
           },
         },
+        // Official protobuf BidiGenerateContentSetup schema (fields 10 & 11):
+        // outputAudioTranscription and inputAudioTranscription belong directly
+        // at the top level of the setup payload for the Live API server, NOT inside
+        // generationConfig. Inside generationConfig the server rejects the
+        // setup frame and closes the socket before setupComplete.
+        // Asked for explicitly because the model answers in AUDIO only: with
+        // outputAudioTranscription the server sends the text transcript alongside
+        // audio. Without it, the on-screen transcript stays empty.
+        // Same reasoning for inputAudioTranscription on the Android audio-in path:
+        // without it, inputTranscription never arrives.
+        'outputAudioTranscription': <String, dynamic>{},
+        'inputAudioTranscription': <String, dynamic>{},
         'systemInstruction': {
           'parts': [
             {'text': naturalTransitInstruction},

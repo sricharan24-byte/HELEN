@@ -5,6 +5,7 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
+import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/home_screen_item.dart';
 
 /// Screen allowing commuters to reorder, show, hide, and reset
@@ -100,11 +101,9 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        // Single reflow-safe title: the two-line brand Column overflowed at
-        // large text scales; the guidance hero below carries the details.
-        title: Text(
-          'Customize Home Screen',
-          style: Theme.of(context).textTheme.titleMedium,
+        title: const BusBuddyLogo(
+          fontSize: 20,
+          subtitle: 'Customize Home Screen',
         ),
         centerTitle: true,
       ),

@@ -10,6 +10,7 @@ import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
+import 'package:busbuddy/features/tickets/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 import '../helpers/map_test_tiles.dart';
 
@@ -122,6 +123,98 @@ void main() {
       expect(find.text('6 min'), findsOneWidget);
       expect(find.text('View Journey Details'), findsOneWidget);
     });
+
+    testWidgets('tapping View Journey Details opens LiveLocationScreen', (
+      tester,
+    ) async {
+      final ticketController = bookCorridorTicketController();
+      await tester.pumpWidget(testApp(ticketController: ticketController));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('View Journey Details'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LiveLocationScreen), findsOneWidget);
+    });
+
+    testWidgets('hides active journey card immediately when ticket completes', (
+      tester,
+    ) async {
+      final ticketController = bookCorridorTicketController();
+      await tester.pumpWidget(testApp(ticketController: ticketController));
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Journey'), findsOneWidget);
+
+      ticketController.completeActiveTrip(reason: 'Reached destination');
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Journey'), findsNothing);
+      expect(find.text('Good morning!'), findsOneWidget);
+      expect(find.text('What would you like to do?'), findsOneWidget);
+    });
+
+    testWidgets(
+      'hides active journey card when multiple bookings occurred and trip completes',
+      (tester) async {
+        final ticketController = bookCorridorTicketController();
+        // Second booking
+        final dataSource = LocalTransportDataSource();
+        final route = dataSource.allRoutes.first;
+        ticketController.bookTicket(
+          origin: dataSource.stopById('vit-main-gate')!,
+          destination: dataSource.stopById('katpadi-railway-station')!,
+          route: route,
+          passengerName: 'Pavan K',
+        );
+
+        await tester.pumpWidget(testApp(ticketController: ticketController));
+        await tester.pumpAndSettle();
+
+        expect(find.text('My Journey'), findsOneWidget);
+
+        ticketController.completeActiveTrip(reason: 'Trip ended');
+        await tester.pumpAndSettle();
+
+        expect(find.text('My Journey'), findsNothing);
+        expect(ticketController.hasActiveTicket, isFalse);
+      },
+    );
+
+    testWidgets(
+      'hides active journey card when ticket validity window has elapsed',
+      (tester) async {
+        final dataSource = LocalTransportDataSource();
+        final route = dataSource.allRoutes.first;
+        final ticketRepo = LocalTicketRepository();
+        final ticketController = TicketController(ticketRepo);
+
+        final pastTicket = Ticket(
+          id: 'BB-EXPIRED-TEST',
+          routeId: route.id,
+          routeName: route.displayName,
+          origin: dataSource.stopById('vit-main-gate')!,
+          destination: dataSource.stopById('katpadi-railway-station')!,
+          busId: '18B',
+          passengerName: 'Pavan',
+          passengerType: PassengerType.general,
+          fareQuote: FareEngine.calculateCorridorFare(PassengerType.general),
+          paymentMethod: PaymentMethod.upi,
+          issuedAt: DateTime.now().subtract(const Duration(hours: 5)),
+          validUntil: DateTime.now().subtract(const Duration(minutes: 1)),
+          status: TicketStatus.active,
+          qrCodeData: 'TEST',
+        );
+        ticketRepo.addTicket(pastTicket);
+
+        await tester.pumpWidget(testApp(ticketController: ticketController));
+        await tester.pumpAndSettle();
+
+        expect(find.text('My Journey'), findsNothing);
+        expect(find.text('Good morning!'), findsOneWidget);
+        expect(ticketController.hasActiveTicket, isFalse);
+      },
+    );
   });
 
   // ── Task Action Cards ────────────────────────────────────────────────

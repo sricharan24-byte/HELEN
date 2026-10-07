@@ -115,13 +115,18 @@ void main() {
           .where((f) => f.containsKey('setup'))
           .toList();
       expect(setups, hasLength(1));
+      final setupMap =
+          (setups.single['setup'] as Map<String, dynamic>);
       final generationConfig =
-          (setups.single['setup'] as Map<String, dynamic>)['generationConfig']
-              as Map<String, dynamic>;
+          setupMap['generationConfig'] as Map<String, dynamic>;
       expect(generationConfig['responseModalities'], <String>['AUDIO']);
       expect(
-        generationConfig.containsKey('outputAudioTranscription'),
+        setupMap.containsKey('outputAudioTranscription'),
         isTrue,
+      );
+      expect(
+        generationConfig.containsKey('outputAudioTranscription'),
+        isFalse,
       );
 
       // The handshake completes only on setupComplete — the old code announced

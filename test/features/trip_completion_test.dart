@@ -140,6 +140,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Select This Bus >'));
       await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Pavan');
+      await tester.pumpAndSettle();
       await tester.tap(find.textContaining('& Issue'));
       await tester.pumpAndSettle();
 
@@ -167,6 +169,8 @@ void main() {
       await tester.tap(find.text('Find Buses'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Select This Bus >'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Pavan');
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('& Issue'));
       await tester.pumpAndSettle();

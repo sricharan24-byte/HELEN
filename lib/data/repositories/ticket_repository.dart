@@ -28,6 +28,12 @@ abstract class TicketRepository {
   /// at the destination ("Reached destination") or an explicit End Trip.
   /// No-op for unknown ids or tickets that already left the active state.
   void completeTicket(String ticketId, {String reason = 'Reached destination'});
+
+  /// Marks all currently active tickets as expired.
+  void completeAllActiveTickets({String reason = 'Reached destination'});
+
+  /// Cancels all currently active tickets.
+  void cancelAllActiveTickets({String reason = 'User cancelled ticket'});
 }
 
 class LocalTicketRepository implements TicketRepository {
@@ -222,6 +228,12 @@ class LocalTicketRepository implements TicketRepository {
     }
 
     // Cleanly transition any expired active tickets per BUS-P1-10
+    _sweepExpiredTickets(reason: 'Validity window elapsed during app closure');
+  }
+
+  /// Sweeps through all stored tickets and transitions any active tickets
+  /// whose validity window has elapsed to [TicketStatus.expired].
+  bool _sweepExpiredTickets({String reason = 'Validity window elapsed'}) {
     final now = DateTime.now();
     bool hadExpiredTransition = false;
     for (int i = 0; i < _tickets.length; i++) {
@@ -229,7 +241,7 @@ class LocalTicketRepository implements TicketRepository {
       if (t.status == TicketStatus.active && t.validUntil.isBefore(now)) {
         final transition = t.transitionTo(
           TicketStatus.expired,
-          reason: 'Validity window elapsed during app closure',
+          reason: reason,
         );
         if (transition.isSuccess) {
           _tickets[i] = transition.valueOrNull!;
@@ -240,6 +252,7 @@ class LocalTicketRepository implements TicketRepository {
     if (hadExpiredTransition) {
       _persist();
     }
+    return hadExpiredTransition;
   }
 
   List<Map<String, Object?>> _snapshot() =>
@@ -248,10 +261,14 @@ class LocalTicketRepository implements TicketRepository {
   void _persist() => _store?.write(storageKey, _snapshot());
 
   @override
-  List<Ticket> get allTickets => List<Ticket>.unmodifiable(_tickets);
+  List<Ticket> get allTickets {
+    _sweepExpiredTickets();
+    return List<Ticket>.unmodifiable(_tickets);
+  }
 
   @override
   Ticket? get activeTicket {
+    _sweepExpiredTickets();
     final now = DateTime.now();
     for (final ticket in _tickets) {
       if (ticket.status == TicketStatus.active &&
@@ -339,6 +356,9 @@ class LocalTicketRepository implements TicketRepository {
       isDemo: true,
     );
 
+    // Ensure any previously active ticket is superseded and closed
+    completeAllActiveTickets(reason: 'Superseded by new ticket booking');
+
     // Prepend to ticket history so newest is first
     _tickets.insert(0, ticket);
     _persist();
@@ -347,6 +367,9 @@ class LocalTicketRepository implements TicketRepository {
 
   @override
   void addTicket(Ticket ticket) {
+    if (ticket.status == TicketStatus.active) {
+      completeAllActiveTickets(reason: 'Superseded by new ticket booking');
+    }
     _tickets.insert(0, ticket);
     _persist();
   }
@@ -364,6 +387,7 @@ class LocalTicketRepository implements TicketRepository {
         _persist();
       }
     }
+    _sweepExpiredTickets();
   }
 
   @override
@@ -381,6 +405,49 @@ class LocalTicketRepository implements TicketRepository {
         _tickets[index] = transitionResult.valueOrNull!;
         _persist();
       }
+    }
+    _sweepExpiredTickets();
+  }
+
+  @override
+  void completeAllActiveTickets({String reason = 'Reached destination'}) {
+    _sweepExpiredTickets();
+    bool changed = false;
+    for (int i = 0; i < _tickets.length; i++) {
+      if (_tickets[i].status == TicketStatus.active) {
+        final transition = _tickets[i].transitionTo(
+          TicketStatus.expired,
+          reason: reason,
+        );
+        if (transition.isSuccess) {
+          _tickets[i] = transition.valueOrNull!;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _persist();
+    }
+  }
+
+  @override
+  void cancelAllActiveTickets({String reason = 'User cancelled ticket'}) {
+    _sweepExpiredTickets();
+    bool changed = false;
+    for (int i = 0; i < _tickets.length; i++) {
+      if (_tickets[i].status == TicketStatus.active) {
+        final transition = _tickets[i].transitionTo(
+          TicketStatus.cancelled,
+          reason: reason,
+        );
+        if (transition.isSuccess) {
+          _tickets[i] = transition.valueOrNull!;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _persist();
     }
   }
 }

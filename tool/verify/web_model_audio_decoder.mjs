@@ -37,7 +37,7 @@ if (evalStart < 0 || evalEnd < 0) {
 }
 // Dart string interpolation is not valid JS; neutralise it.
 const bridgeJs = dartSource.slice(evalStart, evalEnd)
-  .replace(/\$\{?kJsBridgeVersion\}?/g, '8')
+  .replace(/\$\{?kJsBridgeVersion\}?/g, '9')
   .replace(/\$\{/g, '{')
   .replace(/\}/g, '}')
   // The Dart string is non-raw, so escapes are already resolved by the Dart

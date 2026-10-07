@@ -162,6 +162,7 @@ void main() {
       expect(revived.status, TicketStatus.active);
       expect(revived.origin.name, 'VIT');
       expect(revived.destination.name, 'Katpadi RS');
+      expect(revived.seatAllocation, ticket.seatAllocation);
       expect(revived.isActive, isTrue);
     });
 
