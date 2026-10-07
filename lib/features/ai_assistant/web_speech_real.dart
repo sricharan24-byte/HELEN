@@ -4,6 +4,7 @@ import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart';
 
 import '../../core/settings/app_settings_controller.dart';
+import 'audio_speech_engine.dart';
 
 bool enableSimulatedVoiceInput = false;
 bool _jsBridgeInitialized = false;
@@ -607,6 +608,10 @@ void playAudioTone({bool isListening = false}) {
 /// app's only speech producer — one call, one utterance, one voice.
 void speakText(String text) {
   try {
+    if (AudioSpeechEngine.isOfflineTtsMuted) {
+      debugPrint('[WebSpeech] speakText suppressed: offline TTS is muted');
+      return;
+    }
     _ensureJsBridge();
     // Presence is checked first: `__bb_speak_text` returns `undefined`, so the
     // call result alone cannot distinguish "spoke" from "bridge missing".

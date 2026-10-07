@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/a11y/dispose_guard.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
@@ -185,39 +186,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           }
         });
 
-        // Single speaker: every reply is spoken exactly once through the one
-        // speech engine. The bridge's speak() is stop-before-speak, so even a
-        // duplicated call can never layer a second voice.
+        // Single speaker: Gemini Live's natural model audio is the sole voice.
+        // Offline TTS is completely suppressed so it never interrupts or layers with Gemini Live.
         if (!silentProtocol && _spokenOutput.isNotEmpty) {
-          final spoken = _spokenOutput;
-          // Single speaker, part 2: if Gemini streamed its own audio for this
-          // turn, that audio IS the reply — speaking the same words again
-          // through TTS would be the double-voice bug Chunks 41-43 chased.
-          // TTS speaks only when the turn carried no model audio (plain text
-          // turn, REST fallback, socket without audio).
-          if (_modelVoice.hasModelAudioThisTurn) {
-            debugPrint(
-              '[SingleVoice] turn $_turnCounter played model audio; '
-              'skipping TTS',
-            );
-            // Keep holding the microphone: playback is still draining, and the
-            // drain notification releases it. Do NOT return here — the tool
-            // call below must still run (a reply can be both spoken and acted).
-            _pauseVoiceTurn();
-            // Safety net only: the drain is the normal end-of-turn signal, but
-            // a stalled AudioContext must never strand the UI on "Speaking".
-            _armWatchdog();
-          } else {
-            debugPrint(
-              '[SingleVoice] speaking turn via TTS (turn $_turnCounter)',
-            );
-            // Android keeps one microphone stream across turns: withhold its frames
-            // while the assistant talks so the reply is never heard as a question.
-            _pauseVoiceTurn();
-            _audioEngine.stop();
-            _audioEngine.speak(spoken);
-            _armWatchdog();
-          }
+          debugPrint(
+            '[SingleVoice] turn $_turnCounter: Gemini Live response; offline TTS suppressed',
+          );
+          _pauseVoiceTurn();
+          _armWatchdog();
         }
 
         if (actionType != null && !_actionExecutedThisTurn) {
@@ -311,6 +287,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _lastLiveVoice = AppSettingsController.instance.geminiVoice;
     AppSettingsController.instance.addListener(_onSettingsChanged);
     unawaited(_connectValidated());
+
+    // Suppress offline TTS completely: only Gemini Live's natural voice speaks.
+    AudioSpeechEngine.muteOfflineTts(true);
+    AnnouncementCoordinator.instance.isAssistantActive = true;
+    _audioEngine.stop();
 
     // Prime the audio context, but do not rely on this to unlock it: initState
     // runs *after* the tap that pushed this screen, so Chrome's autoplay policy
@@ -446,6 +427,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         run: () {
           _audioEngine.stopListening();
           _audioEngine.stop();
+        },
+      ),
+      (
+        name: 'offlineTtsRestore',
+        run: () {
+          AudioSpeechEngine.muteOfflineTts(false);
+          AnnouncementCoordinator.instance.isAssistantActive = false;
         },
       ),
       (name: 'pulseController', run: _pulseController.dispose),
@@ -821,22 +809,11 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       const msg =
           'Please connect your Google AI Studio API key to chat with Gemini Live.';
       setState(() {
-        _isSpeaking = true;
+        _isSpeaking = false;
         _isListening = false;
         _liveStatus = 'Key Needed';
         _liveTranscription = 'Gemini Live API key is required.';
         _spokenOutput = msg;
-      });
-      _audioEngine.speak(msg);
-      final wordCount = msg.split(' ').length;
-      final fallbackMs = (wordCount * 300).clamp(1500, 10000);
-      _speechTimer?.cancel();
-      _speechTimer = Timer(Duration(milliseconds: fallbackMs), () {
-        if (mounted && _isSpeaking) {
-          setState(() {
-            _isSpeaking = false;
-          });
-        }
       });
       _showApiKeyDialog();
       return;

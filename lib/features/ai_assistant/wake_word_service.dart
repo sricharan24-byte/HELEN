@@ -185,11 +185,12 @@ class WakeWordService extends ChangeNotifier {
     // 2. Pulse AI edge glow blue (listening mode)
     AiControlGlow.instance.listening();
 
-    // 3. Accessible announcement
-    AnnouncementCoordinator.instance.announce(
-      'Hey BusBuddy detected. Starting voice assistant...',
-      priority: AnnouncementPriority.high,
-    );
+    // 3. Mute offline TTS immediately and silence speech engines
+    AudioSpeechEngine.muteOfflineTts(true);
+    AnnouncementCoordinator.instance.isAssistantActive = true;
+    audioEngine.stop();
+    AnnouncementCoordinator.instance.visualStatusText.value =
+        'Hey BusBuddy detected. Starting voice assistant...';
 
     // 4. Fire callback if provided
     onWakeWordDetected?.call(query);
