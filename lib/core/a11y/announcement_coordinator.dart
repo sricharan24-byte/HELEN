@@ -96,6 +96,10 @@ class AnnouncementCoordinator {
   /// Whether spoken accessibility announcements are enabled by the user.
   bool isSpeechEnabled = true;
 
+  /// True when the voice assistant (Gemini Live) is active, suppressing background
+  /// spoken announcements so they never interrupt or speak over the conversation.
+  bool isAssistantActive = false;
+
   AudioSpeechEngine? _speechEngine;
   AudioSpeechEngine get speechEngine => _speechEngine ??= AudioSpeechEngine();
   set speechEngine(AudioSpeechEngine? engine) => _speechEngine = engine;
@@ -255,7 +259,7 @@ class AnnouncementCoordinator {
     _lastAnnouncedTimestamp = timestamp;
 
     try {
-      if (isSpeechEnabled) {
+      if (isSpeechEnabled && !isAssistantActive) {
         if (speechSpeaker != null) {
           speechSpeaker!(message);
         } else if (testAnnounceHandler == null && semanticsAnnounceHandler == null) {
@@ -322,6 +326,7 @@ class AnnouncementCoordinator {
     _activeScopeToken = null;
     _isAudioPlaying = false;
     isSpeechEnabled = true;
+    isAssistantActive = false;
     textDirection = TextDirection.ltr;
     visualStatusText.value = '';
     onUrgentAlertTriggered = null;

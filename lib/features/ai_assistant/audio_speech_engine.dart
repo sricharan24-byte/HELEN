@@ -27,8 +27,27 @@ class AudioSpeechEngine {
   // ignore: cancel_subscriptions
   StreamSubscription<String>? _doneSub;
 
+  /// Global gate to silence offline TTS so it never interrupts or layers with Gemini Live.
+  static bool isOfflineTtsMuted = false;
+
+  /// Mutes or unmutes offline TTS and immediately stops any ongoing speech when muted.
+  static void muteOfflineTts(bool mute) {
+    isOfflineTtsMuted = mute;
+    if (mute) {
+      if (kIsWeb) {
+        speech_impl.stopSpeech();
+      } else {
+        nativeAudioChannel.stopTts();
+      }
+    }
+  }
+
   /// Speaks the provided text out loud through the device/browser speakers.
   void speak(String text) {
+    if (isOfflineTtsMuted) {
+      debugPrint('[AudioSpeechEngine] Offline TTS is muted; skipping: $text');
+      return;
+    }
     if (kIsWeb) {
       speech_impl.speakText(text);
       return;
