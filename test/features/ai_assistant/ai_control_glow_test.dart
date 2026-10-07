@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/features/ai_assistant/ai_control_glow.dart';
+import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
+import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
 
 void main() {
-  tearDown(AiControlGlow.instance.idle);
+  tearDown(() {
+    AiControlGlow.instance.idle();
+    AudioSpeechEngine.muteOfflineTts(false);
+    AnnouncementCoordinator.instance.reset();
+  });
 
   group('AiControlGlow', () {
     test('notifies once per real mode change', () {

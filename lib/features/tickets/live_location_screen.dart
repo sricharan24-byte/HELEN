@@ -278,8 +278,6 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   Widget build(BuildContext context) {
     final ticket = widget.ticket;
     final repository = widget.repository;
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     final colors = AppTheme.colors(context);
 
     final routes = repository.findRoutes(
@@ -336,7 +334,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             tooltip: _isMapExpanded
                 ? 'Exit full screen map'
                 : 'Expand map to full screen',
-            onPressed: () => _toggleMapExpanded(),
+            onPressed: _toggleMapExpanded,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -797,7 +795,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(icon, color: iconColor, size: 20),
-              if (trailing != null) trailing,
+              if (trailing case final Widget t) t,
             ],
           ),
           const SizedBox(height: 8),
@@ -928,19 +926,25 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(Icons.map, size: 18, color: colors.actionPrimary),
-                const SizedBox(width: 8),
-                Text(
-                  'LIVE MAP WINDOW',
-                  style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary,
-                    letterSpacing: 0.5,
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.map, size: 18, color: colors.actionPrimary),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'LIVE MAP WINDOW',
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             TextButton.icon(
               onPressed: () => _toggleMapExpanded(true),
@@ -1057,23 +1061,29 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.event_seat,
-                    color: colors.actionPrimary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SEAT DETAILS',
-                    style: textTheme.labelLarge?.copyWith(
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.event_seat,
                       color: colors.actionPrimary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                      size: 20,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'SEAT DETAILS',
+                        style: textTheme.labelLarge?.copyWith(
+                          color: colors.actionPrimary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1214,23 +1224,29 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.alt_route,
-                    color: colors.actionPrimary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'CORRIDOR STOPS',
-                    style: textTheme.labelLarge?.copyWith(
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.alt_route,
                       color: colors.actionPrimary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                      size: 20,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'CORRIDOR STOPS',
+                        style: textTheme.labelLarge?.copyWith(
+                          color: colors.actionPrimary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Text(
                 '${journeyStops.length} stops',
@@ -1248,7 +1264,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: journeyStops.length,
-            separatorBuilder: (_, __) => Padding(
+            separatorBuilder: (_, _) => Padding(
               padding: const EdgeInsets.only(left: 15),
               child: Container(
                 width: 2,
@@ -1435,10 +1451,13 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               final msg = eta <= 1
                   ? 'Arriving at ${live.nextStopName} now.'
                   : 'Next stop: ${live.nextStopName}. Estimated arrival in $eta minutes.';
+              // Explicit user tap must always speak: bypass the duplicate
+              // debounce that suppresses identical automatic announcements.
               AnnouncementCoordinator.instance.announce(
                 msg,
                 priority: AnnouncementPriority.high,
                 routeId: widget.ticket.routeId,
+                debounceWindow: Duration.zero,
               );
             },
           ),
@@ -1447,10 +1466,13 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             final msg = eta <= 1
                 ? 'Arriving at ${live.nextStopName} now.'
                 : 'Next stop: ${live.nextStopName}. Estimated arrival in $eta minutes.';
+            // Explicit user tap must always speak: bypass the duplicate
+            // debounce that suppresses identical automatic announcements.
             AnnouncementCoordinator.instance.announce(
               msg,
               priority: AnnouncementPriority.high,
               routeId: widget.ticket.routeId,
+              debounceWindow: Duration.zero,
             );
           },
         ),

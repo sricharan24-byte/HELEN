@@ -163,6 +163,9 @@ void main() {
       expect(find.text('Repeat Last Instruction'), findsOneWidget);
       expect(find.text('Emergency Help'), findsOneWidget);
       expect(find.text('Need anything? Just ask.'), findsOneWidget);
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     },
   );
 }

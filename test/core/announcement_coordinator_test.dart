@@ -78,7 +78,7 @@ void main() {
 
     test('vocalizes announcement via speechSpeaker when speech is enabled', () {
       final spoken = <String>[];
-      coordinator.speechSpeaker = (msg) => spoken.add(msg);
+      coordinator.speechSpeaker = spoken.add;
 
       final success = coordinator.announce('Next stop: Katpadi Station');
       expect(success, isTrue);
@@ -87,7 +87,7 @@ void main() {
 
     test('announceEtaUpdate announces stop transitions and arrival', () {
       final spoken = <String>[];
-      coordinator.speechSpeaker = (msg) => spoken.add(msg);
+      coordinator.speechSpeaker = spoken.add;
 
       // Stop transition with 5 minutes ETA
       final first = coordinator.announceEtaUpdate(

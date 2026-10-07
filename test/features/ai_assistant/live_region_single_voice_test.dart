@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
+import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
+import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
 
 // Regression test (single-voice, Chunk 42 follow-up): the spoken-output live
 // region must never carry the reply sentence. The reply is spoken by the
@@ -11,6 +13,10 @@ import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
 // speaking-state transition; the reply text stays a regular semantics node
 // reachable by navigation.
 void main() {
+  setUp(() {
+    AudioSpeechEngine.muteOfflineTts(false);
+    AnnouncementCoordinator.instance.reset();
+  });
   group('GeminiLiveScreen single-voice semantics contract', () {
     testWidgets('spoken-output live region never exposes the reply text',
         (tester) async {

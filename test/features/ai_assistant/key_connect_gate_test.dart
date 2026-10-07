@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/core/settings/app_settings_controller.dart';
+import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
+import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_session.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_transport.dart';
@@ -22,6 +24,8 @@ import 'package:busbuddy/features/ai_assistant/gemini_live_transport.dart';
 void main() {
   setUp(() {
     GeminiLiveSession.testValidateOverride = null;
+    AudioSpeechEngine.muteOfflineTts(false);
+    AnnouncementCoordinator.instance.reset();
   });
   tearDown(() {
     GeminiLiveSession.testValidateOverride = null;

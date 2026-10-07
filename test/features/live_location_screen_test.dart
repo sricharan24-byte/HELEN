@@ -12,6 +12,10 @@ import '../helpers/map_test_tiles.dart';
 
 void main() {
   setUpAll(stubMapTiles);
+  // AnnouncementCoordinator is a process-wide singleton with a duplicate
+  // debounce: reset before every test so one test's announcements never
+  // suppress another's.
+  setUp(AnnouncementCoordinator.instance.reset);
   testWidgets('LiveLocationScreen renders map, vehicle stats, and emergency share button', (tester) async {
     final dataSource = LocalTransportDataSource();
     final repository = LocalTransportRepository(dataSource: dataSource);
@@ -43,7 +47,7 @@ void main() {
     // Verify vehicle stats metrics labels
     expect(find.text('SPEED'), findsOneWidget);
     expect(find.text('ETA TO NEXT'), findsOneWidget);
-    expect(find.text('NEXT STOP'), findsOneWidget);
+    expect(find.text('NEXT STOP'), findsNWidgets(2));
 
     // Verify driver info card
     expect(find.textContaining('Driver: M. Ramanathan'), findsOneWidget);
@@ -209,7 +213,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Tap End Trip Now button
+    // Tap End Trip Now button (scroll into view: content is taller than
+    // the 800x600 test viewport).
+    await tester.ensureVisible(find.text('End Trip Now'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('End Trip Now'));
     await tester.pumpAndSettle();
 
@@ -228,7 +235,7 @@ void main() {
 
   testWidgets('LiveLocationScreen dispatches stop announcements and supports manual audio trigger and mute toggle', (tester) async {
     final announced = <String>[];
-    AnnouncementCoordinator.instance.speechSpeaker = (msg) => announced.add(msg);
+    AnnouncementCoordinator.instance.speechSpeaker = announced.add;
     addTearDown(AnnouncementCoordinator.instance.reset);
 
     final dataSource = LocalTransportDataSource();
@@ -262,10 +269,13 @@ void main() {
       reason: 'Should announce initial upcoming stop',
     );
 
-    // Tap speaker icon button on next stop card
+    // Tap speaker icon button on next stop card (scroll into view: the
+    // metric card sits below the 800x600 test viewport fold).
     announced.clear();
     final speakerBtn = find.byTooltip('Announce stop aloud');
     expect(speakerBtn, findsOneWidget);
+    await tester.ensureVisible(speakerBtn);
+    await tester.pumpAndSettle();
     await tester.tap(speakerBtn);
     await tester.pump();
     expect(

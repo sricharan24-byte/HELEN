@@ -8,6 +8,8 @@ import 'package:busbuddy/core/settings/app_settings_controller.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
+import 'package:busbuddy/domain/ticketing/entities/fare_engine.dart';
+import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
 import 'package:busbuddy/features/tickets/live_location_screen.dart';
@@ -42,6 +44,8 @@ Widget testApp({
 
 /// Fresh installs start ticketless, so tests needing an active ticket book
 /// one explicitly instead of relying on a pre-booked seed.
+/// The caller owns the returned controller: dispose it in a tearDown so the
+/// expiry timer never outlives the test.
 TicketController bookCorridorTicketController() {
   final dataSource = LocalTransportDataSource();
   final route = dataSource.allRoutes.firstWhere(
@@ -76,13 +80,17 @@ void main() {
     testWidgets('displays active ticket greeting banner (Image 2)', (
       tester,
     ) async {
+      final ticketController = bookCorridorTicketController();
       await tester.pumpWidget(
-        testApp(ticketController: bookCorridorTicketController()),
+        testApp(ticketController: ticketController),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Good morning, Pavan!'), findsOneWidget);
       expect(find.text("Here's your journey today."), findsOneWidget);
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     });
 
     testWidgets(
@@ -122,6 +130,9 @@ void main() {
       expect(find.text('3 stops'), findsOneWidget);
       expect(find.text('6 min'), findsOneWidget);
       expect(find.text('View Journey Details'), findsOneWidget);
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     });
 
     testWidgets('tapping View Journey Details opens LiveLocationScreen', (
@@ -135,6 +146,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(LiveLocationScreen), findsOneWidget);
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     });
 
     testWidgets('hides active journey card immediately when ticket completes', (

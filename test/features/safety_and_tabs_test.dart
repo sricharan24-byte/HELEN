@@ -74,6 +74,9 @@ void main() {
         // the only passbook now.
         expect(find.text('My Tickets'), findsOneWidget);
         expect(find.text('ACTIVE'), findsOneWidget);
+        // The booking armed an expiry Timer: dispose before the body ends
+        // (testWidgets verifies timers before teardowns run).
+        ticketController.dispose();
       },
     );
 

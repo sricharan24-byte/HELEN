@@ -29,6 +29,7 @@ void main() {
       dataSource = LocalTransportDataSource();
       ticketRepo = LocalTicketRepository();
       ticketController = TicketController(ticketRepo);
+      addTearDown(ticketController.dispose);
     });
 
     Ticket bookCorridorTicket() {
@@ -182,6 +183,9 @@ void main() {
         'Katpadi Railway Station',
       );
       journeyController.dispose();
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     });
 
     testWidgets('End Trip Early expires the ticket and resets the flow', (
@@ -250,6 +254,9 @@ void main() {
             'bus marker should advance along the route, '
             'was $before still $after after 5s',
       );
+      // The booking armed an expiry Timer: dispose before the body ends
+      // (testWidgets verifies timers before teardowns run).
+      ticketController.dispose();
     });
 
     testWidgets('arrival banner appears when the bus stream terminates', (

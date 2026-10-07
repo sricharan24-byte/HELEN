@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
@@ -58,6 +57,14 @@ class WakeWordService extends ChangeNotifier {
   Timer? _restartTimer;
   bool _initialized = false;
 
+  /// Whether popping the Live screen owes ambient listening a restart.
+  /// Snapshot at [pause] time: only a service that was actually listening (or
+  /// mid-wake) when the Live screen opened may restart on [resume]. A service
+  /// that was never started must not arm a restart timer as a side effect of
+  /// a screen disposing — that strands pending-Timer work and, in widget
+  /// tests, fails teardown.
+  bool _resumeOwed = false;
+
   /// Hook for tests or custom observers when wake word is detected.
   void Function(String? query)? onWakeWordDetected;
 
@@ -67,12 +74,13 @@ class WakeWordService extends ChangeNotifier {
     if (clean.isEmpty) return WakeWordMatch.noMatch;
 
     final regex = RegExp(
-      r'^(?:.*?\b)?(?:hey|ok|okay|hi|hello)?\s*(?:bus\s*buddy)[,\.!\?]?\s*(.*)$',
+      r'^(?:.*?\b)?(?:hey|ok|okay|hi|hello)?\s*(?:bus\s*buddy)[,\.!\?:;]?\s*(.*)$',
       caseSensitive: false,
     );
     final m = regex.firstMatch(clean);
     if (m != null) {
-      final trailing = m.group(1)?.trim();
+      final trailing =
+          m.group(1)?.trim().replaceFirst(RegExp(r'^[:;,\-–—]\s*'), '');
       return WakeWordMatch(
         isMatched: true,
         query: (trailing != null && trailing.isNotEmpty) ? trailing : null,
@@ -125,9 +133,7 @@ class WakeWordService extends ChangeNotifier {
 
     try {
       audioEngine.startListening(
-        onResult: (text, isFinal) {
-          _handleTranscript(text, isFinal);
-        },
+        onResult: _handleTranscript,
         onError: (err) {
           debugPrint('[WakeWordService] Speech recognition notice: $err');
           if (!_isPaused && AppSettingsController.instance.wakePhrase) {
@@ -225,21 +231,26 @@ class WakeWordService extends ChangeNotifier {
 
   /// Pauses wake word listening (called while [GeminiLiveScreen] is open).
   void pause() {
+    _resumeOwed =
+        _isListening || _isProcessingWake || _restartTimer != null;
     _isPaused = true;
     _stopInternal();
   }
 
   /// Resumes wake word listening (called when [GeminiLiveScreen] is popped).
   void resume() {
+    final owed = _resumeOwed;
+    _resumeOwed = false;
     _isPaused = false;
     _isProcessingWake = false;
-    if (AppSettingsController.instance.wakePhrase) {
+    if (owed && AppSettingsController.instance.wakePhrase) {
       _scheduleRestart(delayMs: 400);
     }
   }
 
   /// Stops wake word listening.
   void stopListening() {
+    _resumeOwed = false;
     _stopInternal();
   }
 
@@ -267,12 +278,14 @@ class WakeWordService extends ChangeNotifier {
     repository = null;
     journeyController = null;
     onWakeWordDetected = null;
+    super.dispose();
   }
 
   void resetForTesting({bool uninitialize = false}) {
     _stopInternal();
     _isPaused = false;
     _isProcessingWake = false;
+    _resumeOwed = false;
     onWakeWordDetected = null;
     if (uninitialize && _initialized) {
       AppSettingsController.instance.removeListener(_onSettingsChanged);

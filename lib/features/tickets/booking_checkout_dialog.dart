@@ -297,13 +297,17 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
             // Passenger Name Input (Required)
             Row(
               children: [
-                Text(
-                  'PASSENGER NAME',
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'PASSENGER NAME',
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 4),

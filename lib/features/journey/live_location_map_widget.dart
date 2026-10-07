@@ -313,7 +313,8 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
+                  Flexible(
+                    child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.75),
@@ -321,6 +322,7 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                       border: Border.all(color: Colors.white24),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
                           width: 8,
@@ -331,21 +333,29 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          'LIVE GPS • $speed km/h',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: Text(
+                            'LIVE GPS • $speed km/h',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
+                    ),
                   ),
-                  Row(
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
+                      Flexible(
+                        child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFF007AFF),
@@ -358,6 +368,9 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         ),
                       ),
                       if (widget.onToggleFullScreen != null) ...[
@@ -406,6 +419,7 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                         ),
                       ],
                     ],
+                    ),
                   ),
                 ],
               ),

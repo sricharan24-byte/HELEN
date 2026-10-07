@@ -37,7 +37,7 @@ class AudioSpeechEngine {
       if (kIsWeb) {
         speech_impl.stopSpeech();
       } else {
-        nativeAudioChannel.stopTts();
+        unawaited(nativeAudioChannel.stopTts());
       }
     }
   }

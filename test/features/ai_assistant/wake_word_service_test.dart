@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/core/settings/app_settings_controller.dart';
+import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
 import 'package:busbuddy/features/ai_assistant/ai_control_glow.dart';
 import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
@@ -39,12 +40,16 @@ void main() {
 
   setUp(() {
     AiControlGlow.instance.idle();
+    AudioSpeechEngine.muteOfflineTts(false);
+    AnnouncementCoordinator.instance.reset();
     AppSettingsController.instance.updateWakePhrase(true);
     WakeWordService.instance.resetForTesting();
   });
 
   tearDown(() {
     WakeWordService.instance.resetForTesting(uninitialize: true);
+    AudioSpeechEngine.muteOfflineTts(false);
+    AnnouncementCoordinator.instance.reset();
     AiControlGlow.instance.idle();
   });
 
@@ -186,9 +191,22 @@ void main() {
       WakeWordService.instance.initialize(navigatorKey: navKey);
 
       WakeWordService.instance.simulateWakeWord('Hey BusBuddy, when is next bus?');
-      await tester.pumpAndSettle();
+      // GeminiLiveScreen runs repeating animations and a live connection:
+      // pump frames manually instead of pumpAndSettle (which never settles).
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
       expect(find.byType(GeminiLiveScreen), findsOneWidget);
+
+      // Tear the tree down the same way the connect-gate tests do: replacing
+      // the widget disposes the screen without a pop transition, then one
+      // pump flushes the 400ms ambient-listen resume timer dispose arms
+      // (fake engine schedules nothing further) so no timer outlives the test.
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Text('Home Page'))),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
     });
   });
 }

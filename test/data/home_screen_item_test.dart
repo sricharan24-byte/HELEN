@@ -66,10 +66,10 @@ void main() {
     test(
       'fromJson falls back to defaults when title or subtitle are missing',
       () {
-        final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idAlerts});
-        expect(item.id, HomeScreenItem.idAlerts);
-        expect(item.title, 'Corridor Alerts');
-        expect(item.subtitle, 'Delay & schedule updates');
+        final item = HomeScreenItem.fromJson({'id': HomeScreenItem.idMyTickets});
+        expect(item.id, HomeScreenItem.idMyTickets);
+        expect(item.title, 'My Tickets');
+        expect(item.subtitle, 'View current and previous tickets');
         expect(item.isVisible, isTrue);
       },
     );

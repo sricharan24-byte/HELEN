@@ -6,7 +6,6 @@ import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/models/home_screen_item.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
-import 'package:busbuddy/features/alerts/alerts_page.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
 import 'package:busbuddy/features/safety/safety_sharing_page.dart';

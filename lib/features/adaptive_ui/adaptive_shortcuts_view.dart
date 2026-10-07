@@ -72,27 +72,31 @@ class _AdaptiveShortcutsViewState extends State<AdaptiveShortcutsView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Section Header ─────────────────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Wrap (not Row) so the Manage button drops below the title instead
+        // of squeezing it into overflow at 300% platform text scale.
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 16),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'Suggested for You',
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.2,
-                      ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 16),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Suggested for You',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             TextButton(
               onPressed: () => AdaptiveShortcutsModal.show(context),

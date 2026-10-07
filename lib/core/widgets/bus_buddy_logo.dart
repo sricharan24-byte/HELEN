@@ -35,8 +35,8 @@ class BusBuddyLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final logoRow = Row(
-      mainAxisSize: mainAxisSize,
+    final logoRow = Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           'Bus',

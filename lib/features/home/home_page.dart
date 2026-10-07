@@ -281,7 +281,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     widget.ticketController.checkExpiry();
     final colors = AppTheme.colors(context);
-    final textTheme = Theme.of(context).textTheme;
     final activeTicket = widget.ticketController.activeTicket;
     final hasActiveTicket = activeTicket != null;
     final visibleItems = AppSettingsController.instance.homeScreenItems
@@ -627,72 +626,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                           routes.first,
                                         );
                                       }
-                                      final origin =
-                                          widget.controller.state.origin ??
-                                          (routes.isNotEmpty
-                                              ? widget.repository.getStop(
-                                                  routes.first.orderedStopIds.first,
-                                                )
-                                              : null) ??
-                                          const Stop(
-                                            id: 'vit_main_gate',
-                                            name: 'VIT Main Gate',
-                                            area: 'Vellore',
-                                            latitude: 12.9692,
-                                            longitude: 79.1559,
-                                          );
-                                      final destination =
-                                          widget.controller.state.destination ??
-                                          (routes.isNotEmpty
-                                              ? widget.repository.getStop(
-                                                  routes.first.orderedStopIds.last,
-                                                )
-                                              : null) ??
-                                          const Stop(
-                                            id: 'katpadi_railway_station',
-                                            name: 'Katpadi Railway Station',
-                                            area: 'Katpadi',
-                                            latitude: 12.9790,
-                                            longitude: 79.1368,
-                                          );
-                                      final ticketToTrack = activeTicket ??
-                                          widget.ticketController.activeTicket ??
-                                          Ticket(
-                                            id: 'BB-ACTIVE-18B',
-                                            routeId: routes.isNotEmpty
-                                                ? routes.first.id
-                                                : 'vit-to-katpadi',
-                                            routeName: routes.isNotEmpty
-                                                ? routes.first.displayName
-                                                : 'VIT → Katpadi',
-                                            origin: origin,
-                                            destination: destination,
-                                            busId: '18B',
-                                            passengerName: 'Pavan',
-                                            passengerType: PassengerType.general,
-                                            fareQuote:
-                                                FareEngine.calculateCorridorFare(
-                                                  PassengerType.general,
-                                                ),
-                                            paymentMethod: PaymentMethod.upi,
-                                            issuedAt: DateTime.now(),
-                                            validUntil: DateTime.now().add(
-                                              const Duration(hours: 4),
-                                            ),
-                                            status: TicketStatus.active,
-                                            qrCodeData: Ticket.buildQrPayload(
-                                              ticketId: 'BB-ACTIVE-18B',
-                                              originId: origin.id,
-                                              destinationId: destination.id,
-                                              busId: '18B',
-                                              farePaise: 2000,
-                                              validUntil: DateTime.now().add(
-                                                const Duration(hours: 4),
-                                              ),
-                                              isDemo: true,
-                                            ),
-                                            isDemo: true,
-                                          );
+                                      final ticketToTrack = activeTicket;
                                       unawaited(
                                         Navigator.of(context).push(
                                           MaterialPageRoute<void>(

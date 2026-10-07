@@ -72,7 +72,7 @@ void main() {
 
         // Shows 'Hidden' badge
         expect(find.text('Hidden'), findsOneWidget);
-        expect(find.textContaining('5 of 6 visible'), findsOneWidget);
+        expect(find.textContaining('4 of 5 visible'), findsOneWidget);
 
         // Toggle back to true
         await tester.tap(switches.first);
@@ -82,7 +82,7 @@ void main() {
           AppSettingsController.instance.homeScreenItems.first.isVisible,
           true,
         );
-        expect(find.textContaining('6 of 6 visible'), findsOneWidget);
+        expect(find.textContaining('5 of 5 visible'), findsOneWidget);
       },
     );
 
