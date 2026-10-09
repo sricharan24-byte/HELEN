@@ -9,7 +9,7 @@ import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../ai_assistant/gemini_live_screen.dart';
-import 'live_location_screen.dart';
+import '../journey/live_location_screen.dart';
 import 'ticket_controller.dart';
 import 'ticket_details_page.dart';
 

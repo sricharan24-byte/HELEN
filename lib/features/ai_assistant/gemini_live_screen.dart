@@ -10,7 +10,7 @@ import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
 import '../settings/home_screen_customization_page.dart';
-import '../tickets/live_location_screen.dart';
+import '../journey/live_location_screen.dart';
 import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';

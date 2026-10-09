@@ -10,9 +10,9 @@ import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../../core/a11y/announcement_coordinator.dart';
-import '../../features/ai_assistant/audio_speech_engine.dart';
-import '../journey/live_location_map_widget.dart';
-import 'ticket_controller.dart';
+import '../ai_assistant/audio_speech_engine.dart';
+import 'live_location_map_widget.dart';
+import '../tickets/ticket_controller.dart';
 
 class LiveLocationScreen extends StatefulWidget {
   const LiveLocationScreen({

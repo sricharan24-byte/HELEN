@@ -10,7 +10,7 @@ import 'package:busbuddy/data/models/transport_models.dart' as models;
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/domain/transit/entities/telemetry_state.dart';
-import 'package:busbuddy/features/tickets/live_location_screen.dart';
+import 'package:busbuddy/features/journey/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 
 import '../helpers/map_test_tiles.dart';

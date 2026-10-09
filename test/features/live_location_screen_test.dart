@@ -6,7 +6,7 @@ import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/models/ticket_model.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
-import 'package:busbuddy/features/tickets/live_location_screen.dart';
+import 'package:busbuddy/features/journey/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 import '../helpers/map_test_tiles.dart';
 

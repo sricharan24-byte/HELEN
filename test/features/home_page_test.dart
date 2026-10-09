@@ -12,7 +12,7 @@ import 'package:busbuddy/domain/ticketing/entities/fare_engine.dart';
 import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/features/home/home_page.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
-import 'package:busbuddy/features/tickets/live_location_screen.dart';
+import 'package:busbuddy/features/journey/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 import '../helpers/map_test_tiles.dart';
 

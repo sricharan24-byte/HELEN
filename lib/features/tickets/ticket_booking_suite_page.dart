@@ -15,10 +15,10 @@ import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
 import '../journey/live_location_map_widget.dart';
+import '../journey/live_location_screen.dart';
 import '../safety/safety_sharing_page.dart';
 import '../saved/saved_place_chips.dart';
 import 'booking_checkout_dialog.dart';
-import 'live_location_screen.dart';
 import 'ticket_controller.dart';
 
 /// Unified 3-Step Ticket Booking & Active Trip Suite page matching the master UI screenshots.

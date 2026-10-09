@@ -22,7 +22,7 @@ import '../journey/journey_controller.dart';
 import '../safety/safety_sharing_page.dart';
 import '../settings/settings_page.dart';
 import '../alerts/alerts_page.dart';
-import '../tickets/live_location_screen.dart';
+import '../journey/live_location_screen.dart';
 import '../tickets/my_tickets_page.dart';
 import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
