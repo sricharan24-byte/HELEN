@@ -35,8 +35,6 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
   String get _textSize => _settings.textSize;
   String get _highContrast => _settings.highContrast;
   bool get _hapticFeedback => _settings.hapticFeedback;
-  bool get _simplifiedNav => _settings.simplifiedNav;
-  bool get _screenReaderHints => _settings.screenReaderHints;
 
   void _showTextSizePicker() {
     final colors = AppTheme.colors(context);
@@ -244,6 +242,14 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                 const SizedBox(height: 12),
 
                 // ── Card 4: Haptic Feedback ─────────────────────────────
+                // Honest (BUS-P2-06): the switch gates a real
+                // HapticFeedback.heavyImpact() on the SOS broadcast, the
+                // app's one "important alert". The two cards that used to
+                // sit here — "Simplified Navigation" and "Screen Reader
+                // Hints" — were deleted because nothing read their values.
+                // A switch that changes nothing is a lie in an
+                // accessibility screen. Re-add one when a real behaviour
+                // is behind it.
                 _buildDarkCard(
                   icon: Icons.phonelink_ring,
                   title: 'Haptic Feedback',
@@ -253,36 +259,6 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                     activeThumbColor: Colors.white,
                     activeTrackColor: colors.statusSuccess,
                     onChanged: (val) => setState(() => _settings.updateHapticFeedback(val)),
-                  ),
-                  colors: colors,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Card 5: Simplified Navigation ───────────────────────
-                _buildDarkCard(
-                  icon: Icons.grid_view_rounded,
-                  title: 'Simplified Navigation',
-                  subtitle: 'Larger buttons, fewer steps',
-                  trailing: Switch(
-                    value: _simplifiedNav,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: colors.statusSuccess,
-                    onChanged: (val) => setState(() => _settings.updateSimplifiedNav(val)),
-                  ),
-                  colors: colors,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Card 6: Screen Reader Hints ─────────────────────────
-                _buildDarkCard(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'Screen Reader Hints',
-                  subtitle: 'Extra descriptions for clarity',
-                  trailing: Switch(
-                    value: _screenReaderHints,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: colors.statusSuccess,
-                    onChanged: (val) => setState(() => _settings.updateScreenReaderHints(val)),
                   ),
                   colors: colors,
                 ),

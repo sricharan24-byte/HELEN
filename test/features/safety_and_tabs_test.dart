@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:busbuddy/core/settings/app_settings_controller.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
@@ -27,6 +29,51 @@ void main() {
       expect(find.text('BROADCAST SOS ALERT NOW'), findsOneWidget);
       expect(find.text('TRUSTED EMERGENCY CONTACTS'), findsOneWidget);
       expect(find.textContaining('Parent / Guardian'), findsOneWidget);
+    });
+
+    // BUS-P2-06: the "Haptic Feedback" accessibility switch is honest only
+    // if something reads it. It gates a real vibration on the SOS broadcast,
+    // and the SOS broadcast is the app's one important alert. Without this
+    // the switch would be a lie in an accessibility screen, which is the
+    // Chunk 45 microphone-state bug all over again.
+    testWidgets('SOS broadcast vibrates only when haptics are enabled', (tester) async {
+      final settings = AppSettingsController.instance;
+      final vibes = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            vibes.add(call.arguments.toString());
+          }
+          return null;
+        },
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      Future<void> broadcast() async {
+        await tester.pumpWidget(
+          MaterialApp(home: const SafetySharingPage()),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('BROADCAST SOS ALERT NOW'));
+        await tester.pumpAndSettle();
+        // Confirm the broadcast dialog.
+        await tester.tap(find.textContaining('RECORD SIMULATED SOS'));
+        await tester.pumpAndSettle();
+      }
+
+      settings.updateHapticFeedback(true);
+      await broadcast();
+      expect(vibes, contains('HapticFeedbackType.heavyImpact'),
+          reason: 'haptics on -> SOS must vibrate');
+
+      vibes.clear();
+      settings.updateHapticFeedback(false);
+      await broadcast();
+      expect(vibes, isEmpty, reason: 'haptics off -> SOS must not vibrate');
     });
   });
 

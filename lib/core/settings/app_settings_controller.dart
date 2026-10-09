@@ -38,8 +38,6 @@ class AppSettingsController extends ChangeNotifier {
       ]);
       highContrast = choice('highContrast', highContrast, ['On', 'Off']);
       hapticFeedback = flag('hapticFeedback', hapticFeedback);
-      simplifiedNav = flag('simplifiedNav', simplifiedNav);
-      screenReaderHints = flag('screenReaderHints', screenReaderHints);
       adaptiveUi = flag('adaptiveUi', adaptiveUi);
       startingScreen = choice('startingScreen', startingScreen, [
         'Home',
@@ -123,8 +121,6 @@ class AppSettingsController extends ChangeNotifier {
     'textSize': textSize,
     'highContrast': highContrast,
     'hapticFeedback': hapticFeedback,
-    'simplifiedNav': simplifiedNav,
-    'screenReaderHints': screenReaderHints,
     'adaptiveUi': adaptiveUi,
     'startingScreen': startingScreen,
     'preferredLanguage': preferredLanguage,
@@ -147,8 +143,6 @@ class AppSettingsController extends ChangeNotifier {
   String highContrast = 'On';
   bool get isHighContrast => highContrast == 'On';
   bool hapticFeedback = true;
-  bool simplifiedNav = true;
-  bool screenReaderHints = true;
 
   bool adaptiveUi = true;
   String startingScreen = 'Home';
@@ -267,16 +261,6 @@ class AppSettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateSimplifiedNav(bool val) {
-    simplifiedNav = val;
-    notifyListeners();
-  }
-
-  void updateScreenReaderHints(bool val) {
-    screenReaderHints = val;
-    notifyListeners();
-  }
-
   void updateAdaptiveUi(bool val) {
     adaptiveUi = val;
     notifyListeners();
@@ -377,8 +361,6 @@ class AppSettingsController extends ChangeNotifier {
     textSize = 'Large';
     highContrast = 'On';
     hapticFeedback = true;
-    simplifiedNav = true;
-    screenReaderHints = true;
     adaptiveUi = true;
     startingScreen = 'Home';
     preferredLanguage = 'English';

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/widgets/bus_buddy_logo.dart';
@@ -26,6 +28,7 @@ class SafetySharingPage extends StatefulWidget {
 
 class _SafetySharingPageState extends State<SafetySharingPage> {
   final _contacts = EmergencyContactRepository.instance;
+  final _settings = AppSettingsController.instance;
 
   @override
   void initState() {
@@ -139,6 +142,12 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
   }
 
   void _triggerSosAlert() {
+    // BUS-P2-06: the haptic switch is honest only if something reads it.
+    // The SOS broadcast is the one "important alert" in the app, so it is
+    // the one place a vibration is warranted. Honours the user's switch.
+    if (_settings.hapticFeedback) {
+      unawaited(HapticFeedback.heavyImpact());
+    }
     final colors = AppTheme.colors(context);
 
     unawaited(showDialog<void>(

@@ -31,8 +31,10 @@ void main() {
       expect(find.text('High Contrast'), findsOneWidget);
       expect(find.text('Voice & TalkBack'), findsOneWidget);
       expect(find.text('Haptic Feedback'), findsOneWidget);
-      expect(find.text('Simplified Navigation'), findsOneWidget);
-      expect(find.text('Screen Reader Hints', skipOffstage: false), findsOneWidget);
+      // BUS-P2-06: the two switches whose values nothing read are gone.
+      // A switch in an accessibility screen that changes nothing is a lie.
+      expect(find.text('Simplified Navigation'), findsNothing);
+      expect(find.text('Screen Reader Hints'), findsNothing);
       expect(find.text('Tip', skipOffstage: false), findsOneWidget);
       expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
     });
