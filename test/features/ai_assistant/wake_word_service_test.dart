@@ -13,6 +13,13 @@ class FakeAudioSpeechEngine extends AudioSpeechEngine {
   int chimeCount = 0;
   void Function(String text, bool isFinal)? lastOnResult;
 
+  /// The host VM reports no platform that can transcribe ambient audio, and
+  /// this fake overrides [startListening] to stand in for one. Without this the
+  /// service would correctly refuse to listen and every test below would be
+  /// asserting the refusal.
+  @override
+  bool get canRecognizeSpeech => true;
+
   @override
   void startListening({
     required void Function(String text, bool isFinal) onResult,
@@ -35,8 +42,60 @@ class FakeAudioSpeechEngine extends AudioSpeechEngine {
   }
 }
 
+/// Stands in for a platform where [AudioSpeechEngine.canRecognizeSpeech] is
+/// false (the real value on this VM) but still records whether anything tried
+/// to open the microphone.
+class _RecordingEngine extends AudioSpeechEngine {
+  bool isListeningStarted = false;
+
+  @override
+  bool get canRecognizeSpeech => false;
+
+  @override
+  void startListening({
+    required void Function(String text, bool isFinal) onResult,
+    required void Function(String error) onError,
+    required VoidCallback onEnd,
+  }) {
+    isListeningStarted = true;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // BUS-P1-08 regression: on a platform that cannot transcribe ambient audio
+  // (Android streams its mic to Gemini Live; it has no on-device STT), the
+  // wake-word service used to retry forever. Each retry re-ran the permission
+  // flow and reopened AudioRecord, so it held the device microphone against the
+  // real voice turn — the passenger's microphone appeared dead.
+  group('platforms that cannot transcribe ambient audio', () {
+    test('startListening never opens the microphone', () {
+      final engine = _RecordingEngine();
+      WakeWordService.instance.audioEngine = engine;
+
+      WakeWordService.instance.startListening();
+
+      expect(WakeWordService.instance.isListening, isFalse);
+      expect(engine.isListeningStarted, isFalse);
+    });
+
+    test('initialize does not start listening', () {
+      final engine = _RecordingEngine();
+      WakeWordService.instance.audioEngine = engine;
+
+      WakeWordService.instance.initialize(navigatorKey: GlobalKey<NavigatorState>());
+
+      expect(WakeWordService.instance.isListening, isFalse);
+      expect(engine.isListeningStarted, isFalse);
+    });
+
+    test('simulated voice input is treated as recognisable', () {
+      addTearDown(() => AudioSpeechEngine.enableSimulatedVoiceInput = false);
+      AudioSpeechEngine.enableSimulatedVoiceInput = true;
+      expect(AudioSpeechEngine().canRecognizeSpeech, isTrue);
+    });
+  });
 
   setUp(() {
     AiControlGlow.instance.idle();

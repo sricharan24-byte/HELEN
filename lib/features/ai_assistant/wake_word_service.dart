@@ -106,7 +106,9 @@ class WakeWordService extends ChangeNotifier {
       AppSettingsController.instance.addListener(_onSettingsChanged);
     }
 
-    if (AppSettingsController.instance.wakePhrase && !_isPaused) {
+    if (AppSettingsController.instance.wakePhrase &&
+        !_isPaused &&
+        audioEngine.canRecognizeSpeech) {
       startListening();
     }
   }
@@ -123,6 +125,20 @@ class WakeWordService extends ChangeNotifier {
   /// Starts listening for the wake word using the speech engine.
   void startListening() {
     if (_isListening || _isPaused || !AppSettingsController.instance.wakePhrase) {
+      return;
+    }
+    // The wake word needs a transcript to match against. Where the platform
+    // cannot produce one, listening can only ever fail — and failing restarts
+    // this method, so without this guard the service re-requests the mic
+    // permission and reopens AudioRecord every few seconds, fighting the real
+    // voice turn for the device microphone. Android streams its mic to Gemini
+    // Live instead (see AudioSpeechEngine.openLiveMicrophone), so ambient
+    // wake-word listening is unavailable there, not merely unreliable.
+    if (!audioEngine.canRecognizeSpeech) {
+      if (_isListening) {
+        _isListening = false;
+        notifyListeners();
+      }
       return;
     }
     _restartTimer?.cancel();

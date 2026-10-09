@@ -125,7 +125,9 @@ void main() {
       expect(find.text('Set up how you interact with BusBuddy using voice.'), findsOneWidget);
       expect(find.text('Preferred Language'), findsOneWidget);
       expect(find.text('Voice Speed'), findsOneWidget);
-      expect(find.text('Wake Phrase'), findsOneWidget);
+      // BUS-P1-08: Wake Phrase is gated on AudioSpeechEngine.canRecognizeSpeech,
+      // false on this VM, so the switch is hidden rather than shown inert.
+      expect(find.text('Wake Phrase'), findsNothing);
       expect(find.text('Voice Confirmations'), findsOneWidget);
       expect(find.text('Gemini Live Voice'), findsOneWidget);
       expect(find.text('Example'), findsOneWidget);

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../ai_assistant/audio_speech_engine.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../tickets/ticket_controller.dart';
@@ -51,6 +52,10 @@ class _VoiceAssistantSettingsPageState
   String get _language => _settings.preferredLanguage;
   String get _voiceSpeed => _settings.voiceSpeed;
   bool get _wakePhrase => _settings.wakePhrase;
+
+  /// Whether this platform can transcribe ambient microphone audio at all.
+  /// Gates the Wake Phrase switch, which is otherwise inert here.
+  bool get _canRecognizeSpeech => AudioSpeechEngine().canRecognizeSpeech;
   bool get _voiceConfirmations => _settings.voiceConfirmations;
 
   void _showLanguagePicker() {
@@ -429,25 +434,31 @@ class _VoiceAssistantSettingsPageState
                 const SizedBox(height: 12),
 
                 // ── Light Card 3: Wake Phrase ────────────────────────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.graphic_eq,
-                  title: 'Wake Phrase',
-                  subtitle: 'Say "Hey BusBuddy"',
-                  trailing: Switch(
-                    value: _wakePhrase,
-                    activeThumbColor: colors.onActionPrimary,
-                    activeTrackColor: colors.statusSuccess,
-                    onChanged: (val) {
-                      _settings.updateWakePhrase(val);
-                      AnnouncementCoordinator.instance.announce(
-                        val
-                            ? 'Wake phrase "Hey BusBuddy" enabled'
-                            : 'Wake phrase disabled',
-                      );
-                    },
+                // Hidden where the platform cannot transcribe ambient audio:
+                // the switch would flip a setting nothing reads, which is the
+                // same lie as an inert accessibility switch. Android streams
+                // its microphone to Gemini Live instead of transcribing locally
+                // (AudioSpeechEngine.canRecognizeSpeech).
+                if (_canRecognizeSpeech)
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.graphic_eq,
+                    title: 'Wake Phrase',
+                    subtitle: 'Say "Hey BusBuddy"',
+                    trailing: Switch(
+                      value: _wakePhrase,
+                      activeThumbColor: colors.onActionPrimary,
+                      activeTrackColor: colors.statusSuccess,
+                      onChanged: (val) {
+                        _settings.updateWakePhrase(val);
+                        AnnouncementCoordinator.instance.announce(
+                          val
+                              ? 'Wake phrase "Hey BusBuddy" enabled'
+                              : 'Wake phrase disabled',
+                        );
+                      },
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
 
                 // ── Light Card 4: Voice Confirmations ────────────────────

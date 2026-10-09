@@ -134,6 +134,22 @@ class AudioSpeechEngine {
     speech_impl.enableSimulatedVoiceInput = value;
   }
 
+  /// Whether [startListening] can ever turn microphone audio into a transcript
+  /// on this platform.
+  ///
+  /// Only the Web Speech API path can. Android has no on-device speech-to-text
+  /// in this app: its microphone is streamed to Gemini Live as raw PCM by
+  /// [openLiveMicrophone], which never routes through [startListening]. So on
+  /// Android [startListening] cannot succeed — it runs the permission flow,
+  /// opens and immediately closes `AudioRecord`, and reports a reason.
+  ///
+  /// Callers that retry on failure (the wake-word service) must consult this
+  /// first. Retrying a path that cannot succeed re-requests the microphone
+  /// permission on a timer, holds `AudioRecord` against the real voice turn,
+  /// and never produces a transcript.
+  bool get canRecognizeSpeech =>
+      kIsWeb || AudioSpeechEngine.enableSimulatedVoiceInput;
+
   /// Sets a callback that fires when speech output (PCM or TTS) finishes playing.
   void setAudioEndedCallback(VoidCallback onEnded) {
     _onEnded = onEnded;
