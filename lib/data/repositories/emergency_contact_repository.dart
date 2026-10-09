@@ -57,11 +57,6 @@ class EmergencyContactRepository extends ChangeNotifier {
     _persist();
   }
 
-  void removeContact(int index) {
-    _contacts.removeAt(index);
-    _persist();
-  }
-
   void _persist() {
     unawaited(_store?.write(storageKey, _contacts));
     notifyListeners();

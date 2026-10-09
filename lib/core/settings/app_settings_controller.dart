@@ -56,11 +56,6 @@ class AppSettingsController extends ChangeNotifier {
       voiceSpeed = choice('voiceSpeed', voiceSpeed, ['Slow', 'Normal', 'Fast']);
       wakePhrase = flag('wakePhrase', wakePhrase);
       voiceConfirmations = flag('voiceConfirmations', voiceConfirmations);
-      useGemini = flag('useGemini', useGemini);
-      floatingAssistantEnabled = flag(
-        'floatingAssistantEnabled',
-        floatingAssistantEnabled,
-      );
       final model = value['geminiModel'];
       if (model is String && model.trim().isNotEmpty) {
         geminiModel = model.trim();
@@ -136,8 +131,6 @@ class AppSettingsController extends ChangeNotifier {
     'voiceSpeed': voiceSpeed,
     'wakePhrase': wakePhrase,
     'voiceConfirmations': voiceConfirmations,
-    'useGemini': useGemini,
-    'floatingAssistantEnabled': floatingAssistantEnabled,
     'geminiModel': geminiModel,
     'geminiVoice': geminiVoice,
     'savedPlaceStopIds': savedPlaceStopIds.toList(),
@@ -164,8 +157,6 @@ class AppSettingsController extends ChangeNotifier {
   String voiceSpeed = 'Normal';
   bool wakePhrase = true;
   bool voiceConfirmations = true;
-  bool useGemini = true;
-  bool floatingAssistantEnabled = true;
   String geminiApiKey = const String.fromEnvironment(
     'GEMINI_API_KEY',
     defaultValue: '',
@@ -316,16 +307,6 @@ class AppSettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateUseGemini(bool val) {
-    useGemini = val;
-    notifyListeners();
-  }
-
-  void updateFloatingAssistantEnabled(bool val) {
-    floatingAssistantEnabled = val;
-    notifyListeners();
-  }
-
   void updateGeminiApiKey(String key) {
     geminiApiKey = key.trim();
     notifyListeners();
@@ -404,8 +385,6 @@ class AppSettingsController extends ChangeNotifier {
     voiceSpeed = 'Normal';
     wakePhrase = true;
     voiceConfirmations = true;
-    useGemini = true;
-    floatingAssistantEnabled = true;
     geminiApiKey = const String.fromEnvironment(
       'GEMINI_API_KEY',
       defaultValue: '',

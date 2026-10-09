@@ -9,7 +9,7 @@ import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
-import '../journey/journey_controller.dart';
+import 'journey_controller.dart';
 
 /// Displays the active journey state with accessible tokens and persistent live region.
 class JourneyPage extends StatelessWidget {

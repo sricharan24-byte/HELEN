@@ -27,7 +27,6 @@ class AssistantToolMetadata {
 
   bool get isConfirmable =>
       safetyLevel == CommandSafetyLevel.requiresUserConfirmation;
-  bool get isReadOnly => safetyLevel == CommandSafetyLevel.readOnly;
 
   /// Serializes to a Gemini Live / REST functionDeclaration entry.
   Map<String, dynamic> toFunctionDeclaration() {

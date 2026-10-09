@@ -17,9 +17,9 @@ import '../journey/journey_controller.dart';
 import '../journey/live_location_map_widget.dart';
 import '../safety/safety_sharing_page.dart';
 import '../saved/saved_place_chips.dart';
-import '../tickets/booking_checkout_dialog.dart';
-import '../tickets/live_location_screen.dart';
-import '../tickets/ticket_controller.dart';
+import 'booking_checkout_dialog.dart';
+import 'live_location_screen.dart';
+import 'ticket_controller.dart';
 
 /// Unified 3-Step Ticket Booking & Active Trip Suite page matching the master UI screenshots.
 class TicketBookingSuitePage extends StatefulWidget {

@@ -112,19 +112,6 @@ class BusLocation {
   final DateTime? receivedTimestamp;
 }
 
-/// A user's chosen origin–destination–route triple.
-class JourneySelection {
-  const JourneySelection({
-    required this.origin,
-    required this.destination,
-    required this.route,
-  });
-
-  final Stop origin;
-  final Stop destination;
-  final Route route;
-}
-
 /// Represents an active or completed passenger journey along the corridor.
 class JourneySession {
   const JourneySession({

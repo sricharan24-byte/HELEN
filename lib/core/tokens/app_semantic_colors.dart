@@ -49,13 +49,6 @@ class AppSemanticColors {
   Color get statusSuccessBg => statusSuccess.withValues(alpha: 0.15);
   Color get statusInfoBg => statusInfo.withValues(alpha: 0.15);
   Color get statusWarningBg => statusWarning.withValues(alpha: 0.15);
-  Color get surfaceBackground => background;
-  Color get primaryBlue => actionPrimary;
-  Color get surfaceCard => surface;
-  Color get cardBorder => border;
-  Color get cardBackground => surface;
-  Color get successGreen => statusSuccess;
-  Color get accentYellow => statusWarning;
 
   /// High-Contrast theme palette guaranteeing WCAG 2.2 AAA (7:1 contrast ratio).
   static const AppSemanticColors highContrast = AppSemanticColors(

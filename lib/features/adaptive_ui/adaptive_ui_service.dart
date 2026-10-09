@@ -57,9 +57,6 @@ class AdaptiveUiService extends ChangeNotifier {
   /// Total number of unique habit patterns tracked.
   int get trackedPatternsCount => _usageFrequencies.length;
 
-  /// True if there are any active shortcuts visible to the user.
-  bool get hasVisibleShortcuts => visibleShortcuts.isNotEmpty;
-
   // ── Persistence ─────────────────────────────────────────────────────────────
 
   Future<void> hydrate(LocalJsonStore store) async {

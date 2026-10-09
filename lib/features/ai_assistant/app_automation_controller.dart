@@ -56,19 +56,6 @@ class AppAutomationController extends ChangeNotifier {
     if (journeyCtrl != null) journeyController = journeyCtrl;
   }
 
-  void resetDraft() {
-    origin = null;
-    destination = null;
-    route = null;
-    busId = '18B';
-    hasCustomBus = false;
-    passengerType = PassengerType.general;
-    passengerName = 'Passenger';
-    paymentMethod = PaymentMethod.upi;
-    _passengerExplicit = false;
-    notifyListeners();
-  }
-
   /// Main entry: applies a Live function call (name + args) to the draft.
   AutomationResult handleToolCall(String name, Map<String, dynamic>? args) {
     switch (name) {

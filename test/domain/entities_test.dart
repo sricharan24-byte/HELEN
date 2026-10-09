@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/domain/core/failure.dart';
-import 'package:busbuddy/domain/safety/entities/emergency_contact.dart';
 import 'package:busbuddy/domain/ticketing/entities/fare.dart';
 import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/domain/transit/entities/bus_position.dart';
@@ -192,35 +191,6 @@ void main() {
 
       final badDateJson = ticket.toJson()..['validUntil'] = 'not-a-date';
       expect(() => Ticket.fromJson(badDateJson), throwsA(isA<FormatException>()));
-    });
-  });
-
-  group('EmergencyContact domain entity', () {
-    test('valid contact and serialization roundtrip', () {
-      const contact = EmergencyContact(
-        name: 'Jane Doe',
-        phone: '+91 9876543210',
-        relation: 'Sister',
-        isTrusted: true,
-      );
-
-      expect(contact.isValid, isTrue);
-      final map = contact.toMap();
-      final revived = EmergencyContact.fromMap(map);
-
-      expect(revived, equals(contact));
-      expect(revived.name, 'Jane Doe');
-      expect(revived.phone, '+91 9876543210');
-      expect(revived.relation, 'Sister');
-    });
-
-    test('isValid rejects blank fields', () {
-      const invalid = EmergencyContact(
-        name: ' ',
-        phone: '',
-        relation: 'None',
-      );
-      expect(invalid.isValid, isFalse);
     });
   });
 

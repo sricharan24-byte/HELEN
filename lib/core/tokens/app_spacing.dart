@@ -10,8 +10,6 @@ abstract final class AppSpacing {
   static const double md = 12.0;
   static const double lg = 16.0;
   static const double xl = 24.0;
-  static const double xxl = 32.0;
-  static const double xxxl = 48.0;
 
   /// Absolute WCAG 2.2 Level AA / AAA floor for any interactive touch target.
   static const double minTouchTarget = 48.0;
@@ -28,5 +26,4 @@ abstract final class AppSpacing {
   /// Padding insets.
   static const EdgeInsets pagePadding = EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0);
   static const EdgeInsets cardPadding = EdgeInsets.all(16.0);
-  static const EdgeInsets buttonPadding = EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0);
 }

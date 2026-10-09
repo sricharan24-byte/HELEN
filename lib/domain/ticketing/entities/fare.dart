@@ -78,7 +78,6 @@ class FareQuote {
   int get payablePaise => finalPaise;
   int get discountPercentage =>
       basePaise > 0 ? (((discountPaise * 100) + (basePaise ~/ 2)) ~/ basePaise) : 0;
-  bool get isConcession => discountPaise > 0;
   String get ruleId => ruleVersion;
 
   /// Presentation getters in rupees (strictly for UI formatting):
