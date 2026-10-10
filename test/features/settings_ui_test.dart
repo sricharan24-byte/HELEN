@@ -17,33 +17,37 @@ import '../helpers/map_test_tiles.dart';
 void main() {
   setUpAll(stubMapTiles);
   group('AccessibilitySettingsPage', () {
-    testWidgets('renders hero header, dark cards, tip box, and Ask BusBuddy button', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: AccessibilitySettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'renders hero header, dark cards, tip box, and Ask BusBuddy button',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: AccessibilitySettingsPage()),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Accessibility'), findsWidgets);
-      expect(find.text('Adjust the app to make it easier to use.'), findsOneWidget);
-      expect(find.text('Text Size'), findsOneWidget);
-      expect(find.text('High Contrast'), findsOneWidget);
-      expect(find.text('Voice & TalkBack'), findsOneWidget);
-      expect(find.text('Haptic Feedback'), findsOneWidget);
-      // BUS-P2-06: the two switches whose values nothing read are gone.
-      // A switch in an accessibility screen that changes nothing is a lie.
-      expect(find.text('Simplified Navigation'), findsNothing);
-      expect(find.text('Screen Reader Hints'), findsNothing);
-      expect(find.text('Tip', skipOffstage: false), findsOneWidget);
-      expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
-    });
+        expect(find.text('Accessibility'), findsWidgets);
+        expect(
+          find.text('Adjust the app to make it easier to use.'),
+          findsOneWidget,
+        );
+        expect(find.text('Text Size'), findsOneWidget);
+        expect(find.text('High Contrast'), findsOneWidget);
+        expect(find.text('Voice & TalkBack'), findsOneWidget);
+        expect(find.text('Haptic Feedback'), findsOneWidget);
+        // BUS-P2-06: the two switches whose values nothing read are gone.
+        // A switch in an accessibility screen that changes nothing is a lie.
+        expect(find.text('Simplified Navigation'), findsNothing);
+        expect(find.text('Screen Reader Hints'), findsNothing);
+        expect(find.text('Tip', skipOffstage: false), findsOneWidget);
+        expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
+      },
+    );
 
-    testWidgets('tapping Text Size opens bottom sheet selector', (tester) async {
+    testWidgets('tapping Text Size opens bottom sheet selector', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: AccessibilitySettingsPage(),
-        ),
+        const MaterialApp(home: AccessibilitySettingsPage()),
       );
       await tester.pumpAndSettle();
 
@@ -56,90 +60,116 @@ void main() {
   });
 
   group('PersonalizationSettingsPage', () {
-    testWidgets('renders green hero header, white cards, learning info box, and Ask BusBuddy button', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: PersonalizationSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'renders green hero header, white cards, learning info box, and Ask BusBuddy button',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: PersonalizationSettingsPage()),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Personalization'), findsWidgets);
-      expect(find.text('Customize your experience and choose what you see.'), findsOneWidget);
-      expect(find.text('Customize Home Screen'), findsOneWidget);
-      expect(find.text('Adaptive UI'), findsOneWidget);
-      expect(find.textContaining('BusBuddy learns your frequently used features'), findsOneWidget);
-      expect(find.text('Default Starting Screen'), findsOneWidget);
-      expect(find.text('Reset My Layout', skipOffstage: false), findsOneWidget);
-      expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
-    });
+        expect(find.text('Personalization'), findsWidgets);
+        expect(
+          find.text('Customize your experience and choose what you see.'),
+          findsOneWidget,
+        );
+        expect(find.text('Customize Home Screen'), findsOneWidget);
+        expect(find.text('Adaptive UI'), findsOneWidget);
+        expect(
+          find.textContaining('BusBuddy learns your frequently used features'),
+          findsOneWidget,
+        );
+        await tester.scrollUntilVisible(
+          find.text('Default Starting Screen'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Default Starting Screen'), findsOneWidget);
+        expect(
+          find.text('Reset My Layout', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(find.text('Ask BusBuddy', skipOffstage: false), findsOneWidget);
+      },
+    );
 
-    testWidgets('tapping Default Starting Screen opens starting screen selector', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: PersonalizationSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'tapping Default Starting Screen opens starting screen selector',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: PersonalizationSettingsPage()),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Default Starting Screen'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Default Starting Screen'));
-      await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Default Starting Screen'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Default Starting Screen'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Live Tracking'), findsOneWidget);
-    });
+        expect(find.text('Live Tracking'), findsOneWidget);
+      },
+    );
 
-    testWidgets('tapping Customize Home Screen opens HomeScreenCustomizationPage', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: PersonalizationSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'tapping Customize Home Screen opens HomeScreenCustomizationPage',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: PersonalizationSettingsPage()),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Customize Home Screen'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Customize Home Screen'));
+        await tester.pumpAndSettle();
 
-      expect(find.byType(HomeScreenCustomizationPage), findsOneWidget);
-    });
+        expect(find.byType(HomeScreenCustomizationPage), findsOneWidget);
+      },
+    );
   });
 
   group('VoiceAssistantSettingsPage', () {
-    testWidgets('renders purple mic hero header, light cards, dark example box, and Ask BusBuddy button', (tester) async {
-      tester.view.devicePixelRatio = 1.0;
-      tester.view.physicalSize = const Size(800, 2400);
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+    testWidgets(
+      'renders purple mic hero header, light cards, dark example box, and Ask BusBuddy button',
+      (tester) async {
+        tester.view.devicePixelRatio = 1.0;
+        tester.view.physicalSize = const Size(800, 2400);
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
+        await tester.pumpWidget(
+          const MaterialApp(home: VoiceAssistantSettingsPage()),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Voice Assistant'), findsWidgets);
+        expect(
+          find.text('Set up how you interact with BusBuddy using voice.'),
+          findsOneWidget,
+        );
+        expect(find.text('Preferred Language'), findsOneWidget);
+        expect(find.text('Voice Speed'), findsOneWidget);
+        // BUS-P1-08: Wake Phrase is gated on AudioSpeechEngine.canRecognizeSpeech,
+        // false on this VM, so the switch is hidden rather than shown inert.
+        expect(find.text('Wake Phrase'), findsNothing);
+        expect(find.text('Voice Confirmations'), findsOneWidget);
+        expect(find.text('Gemini Live Voice'), findsOneWidget);
+        expect(find.text('Example'), findsOneWidget);
+        expect(find.text('"Find a bus to Katpadi"'), findsOneWidget);
+        expect(find.text('Ask BusBuddy'), findsOneWidget);
+      },
+    );
+
+    testWidgets('tapping Preferred Language opens language picker', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: VoiceAssistantSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Voice Assistant'), findsWidgets);
-      expect(find.text('Set up how you interact with BusBuddy using voice.'), findsOneWidget);
-      expect(find.text('Preferred Language'), findsOneWidget);
-      expect(find.text('Voice Speed'), findsOneWidget);
-      // BUS-P1-08: Wake Phrase is gated on AudioSpeechEngine.canRecognizeSpeech,
-      // false on this VM, so the switch is hidden rather than shown inert.
-      expect(find.text('Wake Phrase'), findsNothing);
-      expect(find.text('Voice Confirmations'), findsOneWidget);
-      expect(find.text('Gemini Live Voice'), findsOneWidget);
-      expect(find.text('Example'), findsOneWidget);
-      expect(find.text('"Find a bus to Katpadi"'), findsOneWidget);
-      expect(find.text('Ask BusBuddy'), findsOneWidget);
-    });
-
-    testWidgets('tapping Preferred Language opens language picker', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: VoiceAssistantSettingsPage(),
-        ),
+        const MaterialApp(home: VoiceAssistantSettingsPage()),
       );
       await tester.pumpAndSettle();
 
@@ -152,7 +182,9 @@ void main() {
   });
 
   group('SettingsPage Hub', () {
-    testWidgets('renders master settings hub with navigation options', (tester) async {
+    testWidgets('renders master settings hub with navigation options', (
+      tester,
+    ) async {
       final dataSource = LocalTransportDataSource();
       final repository = LocalTransportRepository(dataSource: dataSource);
       final ticketRepo = LocalTicketRepository();
@@ -174,82 +206,94 @@ void main() {
       expect(find.text('Emergency Contacts & SOS'), findsOneWidget);
     });
 
-    testWidgets('tapping Accessibility Settings opens AccessibilitySettingsPage', (tester) async {
-      final dataSource = LocalTransportDataSource();
-      final repository = LocalTransportRepository(dataSource: dataSource);
-      final ticketRepo = LocalTicketRepository();
-      final ticketController = TicketController(ticketRepo);
+    testWidgets(
+      'tapping Accessibility Settings opens AccessibilitySettingsPage',
+      (tester) async {
+        final dataSource = LocalTransportDataSource();
+        final repository = LocalTransportRepository(dataSource: dataSource);
+        final ticketRepo = LocalTicketRepository();
+        final ticketController = TicketController(ticketRepo);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: SettingsPage(
-            repository: repository,
-            ticketController: ticketController,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SettingsPage(
+              repository: repository,
+              ticketController: ticketController,
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Accessibility Settings'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Accessibility Settings'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Adjust the app to make it easier to use.'), findsOneWidget);
-    });
+        expect(
+          find.text('Adjust the app to make it easier to use.'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 
   group('Settings semantic token adoption (theme migration)', () {
-    testWidgets('VoiceAssistantSettingsPage honors high-contrast + light themes', (tester) async {
-      // High-contrast: true-black AAA background, not hardcoded dark navy.
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.highContrast,
-          home: const VoiceAssistantSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        AppSemanticColors.highContrast.background,
-      );
+    testWidgets(
+      'VoiceAssistantSettingsPage honors high-contrast + light themes',
+      (tester) async {
+        // High-contrast: true-black AAA background, not hardcoded dark navy.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.highContrast,
+            home: const VoiceAssistantSettingsPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          AppSemanticColors.highContrast.background,
+        );
 
-      // Light: daylight background, not dark navy.
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: const VoiceAssistantSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        AppSemanticColors.light.background,
-      );
-    });
+        // Light: daylight background, not dark navy.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const VoiceAssistantSettingsPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          AppSemanticColors.light.background,
+        );
+      },
+    );
 
-    testWidgets('PersonalizationSettingsPage honors high-contrast + light themes', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.highContrast,
-          home: const PersonalizationSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        AppSemanticColors.highContrast.background,
-      );
+    testWidgets(
+      'PersonalizationSettingsPage honors high-contrast + light themes',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.highContrast,
+            home: const PersonalizationSettingsPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          AppSemanticColors.highContrast.background,
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: const PersonalizationSettingsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
-        AppSemanticColors.light.background,
-      );
-    });
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const PersonalizationSettingsPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          AppSemanticColors.light.background,
+        );
+      },
+    );
   });
 }

@@ -232,7 +232,11 @@ class BusBuddyVoiceChannel(
         pendingPermission = null
         val permanentlyDenied = !granted && !shouldShowRationale
         result.success(permissionResult(granted, permanentlyDenied))
-        if (granted) startCapture()
+        // Dart subscribes to the microphone EventChannel only after this
+        // permission result completes. Starting capture here can race that
+        // subscription: the first read sees no EventSink and exits, while the
+        // later onListen call sees `recording == true` and cannot restart it.
+        // EventChannel.onListen is the single owner of capture startup.
     }
 
     // ── Microphone capture ────────────────────────────────────────────────

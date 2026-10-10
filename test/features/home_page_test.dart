@@ -81,9 +81,7 @@ void main() {
       tester,
     ) async {
       final ticketController = bookCorridorTicketController();
-      await tester.pumpWidget(
-        testApp(ticketController: ticketController),
-      );
+      await tester.pumpWidget(testApp(ticketController: ticketController));
       await tester.pumpAndSettle();
 
       expect(find.text('Good morning, Pavan!'), findsOneWidget);
@@ -138,6 +136,12 @@ void main() {
     testWidgets('tapping View Journey Details opens LiveLocationScreen', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
       final ticketController = bookCorridorTicketController();
       await tester.pumpWidget(testApp(ticketController: ticketController));
       await tester.pumpAndSettle();

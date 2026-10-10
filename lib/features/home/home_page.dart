@@ -98,21 +98,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           }
         }
         unawaited(
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => TicketBookingSuitePage(
-                ticketController: widget.ticketController,
-                journeyController: widget.controller,
-                initialStepIndex: 0,
-                showTopPrototypeTabs: false,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) {
-              widget.ticketController.refresh();
-              setState(() {});
-            }
-          }),
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TicketBookingSuitePage(
+                    ticketController: widget.ticketController,
+                    journeyController: widget.controller,
+                    initialStepIndex: 0,
+                    showTopPrototypeTabs: false,
+                  ),
+                ),
+              )
+              .then((_) {
+                if (mounted) {
+                  widget.ticketController.refresh();
+                  setState(() {});
+                }
+              }),
         );
         break;
 
@@ -159,40 +161,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               isDemo: true,
             );
         unawaited(
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => LiveLocationScreen(
-                ticket: ticketToTrack,
-                repository: widget.repository,
-                ticketController: widget.ticketController,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) {
-              widget.ticketController.refresh();
-              setState(() {});
-            }
-          }),
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (_) => LiveLocationScreen(
+                    ticket: ticketToTrack,
+                    repository: widget.repository,
+                    ticketController: widget.ticketController,
+                  ),
+                ),
+              )
+              .then((_) {
+                if (mounted) {
+                  widget.ticketController.refresh();
+                  setState(() {});
+                }
+              }),
         );
         break;
 
       case AdaptiveShortcutType.ticketBooking:
         unawaited(
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => TicketBookingSuitePage(
-                ticketController: widget.ticketController,
-                journeyController: widget.controller,
-                initialStepIndex: 1,
-                showTopPrototypeTabs: false,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) {
-              widget.ticketController.refresh();
-              setState(() {});
-            }
-          }),
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TicketBookingSuitePage(
+                    ticketController: widget.ticketController,
+                    journeyController: widget.controller,
+                    initialStepIndex: 1,
+                    showTopPrototypeTabs: false,
+                  ),
+                ),
+              )
+              .then((_) {
+                if (mounted) {
+                  widget.ticketController.refresh();
+                  setState(() {});
+                }
+              }),
         );
         break;
 
@@ -259,21 +265,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _openRouteSearch() {
     if (!_shouldNavigate()) return;
     unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TicketBookingSuitePage(
-            ticketController: widget.ticketController,
-            journeyController: widget.controller,
-            initialStepIndex: 0,
-            showTopPrototypeTabs: false,
-          ),
-        ),
-      ).then((_) {
-        if (mounted) {
-          widget.ticketController.refresh();
-          setState(() {});
-        }
-      }),
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => TicketBookingSuitePage(
+                ticketController: widget.ticketController,
+                journeyController: widget.controller,
+                initialStepIndex: 0,
+                showTopPrototypeTabs: false,
+              ),
+            ),
+          )
+          .then((_) {
+            if (mounted) {
+              widget.ticketController.refresh();
+              setState(() {});
+            }
+          }),
     );
   }
 
@@ -344,23 +352,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                      Semantics(
-                        button: true,
-                        label: 'User Profile',
-                        excludeSemantics: true,
-                        child: Tooltip(
-                          message: 'User Profile',
-                          child: CircleAvatar(
-                            radius: 22,
-                            backgroundColor: colors.surface,
-                            child: Icon(
-                              Icons.person,
-                              color: colors.textPrimary,
-                              size: 24,
-                            ),
-                          ),
                         ),
                       ),
                     ],
@@ -628,21 +619,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                       }
                                       final ticketToTrack = activeTicket;
                                       unawaited(
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute<void>(
-                                            builder: (_) => LiveLocationScreen(
-                                              ticket: ticketToTrack,
-                                              repository: widget.repository,
-                                              ticketController:
-                                                  widget.ticketController,
-                                            ),
-                                          ),
-                                        ).then((_) {
-                                          if (mounted) {
-                                            widget.ticketController.refresh();
-                                            setState(() {});
-                                          }
-                                        }),
+                                        Navigator.of(context)
+                                            .push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    LiveLocationScreen(
+                                                      ticket: ticketToTrack,
+                                                      repository:
+                                                          widget.repository,
+                                                      ticketController: widget
+                                                          .ticketController,
+                                                    ),
+                                              ),
+                                            )
+                                            .then((_) {
+                                              if (mounted) {
+                                                widget.ticketController
+                                                    .refresh();
+                                                setState(() {});
+                                              }
+                                            }),
                                       );
                                     },
                                     style: FilledButton.styleFrom(
@@ -706,35 +702,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.eco_outlined,
-                            color: colors.textMuted,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'More Accessible Cities',
-                                style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.eco_outlined,
+                              color: colors.textMuted,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'More Accessible Cities',
+                                    style: TextStyle(
+                                      color: colors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    'for a Brighter Tomorrow',
+                                    style: TextStyle(
+                                      color: colors.textMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'for a Brighter Tomorrow',
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                       Icon(
                         Icons.directions_bus_filled_outlined,
@@ -837,17 +837,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           semanticLabel: '${item.title}. ${item.subtitle}.',
           onTap: () {
             unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      MyTicketsPage(ticketController: widget.ticketController),
-                ),
-              ).then((_) {
-                if (mounted) {
-                  widget.ticketController.refresh();
-                  setState(() {});
-                }
-              }),
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MyTicketsPage(
+                        ticketController: widget.ticketController,
+                      ),
+                    ),
+                  )
+                  .then((_) {
+                    if (mounted) {
+                      widget.ticketController.refresh();
+                      setState(() {});
+                    }
+                  }),
             );
           },
         );
@@ -902,7 +905,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           title: item.title,
           subtitle: item.subtitle,
           semanticLabel: '${item.title}. ${item.subtitle}.',
-          borderColor: const Color(0xFF334155),
           onTap: () {
             unawaited(
               Navigator.of(context).push(
@@ -930,7 +932,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     required String semanticLabel,
     required VoidCallback onTap,
     IconData? trailingIcon,
-    Color? borderColor,
   }) {
     final colors = AppTheme.colors(context);
     return Semantics(
@@ -939,17 +940,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       excludeSemantics: true,
       child: Material(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 72),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: borderColor ?? colors.border),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
@@ -969,7 +970,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       color: color,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, color: Colors.white, size: 24),
+                    child: Icon(icon, color: colors.onActionPrimary, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

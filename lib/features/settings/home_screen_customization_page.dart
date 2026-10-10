@@ -16,10 +16,12 @@ class HomeScreenCustomizationPage extends StatefulWidget {
   const HomeScreenCustomizationPage({super.key});
 
   @override
-  State<HomeScreenCustomizationPage> createState() => _HomeScreenCustomizationPageState();
+  State<HomeScreenCustomizationPage> createState() =>
+      _HomeScreenCustomizationPageState();
 }
 
-class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPage> {
+class _HomeScreenCustomizationPageState
+    extends State<HomeScreenCustomizationPage> {
   final AppSettingsController _settings = AppSettingsController.instance;
 
   @override
@@ -93,7 +95,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
         backgroundColor: colors.background,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: colors.textPrimary, size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: colors.textPrimary,
+            size: 20,
+          ),
           tooltip: 'Back to Personalization Settings',
           onPressed: () => Navigator.of(context).pop(),
           constraints: const BoxConstraints(
@@ -131,7 +137,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                             color: colors.actionPrimary,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.dashboard_customize, color: colors.actionPrimaryText, size: 24),
+                          child: Icon(
+                            Icons.dashboard_customize,
+                            color: colors.actionPrimaryText,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -180,13 +190,24 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                       ),
                       TextButton.icon(
                         onPressed: _resetToDefaults,
-                        icon: Icon(Icons.refresh, size: 16, color: colors.actionPrimary),
+                        icon: Icon(
+                          Icons.refresh,
+                          size: 16,
+                          color: colors.actionPrimary,
+                        ),
                         label: Text(
                           'Reset',
-                          style: TextStyle(color: colors.actionPrimary, fontSize: 13, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: colors.actionPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         style: TextButton.styleFrom(
-                          minimumSize: const Size(48, AppSpacing.minTouchTarget),
+                          minimumSize: const Size(
+                            48,
+                            AppSpacing.minTouchTarget,
+                          ),
                         ),
                       ),
                     ],
@@ -197,6 +218,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                   ReorderableListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
                     itemCount: items.length,
                     onReorderItem: (oldIndex, newIndex) {
                       _settings.reorderHomeScreenItem(oldIndex, newIndex);
@@ -225,9 +247,7 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: colors.surface,
-                border: Border(
-                  top: BorderSide(color: colors.border),
-                ),
+                border: Border(top: BorderSide(color: colors.border)),
               ),
               child: Row(
                 children: [
@@ -237,7 +257,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
@@ -268,7 +292,11 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
                       style: FilledButton.styleFrom(
                         backgroundColor: colors.actionPrimary,
                         foregroundColor: colors.actionPrimaryText,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         minimumSize: const Size(100, AppSpacing.minTouchTarget),
                       ),
@@ -306,139 +334,136 @@ class _HomeScreenCustomizationPageState extends State<HomeScreenCustomizationPag
         color: isVisible ? colors.surface : colors.background,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
-          color: isVisible ? colors.border : colors.border.withValues(alpha: 0.5),
+          color: isVisible
+              ? colors.border
+              : colors.border.withValues(alpha: 0.5),
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Icon Bubble ───────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isVisible ? item.color : item.color.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  item.icon,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // ── Title & Subtitle ──────────────────────────────────────
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isVisible
+                          ? item.color
+                          : item.color.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      item.icon,
+                      color: colors.onActionPrimary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            item.title,
-                            style: TextStyle(
-                              color: isVisible ? colors.textPrimary : colors.textSecondary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (!isVisible) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: colors.border,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                            child: Text(
-                              'Hidden',
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            Text(
+                              item.title,
                               style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 10,
+                                color: isVisible
+                                    ? colors.textPrimary
+                                    : colors.textSecondary,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
+                            if (!isVisible)
+                              Text(
+                                'Hidden',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          item.subtitle,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 12,
                           ),
-                        ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.subtitle,
-                      style: TextStyle(
-                        color: colors.textSecondary,
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Move Up Button (Screen-Reader / Motor Alternative) ───
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_upward,
-                  size: 18,
-                  color: isFirst ? colors.textSecondary.withValues(alpha: 0.3) : colors.textSecondary,
-                ),
-                tooltip: 'Move Up',
-                constraints: const BoxConstraints(
-                  minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget,
-                ),
-                onPressed: isFirst ? null : () => _moveUp(index, item),
-              ),
-
-              // ── Move Down Button (Screen-Reader / Motor Alternative) ─
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_downward,
-                  size: 18,
-                  color: isLast ? colors.textSecondary.withValues(alpha: 0.3) : colors.textSecondary,
-                ),
-                tooltip: 'Move Down',
-                constraints: const BoxConstraints(
-                  minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget,
-                ),
-                onPressed: isLast ? null : () => _moveDown(index, item),
-              ),
-
-              // ── Visibility Switch ───────────────────────────────────
-              Semantics(
-                label: '${item.title} visibility',
-                child: Switch(
-                  value: isVisible,
-                  activeThumbColor: Colors.white,
-                  activeTrackColor: colors.statusSuccess,
-                  inactiveThumbColor: Colors.white60,
-                  inactiveTrackColor: colors.border,
-                  onChanged: (val) => _toggleVisibility(item, val),
-                ),
-              ),
-
-              // ── Reorder Drag Handle (≡) ─────────────────────────────
-              // 48x48 tappable: the bare 22dp icon was far below the WCAG
-              // touch-target floor.
-              ReorderableDragStartListener(
-                index: index,
-                child: SizedBox(
-                  width: AppSpacing.minTouchTarget,
-                  height: AppSpacing.minTouchTarget,
-                  child: Icon(
-                    Icons.drag_handle,
-                    color: colors.textSecondary,
-                    size: 22,
                   ),
-                ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_upward,
+                      size: 18,
+                      color: isFirst
+                          ? colors.textSecondary.withValues(alpha: 0.3)
+                          : colors.textSecondary,
+                    ),
+                    tooltip: 'Move Up',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    onPressed: isFirst ? null : () => _moveUp(index, item),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_downward,
+                      size: 18,
+                      color: isLast
+                          ? colors.textSecondary.withValues(alpha: 0.3)
+                          : colors.textSecondary,
+                    ),
+                    tooltip: 'Move Down',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    onPressed: isLast ? null : () => _moveDown(index, item),
+                  ),
+                  Semantics(
+                    label: '${item.title} visibility',
+                    child: Switch(
+                      value: isVisible,
+                      activeThumbColor: colors.onActionPrimary,
+                      activeTrackColor: colors.statusSuccess,
+                      inactiveThumbColor: colors.onActionPrimary,
+                      inactiveTrackColor: colors.border,
+                      onChanged: (val) => _toggleVisibility(item, val),
+                    ),
+                  ),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: SizedBox(
+                      width: AppSpacing.minTouchTarget,
+                      height: AppSpacing.minTouchTarget,
+                      child: Icon(
+                        Icons.drag_handle,
+                        color: colors.textSecondary,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

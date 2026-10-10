@@ -1656,18 +1656,37 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
               const SizedBox(height: 16),
 
-              // Quick Spoken Prompt Chips Carousel
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    _buildPromptChip('Where is my bus?'),
-                    _buildPromptChip('Find a bus from VIT to Katpadi'),
-                    _buildPromptChip('How many stops left?'),
-                    _buildPromptChip('Share my location'),
-                    _buildPromptChip('Book ticket'),
-                  ],
+              // Let prompts wrap to the next line so every option stays
+              // visible at narrow widths and large text sizes.
+              LayoutBuilder(
+                builder: (context, constraints) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      _buildPromptChip(
+                        'Where is my bus?',
+                        maxWidth: constraints.maxWidth - AppSpacing.sm,
+                      ),
+                      _buildPromptChip(
+                        'Find a bus from VIT to Katpadi',
+                        maxWidth: constraints.maxWidth - AppSpacing.sm,
+                      ),
+                      _buildPromptChip(
+                        'How many stops left?',
+                        maxWidth: constraints.maxWidth - AppSpacing.sm,
+                      ),
+                      _buildPromptChip(
+                        'Share my location',
+                        maxWidth: constraints.maxWidth - AppSpacing.sm,
+                      ),
+                      _buildPromptChip(
+                        'Book ticket',
+                        maxWidth: constraints.maxWidth - AppSpacing.sm,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -1730,7 +1749,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     );
   }
 
-  Widget _buildPromptChip(String prompt) {
+  Widget _buildPromptChip(String prompt, {required double maxWidth}) {
     final colors = AppTheme.colors(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -1739,7 +1758,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         constraints: const BoxConstraints(
           minWidth: AppSpacing.minTouchTarget,
           minHeight: AppSpacing.minTouchTarget,
-        ),
+        ).copyWith(maxWidth: maxWidth),
         child: ActionChip(
           backgroundColor: colors.surfaceSubtle,
           side: BorderSide(color: colors.surface),

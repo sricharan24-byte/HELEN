@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/a11y/enlarging_text_scaler.dart';
@@ -7,13 +6,11 @@ import 'core/settings/app_settings_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'data/datasources/local_json_store.dart';
 import 'data/repositories/emergency_contact_repository.dart';
-import 'data/models/transport_models.dart' as models;
 import 'data/repositories/transport_repository.dart';
 import 'features/ai_assistant/ai_control_glow.dart';
 import 'features/ai_assistant/wake_word_service.dart';
-import 'features/home/home_page.dart';
+import 'features/navigation/app_navigation_shell.dart';
 import 'features/journey/journey_controller.dart';
-import 'features/route_details/route_details_page.dart';
 import 'features/adaptive_ui/adaptive_ui_service.dart';
 import 'features/tickets/ticket_controller.dart';
 
@@ -89,7 +86,9 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp(
           title: 'BusBuddy',
           navigatorKey: _navigatorKey,
-          theme: settings.isHighContrast ? AppTheme.highContrast : AppTheme.dark,
+          theme: settings.isHighContrast
+              ? AppTheme.highContrast
+              : AppTheme.dark,
           builder: (context, child) {
             final media = MediaQuery.of(context);
             // Astra BUS-P0-03: Strictly preserve platform non-linear TextScaler.
@@ -99,55 +98,17 @@ class _MyAppState extends State<MyApp> {
                 ? EnlargingTextScaler(media.textScaler, multiplier)
                 : media.textScaler;
             return MediaQuery(
-              data: media.copyWith(
-                textScaler: effectiveScaler,
-              ),
+              data: media.copyWith(textScaler: effectiveScaler),
               // The AI glow frame sits above the navigator so it follows the
               // assistant across every screen it opens — top bar, bottom bar
               // and side rails glow with its current activity.
-              child: Stack(
-                children: [
-                  child!,
-                  const AiGlowFrame(),
-                ],
-              ),
+              child: Stack(children: [child!, const AiGlowFrame()]),
             );
           },
-          home: HomePage(
+          home: AppNavigationShell(
             controller: widget.journeyController,
             repository: widget.repository,
             ticketController: widget.ticketController,
-            onRouteSelected: (routeId) {
-              // Resolve the route from the repository and push the details page.
-              final originId = widget.journeyController.state.origin?.id;
-              final destinationId = widget.journeyController.state.destination?.id;
-              if (originId == null || destinationId == null) return;
-
-              final routes = widget.repository.findRoutes(
-                originId: originId,
-                destinationId: destinationId,
-              );
-              models.Route? resolved;
-              for (final r in routes) {
-                if (r.id == routeId) {
-                  resolved = r;
-                  break;
-                }
-              }
-              resolved ??= routes.isNotEmpty ? routes.first : null;
-              if (resolved == null) return;
-
-              widget.journeyController.selectRoute(resolved);
-
-              unawaited(_navigatorKey.currentState?.push(
-                MaterialPageRoute<void>(
-                  builder: (_) => RouteDetailsPage(
-                    controller: widget.journeyController,
-                    repository: widget.repository,
-                  ),
-                ),
-              ));
-            },
           ),
         );
       },

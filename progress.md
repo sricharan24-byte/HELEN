@@ -1,5 +1,18 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-09: Android Microphone Startup Handoff
+
+> **Trigger**: Continue Android optimization with the microphone as the active issue.
+
+* Traced the permission and capture flow across `BusBuddyVoiceChannel`, `NativeAudioChannel`, and `AndroidVoiceTurn`.
+* Fixed a native startup race: the permission callback no longer starts `AudioRecord` before Dart subscribes to the microphone `EventChannel`. Capture starts from `EventChannel.onListen`, where its event sink is available; this prevents an early read from exiting with no sink and leaving the subsequent subscription without active capture.
+* **Not device-verified**: needs a physical Android microphone, a valid Gemini Live key, and a successful build. `flutter build apk` could not launch the installed Snap Flutter command in this environment; direct Gradle could not determine a usable wildcard IP. The capture round trip remains unverified until run on device.
+
+* **Files**: `android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt`
+* **Verification**: `git diff --check` only; Android build unavailable in this environment.
+
+---
+
 **Project Name**: BusBuddy  
 **Corridor Focus**: VIT Vellore → Katpadi Railway Station (Vellore, Tamil Nadu, India)  
 **Framework**: Flutter / Dart  

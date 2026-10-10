@@ -19,10 +19,12 @@ class MyTicketsPage extends StatefulWidget {
     super.key,
     required this.ticketController,
     this.repository,
+    this.showBackButton = true,
   });
 
   final TicketController ticketController;
   final TransportRepository? repository;
+  final bool showBackButton;
 
   @override
   State<MyTicketsPage> createState() => _MyTicketsPageState();
@@ -48,22 +50,22 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           appBar: AppBar(
             backgroundColor: colors.background,
             elevation: 0,
-            leading: IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new,
-                color: colors.textPrimary,
-                size: 20,
-              ),
-              onPressed: () => Navigator.of(context).pop(),
-              constraints: const BoxConstraints(
-                minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget,
-              ),
-            ),
-            title: const BusBuddyLogo(
-              fontSize: 20,
-              subtitle: 'My Tickets',
-            ),
+            automaticallyImplyLeading: widget.showBackButton,
+            leading: widget.showBackButton
+                ? IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: colors.textPrimary,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                  )
+                : null,
+            title: const BusBuddyLogo(fontSize: 20, subtitle: 'My Tickets'),
             centerTitle: true,
           ),
           body: SafeArea(
@@ -297,6 +299,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
   // ── Current Ticket Tab View ──────────────────────────────────────────────
   Widget _buildCurrentTicketTab(Ticket? activeTicket) {
     final colors = AppTheme.colors(context);
+    final askBarScrollInset = MediaQuery.textScalerOf(context).scale(40) + 72;
     if (activeTicket == null) {
       // Scrollable so the empty state reflows instead of overflowing at
       // large text scales; vertically centered while it fits.
@@ -342,7 +345,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, askBarScrollInset),
       children: [
         // Active Ticket Card (status-tinted surface, matches image reference)
         Container(
@@ -484,17 +487,23 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                   constraints: const BoxConstraints(minHeight: 52),
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      final repo =
+                          widget.repository ??
+                          AppServiceLocator.instance.transportRepository;
                       unawaited(
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) =>
-                                TicketDetailsPage(ticket: activeTicket),
+                            builder: (_) => LiveLocationScreen(
+                              ticket: activeTicket,
+                              repository: repo,
+                              ticketController: widget.ticketController,
+                            ),
                           ),
                         ),
                       );
                     },
                     icon: Icon(
-                      Icons.qr_code_2,
+                      Icons.map_outlined,
                       color: colors.onActionPrimary,
                       size: 22,
                     ),
@@ -502,7 +511,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'View Ticket',
+                          'View Trip & Location',
                           style: TextStyle(
                             color: colors.onActionPrimary,
                             fontSize: 16,
@@ -635,21 +644,14 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           children: [
             Expanded(
               child: _buildQuickActionCard(
-                icon: Icons.map_outlined,
-                title: 'Live Map',
-                subtitle: 'Track real bus location',
+                icon: Icons.qr_code_2,
+                title: 'Boarding Pass',
+                subtitle: 'Show your ticket QR',
                 onTap: () {
-                  final repo =
-                      widget.repository ??
-                      AppServiceLocator.instance.transportRepository;
                   unawaited(
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => LiveLocationScreen(
-                          ticket: activeTicket,
-                          repository: repo,
-                          ticketController: widget.ticketController,
-                        ),
+                        builder: (_) => TicketDetailsPage(ticket: activeTicket),
                       ),
                     ),
                   );
@@ -799,8 +801,9 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
       );
     }
 
+    final askBarScrollInset = MediaQuery.textScalerOf(context).scale(40) + 72;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, askBarScrollInset),
       itemCount: pastTickets.length,
       itemBuilder: (context, index) {
         final ticket = pastTickets[index];

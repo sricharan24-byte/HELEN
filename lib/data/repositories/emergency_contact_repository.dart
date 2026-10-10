@@ -10,18 +10,26 @@ class EmergencyContactRepository extends ChangeNotifier {
   static const storageKey = 'busbuddy.emergencyContacts.v1';
   LocalJsonStore? _store;
   final List<Map<String, String>> _contacts = [
-    {'name': 'Parent / Guardian', 'phone': '+91 98765 43210', 'relation': 'Family'},
-    {'name': 'Campus Security', 'phone': '+91 416 220 2000', 'relation': 'VIT Security'},
+    {
+      'name': 'Parent / Guardian',
+      'phone': '+91 98765 43210',
+      'relation': 'Family',
+    },
+    {
+      'name': 'Campus Security',
+      'phone': '+91 416 220 2000',
+      'relation': 'VIT Security',
+    },
   ];
 
-  List<Map<String, String>> get contacts => List.unmodifiable(
-    _contacts.map(Map<String, String>.unmodifiable),
-  );
+  List<Map<String, String>> get contacts =>
+      List.unmodifiable(_contacts.map(Map<String, String>.unmodifiable));
 
   static bool _valid(Object? value) =>
       value is Map &&
       ['name', 'phone', 'relation'].every(
-        (key) => value[key] is String && (value[key] as String).trim().isNotEmpty,
+        (key) =>
+            value[key] is String && (value[key] as String).trim().isNotEmpty,
       );
 
   Future<void> hydrate(LocalJsonStore store) async {
@@ -52,9 +60,23 @@ class EmergencyContactRepository extends ChangeNotifier {
   void addContact(Map<String, String> contact) {
     if (!_valid(contact)) return;
     _contacts.add({
-      for (final key in ['name', 'phone', 'relation']) key: contact[key]!.trim(),
+      for (final key in ['name', 'phone', 'relation'])
+        key: contact[key]!.trim(),
     });
     _persist();
+  }
+
+  bool removeContact(Map<String, String> contact) {
+    final index = _contacts.indexWhere(
+      (saved) =>
+          saved['name'] == contact['name'] &&
+          saved['phone'] == contact['phone'] &&
+          saved['relation'] == contact['relation'],
+    );
+    if (index == -1) return false;
+    _contacts.removeAt(index);
+    _persist();
+    return true;
   }
 
   void _persist() {

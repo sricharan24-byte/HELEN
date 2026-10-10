@@ -14,14 +14,12 @@ import '../../domain/ticketing/entities/fare_engine.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
-import '../journey/live_location_map_widget.dart';
 import '../journey/live_location_screen.dart';
-import '../safety/safety_sharing_page.dart';
 import '../saved/saved_place_chips.dart';
 import 'booking_checkout_dialog.dart';
 import 'ticket_controller.dart';
 
-/// Unified 3-Step Ticket Booking & Active Trip Suite page matching the master UI screenshots.
+/// Ticket booking flow; active tickets open the dedicated live location screen.
 class TicketBookingSuitePage extends StatefulWidget {
   const TicketBookingSuitePage({
     super.key,
@@ -36,6 +34,7 @@ class TicketBookingSuitePage extends StatefulWidget {
     this.initialPaymentMethod = PaymentMethod.upi,
     this.initialPassengerName,
     this.autoOpenCheckout = false,
+    this.showBackButton = true,
   });
 
   final TicketController ticketController;
@@ -49,6 +48,7 @@ class TicketBookingSuitePage extends StatefulWidget {
   final PaymentMethod initialPaymentMethod;
   final String? initialPassengerName;
   final bool autoOpenCheckout;
+  final bool showBackButton;
 
   @override
   State<TicketBookingSuitePage> createState() => _TicketBookingSuitePageState();
@@ -63,11 +63,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   late Stop _destination;
   late DateTime _selectedDate;
   late String _selectedDateText;
-  bool _isAnnouncementsOn = true;
   String _selectedBusId = '18B';
   bool _isCurrentLocation = true;
-  String? _lastAnnouncedStop;
-  bool _hasAnnouncedCurrentStopArrival = false;
   AnnouncementScopeToken? _scopeToken;
 
   /// Saved places resolved against the loaded stops, in the passenger's saved
@@ -102,9 +99,6 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     );
   }
 
-  bool _hasArrived = false;
-  bool _tripActionInFlight = false;
-
   static String _formatSelectedDate(DateTime date) {
     final now = DateTime.now();
     final isToday =
@@ -130,7 +124,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
   @override
   void initState() {
     super.initState();
-    _activeStepIndex = widget.initialStepIndex;
+    _activeStepIndex = widget.initialStepIndex.clamp(0, 1);
 
     _repository = AppServiceLocator.instance.transportRepository;
     _allStops = AppServiceLocator.instance.transportDataSource.allStops;
@@ -478,42 +472,57 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     String? routeId,
   }) {
     final quote = fareQuote ?? _calculateCurrentFareQuote();
+    Ticket? ticketToTrack;
+    final checkout = showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return BookingCheckoutDialog(
+          busId: busId,
+          routeName: routeName,
+          origin: _origin,
+          destination: _destination,
+          initialFareQuote: quote,
+          routeId: routeId ?? _resolveRouteId(),
+          travelDate: _selectedDate,
+          initialPassengerType: widget.initialPassengerType,
+          initialPaymentMethod: widget.initialPaymentMethod,
+          initialPassengerName: widget.initialPassengerName,
+          onTicketBooked: (ticket) {
+            AdaptiveUiService.instance.recordTicketBooking(
+              originName: ticket.origin.name,
+              destinationName: ticket.destination.name,
+              busId: ticket.busId,
+              routeId: ticket.routeId,
+            );
+            widget.ticketController.addTicket(ticket);
+            _startTripForTicket(ticket);
+            ticketToTrack = ticket;
+            setState(() {
+              _selectedBusId = ticket.busId;
+              _activeStepIndex = 1;
+            });
+          },
+        );
+      },
+    );
     unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) {
-          return BookingCheckoutDialog(
-            busId: busId,
-            routeName: routeName,
-            origin: _origin,
-            destination: _destination,
-            initialFareQuote: quote,
-            routeId: routeId ?? _resolveRouteId(),
-            travelDate: _selectedDate,
-            initialPassengerType: widget.initialPassengerType,
-            initialPaymentMethod: widget.initialPaymentMethod,
-            initialPassengerName: widget.initialPassengerName,
-            onTicketBooked: (ticket) {
-              AdaptiveUiService.instance.recordTicketBooking(
-                originName: ticket.origin.name,
-                destinationName: ticket.destination.name,
-                busId: ticket.busId,
-                routeId: ticket.routeId,
-              );
-              widget.ticketController.addTicket(ticket);
-              _startTripForTicket(ticket);
-              setState(() {
-                _selectedBusId = ticket.busId;
-                _activeStepIndex = 2;
-                _hasArrived = false;
-                _lastAnnouncedStop = null;
-              });
-            },
-          );
-        },
-      ),
+      checkout.whenComplete(() {
+        final ticket = ticketToTrack;
+        if (!mounted || ticket == null) return;
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => LiveLocationScreen(
+                ticket: ticket,
+                repository: _repository,
+                ticketController: widget.ticketController,
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -549,198 +558,17 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     );
   }
 
-  /// Completes the ride: the ticket expires, the journey session closes,
-  /// and the movement engine is torn down. [arrived] distinguishes destination
-  /// arrival from an early End Trip (e.g. alighting mid-route).
-  Future<void> _endTrip({required bool arrived}) async {
-    if (_tripActionInFlight || !mounted) return;
-    setState(() => _tripActionInFlight = true);
-    try {
-      widget.ticketController.completeActiveTrip(
-        reason: arrived ? 'Reached destination' : 'Trip ended early by rider',
-      );
-      final journey = widget.journeyController;
-      if (journey != null) {
-        await journey.completeJourney();
-      }
-      await _repository.stopJourney(_selectedBusId, _resolveRouteId());
-      AnnouncementCoordinator.instance.announce(
-        'Reached ${_destination.name}. Your ticket has expired.',
-        routeId: _resolveRouteId(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reached destination. Ticket expired.')),
-      );
-      setState(() {
-        _activeStepIndex = 0;
-        _hasArrived = false;
-        _lastAnnouncedStop = null;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _tripActionInFlight = false);
-      }
-    }
-  }
-
-  /// Cancels the active ticket with explicit confirmation. The journey
-  /// session resets and the movement engine is torn down.
-  Future<void> _cancelActiveTicket() async {
-    if (_tripActionInFlight || !mounted) return;
-    final dialogColors = AppTheme.colors(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this ticket?'),
-        content: const Text(
-          'Your active ticket will be cancelled and the trip will end. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Ticket'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: dialogColors.actionPrimary,
-            ),
-            child: Text(
-              'Cancel Ticket',
-              style: TextStyle(color: dialogColors.onActionPrimary),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    setState(() => _tripActionInFlight = true);
-    try {
-      widget.ticketController.cancelActiveTicket();
-      final journey = widget.journeyController;
-      if (journey != null) {
-        await journey.reset();
-      }
-      await _repository.stopJourney(_selectedBusId, _resolveRouteId());
-      AnnouncementCoordinator.instance.announce(
-        'Ticket cancelled. The trip has ended.',
-        routeId: _resolveRouteId(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Ticket cancelled.')));
-      setState(() {
-        _activeStepIndex = 0;
-        _hasArrived = false;
-        _lastAnnouncedStop = null;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _tripActionInFlight = false);
-      }
-    }
-  }
-
-  void _confirmEndTrip({required bool arrived}) {
-    if (_tripActionInFlight) return;
-    final dialogColors = AppTheme.colors(context);
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(arrived ? 'Complete your journey?' : 'End trip early?'),
-          content: Text(
-            arrived
-                ? 'You have reached ${_destination.name}. Your ticket will expire.'
-                : 'The bus has not reached ${_destination.name} yet. Your ticket will expire and the trip will end now.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Keep Riding'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                unawaited(_endTrip(arrived: arrived));
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: dialogColors.actionPrimary,
-              ),
-              child: Text(
-                'End Trip',
-                style: TextStyle(color: dialogColors.onActionPrimary),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Stops on the passenger's own journey segment of the active route
-  /// (boarding stop through alighting stop), in travel order.
-  List<Stop> get _activeRouteStops {
-    final dataSource = AppServiceLocator.instance.transportDataSource;
-    final route = dataSource.allRoutes.firstWhere(
-      (r) => r.id == _resolveRouteId(),
-      orElse: () => dataSource.allRoutes.first,
-    );
-    final ordered = <Stop>[];
-    for (final id in route.orderedStopIds) {
-      final stop = dataSource.stopById(id);
-      if (stop != null) ordered.add(stop);
-    }
-    final startIndex = ordered.indexWhere((s) => s.id == _origin.id);
-    final endIndex = ordered.indexWhere((s) => s.id == _destination.id);
-    if (startIndex == -1 || endIndex == -1 || startIndex > endIndex) {
-      return ordered;
-    }
-    return ordered.sublist(startIndex, endIndex + 1);
-  }
-
-  /// Next real stop the bus reaches after the boarding stop.
-  String _upcomingStopName() {
-    final stops = _activeRouteStops;
-    if (stops.length > 1) return stops[1].name;
-    return _destination.name;
-  }
-
-  int _calculateRemainingStops([BusLocation? live]) {
-    if (live != null && live.nextStopId.isNotEmpty) {
-      final idx = _activeRouteStops.indexWhere((s) => s.id == live.nextStopId);
-      if (idx != -1) {
-        return (_activeRouteStops.length - idx).clamp(0, 50);
-      }
-    }
-    final routes = AppServiceLocator.instance.transportDataSource.allRoutes;
-    for (final route in routes) {
-      final o = route.orderedStopIds.indexOf(_origin.id);
-      final d = route.orderedStopIds.indexOf(_destination.id);
-      if (o != -1 && d != -1 && o < d) {
-        final totalStops = d - o;
-        return (totalStops > 3 ? 3 : totalStops).clamp(1, 10);
-      }
-    }
-    return (_activeRouteStops.length > 1 ? _activeRouteStops.length - 1 : 1);
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
     return Scaffold(
       backgroundColor: colors.background,
       appBar: PreferredSize(
-        // 48dp step tabs + the 56dp sub app bar need 120dp; a little slack
-        // keeps the taller accessible tabs from clipping in the app bar.
         preferredSize: Size.fromHeight(widget.showTopPrototypeTabs ? 124 : 56),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Top Prototype Header Tabs (1. Booking | 2. Results | 3. Active Trip)
               if (widget.showTopPrototypeTabs)
                 Container(
                   color: colors.background,
@@ -749,16 +577,12 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     vertical: 8,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildStepTab(0, '1. Booking'),
                       _buildStepTab(1, '2. Results'),
-                      _buildStepTab(2, '3. Active Trip'),
                     ],
                   ),
                 ),
-
-              // Sub App Bar
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -766,21 +590,24 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                      onPressed: () {
-                        unawaited(Navigator.of(context).maybePop());
-                      },
-                    ),
-                    const SizedBox(width: 8),
+                    if (widget.showBackButton) ...[
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+                        onPressed: () =>
+                            unawaited(Navigator.of(context).maybePop()),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
                     const BusBuddyLogo(fontSize: 20),
                     const Spacer(),
                     Text(
                       _activeStepIndex == 0
                           ? 'Book a Ticket'
-                          : _activeStepIndex == 1
-                          ? 'Available Buses'
-                          : 'My Journey',
+                          : 'Available Buses',
                       style: TextStyle(
                         color: colors.textSecondary,
                         fontSize: 13,
@@ -797,11 +624,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
       ),
       body: IndexedStack(
         index: _activeStepIndex,
-        children: [
-          _buildBookingStepView(),
-          _buildResultsStepView(),
-          _buildActiveTripStepView(),
-        ],
+        children: [_buildBookingStepView(), _buildResultsStepView()],
       ),
       bottomNavigationBar: _buildStickyAskBusBuddyBar(),
     );
@@ -1532,817 +1355,6 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     );
   }
 
-  // ── Step 3: Active Trip Tracker (Image 3) ──────────────────────────────────
-  Widget _buildActiveTripStepView() {
-    final colors = AppTheme.colors(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Destination Banner (arrival state once the bus terminates)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(
-              color: colors.statusSuccessBg,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              border: Border.all(color: colors.statusSuccess),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _hasArrived ? Icons.check_circle : Icons.location_on,
-                  color: colors.statusSuccess,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _hasArrived
-                            ? 'Reached the destination'
-                            : 'You are going to',
-                        style: TextStyle(
-                          color: colors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _destination.name,
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      if (_hasArrived)
-                        Text(
-                          'You have reached. Tap End Trip below — your ticket will expire.',
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  color: colors.textSecondary,
-                  size: 26,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Active Bus Tracker Card
-          StreamBuilder<BusLocation>(
-            stream: _repository.streamBusLocation(
-              _selectedBusId,
-              _resolveRouteId(),
-              originStopId: _origin.id,
-              destinationStopId: _destination.id,
-            ),
-            builder: (context, snapshot) {
-              final live = snapshot.data;
-              final streamDone =
-                  snapshot.connectionState == ConnectionState.done;
-              final arrivedNow =
-                  streamDone ||
-                  (live != null && live.progressPercentage >= 1.0);
-              if (arrivedNow && !_hasArrived) {
-                // Deferred past build: mutating state during build trips the
-                // framework's build-phase assertion.
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!mounted || _hasArrived) return;
-                  setState(() => _hasArrived = true);
-                  AnnouncementCoordinator.instance.announce(
-                    'You have reached ${_destination.name}. Tap End Trip to expire your ticket.',
-                    priority: AnnouncementPriority.high,
-                    routeId: _resolveRouteId(),
-                  );
-                });
-              }
-              if (live != null &&
-                  live.nextStopName.isNotEmpty &&
-                  live.nextStopName != _lastAnnouncedStop) {
-                final nextStop = live.nextStopName;
-                final eta = live.etaMinutes;
-                _lastAnnouncedStop = nextStop;
-                _hasAnnouncedCurrentStopArrival = false;
-                if (_isAnnouncementsOn) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted || !_isAnnouncementsOn || _hasArrived) return;
-                    final msg = eta <= 1
-                        ? 'Arriving at $nextStop now.'
-                        : 'Next stop: $nextStop. Estimated arrival in $eta minutes.';
-                    AnnouncementCoordinator.instance.announce(
-                      msg,
-                      routeId: _resolveRouteId(),
-                      priority: AnnouncementPriority.high,
-                    );
-                  });
-                }
-              } else if (live != null &&
-                  live.nextStopName.isNotEmpty &&
-                  live.etaMinutes <= 1 &&
-                  !_hasAnnouncedCurrentStopArrival &&
-                  !_hasArrived) {
-                _hasAnnouncedCurrentStopArrival = true;
-                if (_isAnnouncementsOn) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted || !_isAnnouncementsOn || _hasArrived) return;
-                    AnnouncementCoordinator.instance.announce(
-                      'Arriving at ${live.nextStopName} now.',
-                      routeId: _resolveRouteId(),
-                      priority: AnnouncementPriority.high,
-                    );
-                  });
-                }
-              }
-
-              final remainingStops = _calculateRemainingStops(live);
-              final etaMinutes = live?.etaMinutes ?? 6;
-              final nextStop = (live != null && live.nextStopName.isNotEmpty)
-                  ? live.nextStopName
-                  : _upcomingStopName();
-              final nextStopEta = live != null
-                  ? '~ ${(live.etaMinutes / (remainingStops > 0 ? remainingStops : 1)).ceil().clamp(1, 10)} min'
-                  : '~ 2 min';
-
-              return Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  border: Border.all(color: colors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.directions_bus,
-                              color: colors.textPrimary,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Bus $_selectedBusId',
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.statusSuccessBg,
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusMd,
-                            ),
-                          ),
-                          child: Text(
-                            'On Track',
-                            style: TextStyle(
-                              color: colors.statusSuccess,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_origin.name.replaceAll(' Main Gate', '')} → ${_destination.name.replaceAll(' Railway Station', '')}',
-                      style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Metrics Row (Stops Remaining | Estimated Arrival)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '$remainingStops',
-                                style: TextStyle(
-                                  color: colors.textPrimary,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Stops Remaining',
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(width: 1, height: 40, color: colors.border),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '$etaMinutes min',
-                                style: TextStyle(
-                                  color: colors.textPrimary,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Estimated Arrival',
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Visual Step Progress Timeline Bar
-                    _buildProgressTimeline(live),
-                    const SizedBox(height: 20),
-
-                    // Next Stop Banner
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: colors.statusInfoBg,
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusMd,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.directions_bus,
-                            color: colors.actionPrimary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Next Stop ',
-                            style: TextStyle(
-                              color: colors.actionPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              nextStop,
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            nextStopEta,
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Interactive Real Map of the passenger's own route segment
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      child: LiveLocationMapWidget(
-                        stops: _activeRouteStops,
-                        currentLocation: live,
-                        originStopId: _origin.id,
-                        destinationStopId: _destination.id,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // Journey Assistant Banner
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isAnnouncementsOn = !_isAnnouncementsOn;
-                AnnouncementCoordinator.instance.isSpeechEnabled = _isAnnouncementsOn;
-              });
-              AnnouncementCoordinator.instance.announce(
-                _isAnnouncementsOn
-                    ? 'Journey announcements turned ON'
-                    : 'Journey announcements muted',
-                priority: AnnouncementPriority.high,
-                routeId: _resolveRouteId(),
-              );
-            },
-            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: colors.actionPrimary,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.volume_up,
-                    color: colors.onActionPrimary,
-                    size: 26,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Journey Assistant',
-                          style: TextStyle(
-                            color: colors.onActionPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Announcements are ${_isAnnouncementsOn ? 'ON' : 'OFF'}',
-                          style: TextStyle(
-                            color: colors.onActionPrimary.withValues(
-                              alpha: 0.8,
-                            ),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colors.onActionPrimary,
-                    size: 26,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Quick Action Grid (View Live Map | Repeat Last Instruction | Emergency Help)
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickActionButton(
-                  icon: Icons.map_outlined,
-                  label: 'View Live Map',
-                  bgColor: colors.surfaceSubtle,
-                  textColor: colors.textPrimary,
-                  onTap: () {
-                    final ticket =
-                        widget.ticketController.activeTicket ??
-                        Ticket(
-                          id: 'BB-20250906-184256',
-                          routeId: 'vit-to-katpadi',
-                          routeName: 'VIT → Katpadi',
-                          origin: _origin,
-                          destination: _destination,
-                          busId: '18B',
-                          passengerName: 'Pavan K',
-                          passengerType: PassengerType.general,
-                          fareQuote: FareEngine.calculateCorridorFare(
-                            PassengerType.general,
-                          ),
-                          paymentMethod: PaymentMethod.upi,
-                          issuedAt: DateTime.now(),
-                          validUntil: DateTime.now().add(
-                            const Duration(hours: 4),
-                          ),
-                          status: TicketStatus.active,
-                          qrCodeData: Ticket.buildQrPayload(
-                            ticketId: 'BB-20250906-184256',
-                            originId: _origin.id,
-                            destinationId: _destination.id,
-                            busId: '18B',
-                            farePaise: 2000,
-                            validUntil: DateTime.now().add(
-                              const Duration(hours: 4),
-                            ),
-                            isDemo: true,
-                          ),
-                          isDemo: true,
-                        );
-                    final repo = AppServiceLocator.instance.transportRepository;
-                    unawaited(
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => LiveLocationScreen(
-                            ticket: ticket,
-                            repository: repo,
-                            ticketController: widget.ticketController,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildQuickActionButton(
-                  icon: Icons.published_with_changes,
-                  label: 'Repeat Last Instruction',
-                  bgColor: colors.surfaceSubtle,
-                  textColor: colors.textPrimary,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Next stop ${_upcomingStopName()} in approximately 2 minutes.',
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildQuickActionButton(
-                  icon: Icons.warning_amber_rounded,
-                  label: 'Emergency Help',
-                  // Emergency SOS keeps the reserved error-red role.
-                  bgColor: colors.statusAlertBg,
-                  textColor: colors.statusError,
-                  iconColor: colors.statusError,
-                  onTap: () {
-                    final sosColors = AppTheme.colors(context);
-                    unawaited(
-                      showDialog<void>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: sosColors.background,
-                          title: Text(
-                            'Broadcast Emergency SOS?',
-                            style: TextStyle(color: sosColors.textPrimary),
-                          ),
-                          content: Text(
-                            'This will alert your trusted emergency contacts and transport help desk with live GPS location.',
-                            style: TextStyle(color: sosColors.textSecondary),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: sosColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                unawaited(
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => SafetySharingPage(
-                                        activeTicket: widget
-                                            .ticketController
-                                            .activeTicket,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: sosColors.statusError,
-                              ),
-                              child: Text(
-                                'SEND SOS NOW',
-                                style: TextStyle(
-                                  color: sosColors.onActionPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Trip Actions (End Trip | Cancel Ticket): always visible so the
-          // rider can finish on arrival or end early / cancel at any point.
-          Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  label: _hasArrived
-                      ? 'End trip. Complete your journey.'
-                      : 'End trip early. Your ticket will expire.',
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: ElevatedButton.icon(
-                      onPressed: _tripActionInFlight
-                          ? null
-                          : () => _confirmEndTrip(arrived: _hasArrived),
-                      icon: const Icon(Icons.flag_outlined, size: 20),
-                      label: Text(
-                        _hasArrived ? 'End Trip' : 'End Trip Early',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colors.actionPrimary,
-                        foregroundColor: colors.onActionPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMd,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  label: 'Cancel ticket. Your active ticket will be cancelled.',
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: OutlinedButton.icon(
-                      onPressed: _tripActionInFlight
-                          ? null
-                          : _cancelActiveTicket,
-                      icon: const Icon(Icons.cancel_outlined, size: 20),
-                      label: const Text(
-                        'Cancel Ticket',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        // Red is reserved exclusively for Emergency SOS — the
-                        // destructive (non-SOS) cancel action stays neutral.
-                        foregroundColor: colors.textPrimary,
-                        side: BorderSide(color: colors.border, width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMd,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressTimeline([BusLocation? live]) {
-    final colors = AppTheme.colors(context);
-    // Timeline labels come from the passenger's real route segment: the
-    // boarding stop, the next stop after boarding, a mid-journey stop, and
-    // the alighting stop.
-    final stops = _activeRouteStops;
-    String label(int index, String fallback) {
-      if (index >= 0 && index < stops.length) {
-        return stops[index].name.replaceAll(' ', '\n');
-      }
-      return fallback;
-    }
-
-    final labels = [
-      label(0, 'Origin'),
-      label(stops.length > 1 ? 1 : 0, 'Next\nStop'),
-      label(stops.length > 2 ? stops.length - 2 : 0, 'Via'),
-      label(stops.length - 1, 'Destination'),
-    ];
-    final labelStyles = [
-      Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-        color: colors.textSecondary,
-      ),
-      Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w800,
-        color: colors.textPrimary,
-      ),
-      Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: colors.textMuted,
-      ),
-      Theme.of(context).textTheme.labelSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: colors.textMuted,
-      ),
-    ];
-
-    int activeNodeIndex = 1;
-    if (live != null) {
-      if (live.progressPercentage >= 0.9) {
-        activeNodeIndex = 3;
-      } else if (live.progressPercentage >= 0.5) {
-        activeNodeIndex = 2;
-      } else if (live.progressPercentage >= 0.2) {
-        activeNodeIndex = 1;
-      } else {
-        activeNodeIndex = 0;
-      }
-    }
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildTimelineNode(
-              isCompleted: activeNodeIndex > 0,
-              isActive: activeNodeIndex == 0,
-            ),
-            Expanded(
-              child: Container(
-                height: 4,
-                color: activeNodeIndex > 0
-                    ? colors.statusSuccess
-                    : colors.border,
-              ),
-            ),
-            _buildTimelineNode(
-              isCompleted: activeNodeIndex > 1,
-              isActive: activeNodeIndex == 1,
-            ),
-            Expanded(
-              child: Container(
-                height: 4,
-                color: activeNodeIndex > 1
-                    ? colors.statusSuccess
-                    : colors.border,
-              ),
-            ),
-            _buildTimelineNode(
-              isCompleted: activeNodeIndex > 2,
-              isActive: activeNodeIndex == 2,
-            ),
-            Expanded(
-              child: Container(
-                height: 4,
-                color: activeNodeIndex > 2
-                    ? colors.statusSuccess
-                    : colors.border,
-              ),
-            ),
-            _buildTimelineNode(
-              isCompleted: activeNodeIndex >= 3,
-              isActive: activeNodeIndex == 3,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (int i = 0; i < labels.length; i++)
-              Expanded(
-                child: Text(
-                  labels[i],
-                  textAlign: TextAlign.center,
-                  style: labelStyles[i],
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimelineNode({
-    required bool isCompleted,
-    required bool isActive,
-  }) {
-    final colors = AppTheme.colors(context);
-    if (isCompleted) {
-      return Container(
-        width: 18,
-        height: 18,
-        decoration: BoxDecoration(
-          color: colors.statusSuccess,
-          shape: BoxShape.circle,
-        ),
-      );
-    } else if (isActive) {
-      return Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: colors.statusSuccess, width: 4),
-        ),
-      );
-    } else {
-      return Container(
-        width: 18,
-        height: 18,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: colors.border, width: 3),
-        ),
-      );
-    }
-  }
-
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color textColor,
-    Color? iconColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      child: Container(
-        // minHeight instead of a fixed height so the label can reflow and
-        // wrap at large text scales instead of overflowing.
-        constraints: const BoxConstraints(minHeight: 105),
-        padding: const EdgeInsets.all(12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: iconColor ?? textColor, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Sticky Bottom Ask BusBuddy Action Bar
   Widget _buildStickyAskBusBuddyBar() {
     final colors = AppTheme.colors(context);
@@ -2351,7 +1363,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
       'Select a bus or ask for schedule',
       'Need anything? Just ask.',
     ];
-    final activePrompt = prompts[_activeStepIndex.clamp(0, 2)];
+    final activePrompt = prompts[_activeStepIndex.clamp(0, 1)];
 
     return SafeArea(
       child: Padding(

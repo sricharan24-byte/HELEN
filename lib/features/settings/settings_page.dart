@@ -46,8 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
     final settings = AppSettingsController.instance;
-    final emergencyCount =
-        EmergencyContactRepository.instance.contacts.length;
+    final emergencyCount = EmergencyContactRepository.instance.contacts.length;
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -98,8 +97,7 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: Icons.home,
               title: 'Personalization Settings',
               subtitle: 'Customize home screen, adaptive UI, & layout',
-              trailingText:
-                  'Adaptive ${settings.adaptiveUi ? 'On' : 'Off'}',
+              trailingText: 'Adaptive ${settings.adaptiveUi ? 'On' : 'Off'}',
               onTap: () {
                 unawaited(
                   Navigator.of(context).push(
@@ -208,7 +206,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Semantics(
       button: true,
-      label: '$title. $subtitle.',
+      label: '$title. $subtitle. $trailingText.',
       excludeSemantics: true,
       child: Material(
         color: colors.surface,
@@ -239,7 +237,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   child: Icon(icon, color: colors.onActionPrimary, size: 24),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,28 +258,22 @@ class _SettingsPageState extends State<SettingsPage> {
                           fontSize: 12,
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        trailingText,
+                        style: TextStyle(
+                          color: colors.actionSecondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      trailingText,
-                      style: TextStyle(
-                        color: colors.actionSecondary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.chevron_right,
-                      color: colors.actionSecondary,
-                      size: 20,
-                    ),
-                  ],
+                Icon(
+                  Icons.chevron_right,
+                  color: colors.actionSecondary,
+                  size: 24,
                 ),
               ],
             ),

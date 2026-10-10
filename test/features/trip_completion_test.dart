@@ -10,6 +10,7 @@ import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/domain/transit/entities/telemetry_state.dart';
 import 'package:busbuddy/features/journey/journey_controller.dart';
+import 'package:busbuddy/features/journey/live_location_screen.dart';
 import 'package:busbuddy/features/tickets/ticket_booking_suite_page.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
 
@@ -146,7 +147,7 @@ void main() {
       await tester.tap(find.textContaining('& Issue'));
       await tester.pumpAndSettle();
 
-      expect(find.text('My Journey'), findsOneWidget);
+      expect(find.byType(LiveLocationScreen), findsOneWidget);
     }
 
     testWidgets('buying a ticket starts the journey session', (tester) async {
@@ -176,7 +177,8 @@ void main() {
       await tester.tap(find.textContaining('& Issue'));
       await tester.pumpAndSettle();
 
-      expect(find.text('My Journey'), findsOneWidget);
+      expect(find.byType(LiveLocationScreen), findsOneWidget);
+      expect(find.text('LIVE MAP WINDOW'), findsOneWidget);
       expect(journeyController.state.phase, JourneyPhase.active);
       expect(
         journeyController.state.activeSession?.destination.name,
@@ -188,47 +190,24 @@ void main() {
       ticketController.dispose();
     });
 
-    testWidgets('End Trip Early expires the ticket and resets the flow', (
-      tester,
-    ) async {
+    testWidgets('Ending a tracked trip expires its ticket', (tester) async {
       await bookAndReachActiveTrip(tester);
       final ticketId = ticketController.activeTicket!.id;
 
-      await tester.ensureVisible(find.text('End Trip Early'));
+      await tester.ensureVisible(find.text('End Trip Now'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('End Trip Early'));
+      await tester.tap(find.text('End Trip Now'));
       await tester.pumpAndSettle();
 
-      expect(find.text('End trip early?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(ElevatedButton, 'End Trip'));
+      expect(find.text('End Current Trip?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'End Trip'));
       await tester.pumpAndSettle();
 
       final stored = ticketController.tickets.firstWhere(
         (t) => t.id == ticketId,
       );
       expect(stored.status, TicketStatus.expired);
-      expect(find.text('Where would you like to go?'), findsOneWidget);
-    });
-
-    testWidgets('Cancel Ticket cancels with confirmation', (tester) async {
-      await bookAndReachActiveTrip(tester);
-      final ticketId = ticketController.activeTicket!.id;
-
-      await tester.ensureVisible(find.text('Cancel Ticket'));
-      await tester.pumpAndSettle();
-      // The card button (dialog not open yet, so exactly one match).
-      await tester.tap(find.text('Cancel Ticket'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Cancel this ticket?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Cancel Ticket'));
-      await tester.pumpAndSettle();
-
-      final stored = ticketController.tickets.firstWhere(
-        (t) => t.id == ticketId,
-      );
-      expect(stored.status, TicketStatus.cancelled);
-      expect(find.text('Where would you like to go?'), findsOneWidget);
+      expect(find.byType(LiveLocationScreen), findsNothing);
     });
 
     testWidgets('bus marker moves as live positions stream in', (tester) async {
@@ -239,8 +218,7 @@ void main() {
         return layer.markers.firstWhere((m) => m.width == 44);
       }
 
-      // The embedded Active Trip map renders the live bus icon (regression:
-      // the map used to receive no positions, so no bus ever appeared).
+      // The dedicated tracking page renders the live bus icon.
       final before = busMarker().point;
       await tester.pump(const Duration(seconds: 5));
       await tester.pump();
@@ -269,27 +247,21 @@ void main() {
       addTearDown(AppServiceLocator.instance.resetForTesting);
 
       await bookAndReachActiveTrip(tester);
-      final ticketId = ticketController.activeTicket!.id;
+      final ticketId = ticketController.tickets
+          .firstWhere((ticket) => ticket.passengerName == 'Pavan')
+          .id;
 
-      expect(find.textContaining('Reached the destination'), findsOneWidget);
-      expect(find.text('End Trip'), findsOneWidget);
+      expect(find.text('Destination Reached'), findsOneWidget);
+      expect(find.textContaining('Live map closing in'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('End Trip'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('End Trip'));
-      await tester.pumpAndSettle();
-      final dialogConfirm = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('End Trip'),
-      );
-      expect(dialogConfirm, findsOneWidget);
-      await tester.tap(dialogConfirm);
+      await tester.tap(find.text('Back to Home now'));
       await tester.pumpAndSettle();
 
       final stored = ticketController.tickets.firstWhere(
         (t) => t.id == ticketId,
       );
       expect(stored.status, TicketStatus.expired);
+      expect(find.byType(LiveLocationScreen), findsNothing);
     });
   });
 }

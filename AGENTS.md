@@ -17,6 +17,7 @@ This repository contains a Flutter/Dart-based accessible public transport assist
 - `python create_research_doc.py` — generates `BusBuddy_Implementation_Research_and_UI_Design.docx` using `python-docx`
 
 ## Coding Style / Naming
+- Use Ponytail skill for coding and check you are following it while coding.
 - The Python document generator uses UPPERCASE constants for configuration (`OUT`, `BLUE`, `DARK_BLUE`, `MUTED`, `LIGHT_BLUE`, `LIGHT_GRAY`).
 - Dart/model naming follows camelCase for entities (e.g., `routeId`, `displayName`, `orderedStopIds`, `direction`, `stopId`, `name`, `latitude`, `longitude`, `busId`, `tripId`, `LiveLocation`, `JourneySession`, `UserPreference`).
 - Flutter/Dart conventions: `flutter_lints` package active via `analysis_options.yaml`.

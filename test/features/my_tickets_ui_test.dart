@@ -62,7 +62,7 @@ void main() {
       expect(find.text('Valid Ticket'), findsOneWidget);
 
       // Verify Buttons & Quick Actions
-      expect(find.text('View Ticket'), findsOneWidget);
+      expect(find.text('View Trip & Location'), findsOneWidget);
       expect(find.text('Cancel Ticket'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Share Ticket'),
@@ -71,6 +71,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Share Ticket'), findsOneWidget);
+      expect(find.text('Boarding Pass'), findsOneWidget);
       expect(find.text('Download'), findsOneWidget);
       expect(find.text('Ask BusBuddy'), findsOneWidget);
     },
@@ -123,7 +124,7 @@ void main() {
   );
 
   testWidgets(
-    'Tapping View Ticket opens TicketDetailsPage with Valid banner & QR Code pass',
+    'Tapping Boarding Pass opens TicketDetailsPage with Valid banner & QR Code pass',
     (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1400);
       tester.view.devicePixelRatio = 1.0;
@@ -136,8 +137,13 @@ void main() {
 
       final active = ticketController.activeTicket!;
 
-      // Tap View Ticket button
-      await tester.tap(find.text('View Ticket'));
+      // Boarding Pass remains the direct route to the ticket QR.
+      await tester.scrollUntilVisible(
+        find.text('Boarding Pass'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Boarding Pass'));
       await tester.pumpAndSettle();
 
       // Verify Ticket Details Page UI elements

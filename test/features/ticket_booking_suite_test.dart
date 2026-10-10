@@ -39,7 +39,7 @@ void main() {
       // Verify Prototype Header Tabs when enabled
       expect(find.text('1. Booking'), findsOneWidget);
       expect(find.text('2. Results'), findsOneWidget);
-      expect(find.text('3. Active Trip'), findsOneWidget);
+      expect(find.text('3. Active Trip'), findsNothing);
 
       // Verify Title & Subtitle (Image 1)
       expect(find.text('Where would you like to go?'), findsOneWidget);
@@ -106,66 +106,47 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Selecting a bus navigates to Step 3 (3. Active Trip) showing journey tracker',
-    (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 1400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
+  testWidgets('Booking a selected bus opens the dedicated live trip screen', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
 
-      await tester.pumpWidget(
-        buildTestableWidget(
-          TicketBookingSuitePage(
-            ticketController: ticketController,
-            initialStepIndex: 1,
-          ),
+    await tester.pumpWidget(
+      buildTestableWidget(
+        TicketBookingSuitePage(
+          ticketController: ticketController,
+          initialStepIndex: 1,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Select Bus 18B to open checkout modal
-      await tester.tap(find.text('Select This Bus >'));
-      await tester.pumpAndSettle();
+    // Select Bus 18B to open checkout modal
+    await tester.tap(find.text('Select This Bus >'));
+    await tester.pumpAndSettle();
 
-      // Verify checkout modal bottom sheet appears with passenger and payment options
-      expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
-      expect(find.text('General'), findsOneWidget);
-      expect(find.text('Student'), findsOneWidget);
-      expect(find.text('Senior'), findsOneWidget);
+    // Verify checkout modal bottom sheet appears with passenger and payment options
+    expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
+    expect(find.text('General'), findsOneWidget);
+    expect(find.text('Student'), findsOneWidget);
+    expect(find.text('Senior'), findsOneWidget);
 
-      // Enter required passenger name
-      await tester.enterText(find.byType(TextField), 'Pavan K');
-      await tester.pumpAndSettle();
+    // Enter required passenger name
+    await tester.enterText(find.byType(TextField), 'Pavan K');
+    await tester.pumpAndSettle();
 
-      // Tap Pay & Issue button to complete booking
-      await tester.tap(find.textContaining('& Issue'));
-      await tester.pumpAndSettle();
+    // Tap Pay & Issue button to complete booking
+    await tester.tap(find.textContaining('& Issue'));
+    await tester.pumpAndSettle();
 
-      // Verify Step 3 UI Elements (Image 3)
-      expect(find.text('My Journey'), findsOneWidget);
-      expect(find.text('You are going to'), findsOneWidget);
-      expect(find.text('Katpadi Railway Station'), findsOneWidget);
-
-      // Verify Tracker Metrics & Timeline
-      expect(find.text('Bus 18B'), findsOneWidget);
-      expect(find.text('On Track'), findsOneWidget);
-      expect(find.text('Stops Remaining'), findsOneWidget);
-      expect(find.textContaining('min'), findsWidgets);
-      expect(find.text('Estimated Arrival'), findsOneWidget);
-
-      // Verify Next Stop banner & Journey Assistant
-      expect(find.textContaining('Old Katpadi'), findsAtLeastNWidgets(1));
-      expect(find.text('Journey Assistant'), findsOneWidget);
-      expect(find.text('Announcements are ON'), findsOneWidget);
-
-      // Verify Quick Actions Grid
-      expect(find.text('View Live Map'), findsOneWidget);
-      expect(find.text('Repeat Last Instruction'), findsOneWidget);
-      expect(find.text('Emergency Help'), findsOneWidget);
-      expect(find.text('Need anything? Just ask.'), findsOneWidget);
-      // The booking armed an expiry Timer: dispose before the body ends
-      // (testWidgets verifies timers before teardowns run).
-      ticketController.dispose();
-    },
-  );
+    // The ticket is issued into the dedicated tracking screen.
+    expect(find.text('LIVE MAP WINDOW'), findsOneWidget);
+    expect(find.text('SEAT DETAILS'), findsOneWidget);
+    expect(find.text('CORRIDOR STOPS'), findsOneWidget);
+    // The booking armed an expiry Timer: dispose before the body ends
+    // (testWidgets verifies timers before teardowns run).
+    ticketController.dispose();
+  });
 }

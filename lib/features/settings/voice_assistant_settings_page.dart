@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'settings_ask_bus_buddy_bar.dart';
+
 import '../ai_assistant/audio_speech_engine.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -309,446 +311,382 @@ class _VoiceAssistantSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const BusBuddyLogo(
-          fontSize: 20,
-          subtitle: 'Voice Assistant',
-        ),
+        title: const BusBuddyLogo(fontSize: 20, subtitle: 'Voice Assistant'),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              children: [
-                // ── Hero Header Card (Purple Circle) ────────────────────
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        // One accent per app: the mic badge uses the same
-                        // actionPrimary as every other action surface.
-                        decoration: BoxDecoration(
-                          color: colors.actionPrimary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.mic,
-                          color: colors.onActionPrimary,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Voice Assistant',
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Set up how you interact with BusBuddy using voice.',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ── Light Card 1: Preferred Language ─────────────────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.language,
-                  title: 'Preferred Language',
-                  subtitle: 'Choose the assistant language',
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _language,
-                        style: TextStyle(
-                          color: colors.actionPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colors.actionPrimary,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                  onTap: _showLanguagePicker,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 2: Voice Speed ────────────────────────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.speed,
-                  title: 'Voice Speed',
-                  subtitle: 'Adjust how fast the assistant speaks',
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _voiceSpeed,
-                        style: TextStyle(
-                          color: colors.actionPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colors.actionPrimary,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                  onTap: _showVoiceSpeedPicker,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 3: Wake Phrase ────────────────────────────
-                // Hidden where the platform cannot transcribe ambient audio:
-                // the switch would flip a setting nothing reads, which is the
-                // same lie as an inert accessibility switch. Android streams
-                // its microphone to Gemini Live instead of transcribing locally
-                // (AudioSpeechEngine.canRecognizeSpeech).
-                if (_canRecognizeSpeech)
-                  _buildLightCard(
-                    colors: colors,
-                    icon: Icons.graphic_eq,
-                    title: 'Wake Phrase',
-                    subtitle: 'Say "Hey BusBuddy"',
-                    trailing: Switch(
-                      value: _wakePhrase,
-                      activeThumbColor: colors.onActionPrimary,
-                      activeTrackColor: colors.statusSuccess,
-                      onChanged: (val) {
-                        _settings.updateWakePhrase(val);
-                        AnnouncementCoordinator.instance.announce(
-                          val
-                              ? 'Wake phrase "Hey BusBuddy" enabled'
-                              : 'Wake phrase disabled',
-                        );
-                      },
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                children: [
+                  // ── Hero Header Card (Purple Circle) ────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      border: Border.all(color: colors.border),
                     ),
-                  ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 4: Voice Confirmations ────────────────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.verified_user_outlined,
-                  title: 'Voice Confirmations',
-                  subtitle:
-                      'Ask for confirmation before important actions (e.g. booking)',
-                  trailing: Switch(
-                    value: _voiceConfirmations,
-                    activeThumbColor: colors.onActionPrimary,
-                    activeTrackColor: colors.statusSuccess,
-                    onChanged: _settings.updateVoiceConfirmations,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 5: Gemini Live Voice Selection ────────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.record_voice_over_outlined,
-                  title: 'Gemini Live Voice',
-                  subtitle: 'Official Google voice: ${_settings.geminiVoice}',
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _settings.geminiVoice,
-                        style: TextStyle(
-                          color: colors.actionPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          // One accent per app: the mic badge uses the same
+                          // actionPrimary as every other action surface.
+                          decoration: BoxDecoration(
+                            color: colors.actionPrimary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.mic,
+                            color: colors.onActionPrimary,
+                            size: 28,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colors.actionPrimary,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                  onTap: _showVoicePicker,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Light Card 6: Google AI Studio Live API Key ──────────
-                _buildLightCard(
-                  colors: colors,
-                  icon: Icons.vpn_key_outlined,
-                  title: 'Gemini Live API',
-                  subtitle: _settings.geminiApiKey.isEmpty
-                      ? 'Tap to connect key from aistudio.google.com/live-api'
-                      : 'Key saved (${_settings.geminiModel.replaceAll('models/', '')}) • Ready for live voice',
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _settings.geminiApiKey.isNotEmpty
-                              ? colors.statusSuccessBg
-                              : colors.surfaceSubtle,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        ),
-                        child: _settings.geminiApiKey.isNotEmpty
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.bolt,
-                                    size: 16,
-                                    color: colors.statusSuccess,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'GEMINI LIVE',
-                                    style: TextStyle(
-                                      color: colors.statusSuccess,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Text(
-                                'NOT CONNECTED',
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Voice Assistant',
                                 style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 11,
+                                  color: colors.textPrimary,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colors.actionPrimary,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                  onTap: _showApiKeyDialog,
-                ),
-                const SizedBox(height: 14),
-
-                // Gemini Live Launch Action Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: colors.actionPrimary, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusMd),
-                      ),
-                    ),
-                    onPressed: () {
-                      unawaited(
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => GeminiLiveScreen(
-                              ticketController: widget.ticketController,
-                              repository: widget.repository,
-                            ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Set up how you interact with BusBuddy using voice.',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    icon: Icon(Icons.auto_awesome, color: colors.actionPrimary),
-                    label: Text(
-                      'Launch Gemini Live Voice Interface',
-                      style: TextStyle(
-                        color: colors.actionPrimary,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
-                // ── Dark Blue Example Box ────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
+                  // ── Light Card 1: Preferred Language ─────────────────────
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.language,
+                    title: 'Preferred Language',
+                    subtitle: 'Choose the assistant language',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _language,
+                          style: TextStyle(
+                            color: colors.actionPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
                           color: colors.actionPrimary,
-                          shape: BoxShape.circle,
+                          size: 20,
                         ),
-                        child: Icon(
-                          Icons.info,
-                          color: colors.onActionPrimary,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Example',
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '"Find a bus to Katpadi"',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                                height: 1.5,
-                              ),
-                            ),
-                            Text(
-                              '"Show my current ticket"',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                                height: 1.5,
-                              ),
-                            ),
-                            Text(
-                              '"What\'s my next stop?"',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    onTap: _showLanguagePicker,
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(height: 12),
 
-            // ── Sticky Bottom Ask BusBuddy Action Bar ─────────────────────
-            // Single actionPrimary accent (red is reserved for Emergency SOS).
-            // minHeight instead of a fixed height so two-line content reflows
-            // at 300% text scale instead of overflowing.
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 12,
-              child: Semantics(
-                button: true,
-                label: 'Ask BusBuddy. Test the voice assistant.',
-                excludeSemantics: true,
-                child: Material(
-                  color: colors.actionPrimary,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  child: InkWell(
-                    onTap: _openAskBusBuddy,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minHeight: AppSpacing.minTouchTarget,
+                  // ── Light Card 2: Voice Speed ────────────────────────────
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.speed,
+                    title: 'Voice Speed',
+                    subtitle: 'Adjust how fast the assistant speaks',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _voiceSpeed,
+                          style: TextStyle(
+                            color: colors.actionPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
+                          color: colors.actionPrimary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    onTap: _showVoiceSpeedPicker,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Light Card 3: Wake Phrase ────────────────────────────
+                  // Hidden where the platform cannot transcribe ambient audio:
+                  // the switch would flip a setting nothing reads, which is the
+                  // same lie as an inert accessibility switch. Android streams
+                  // its microphone to Gemini Live instead of transcribing locally
+                  // (AudioSpeechEngine.canRecognizeSpeech).
+                  if (_canRecognizeSpeech)
+                    _buildLightCard(
+                      colors: colors,
+                      icon: Icons.graphic_eq,
+                      title: 'Wake Phrase',
+                      subtitle: 'Say "Hey BusBuddy"',
+                      trailing: Switch(
+                        value: _wakePhrase,
+                        activeThumbColor: colors.onActionPrimary,
+                        activeTrackColor: colors.statusSuccess,
+                        onChanged: (val) {
+                          _settings.updateWakePhrase(val);
+                          AnnouncementCoordinator.instance.announce(
+                            val
+                                ? 'Wake phrase "Hey BusBuddy" enabled'
+                                : 'Wake phrase disabled',
+                          );
+                        },
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: colors.onActionPrimary.withValues(
-                                alpha: 0.2,
-                              ),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.mic,
-                              color: colors.onActionPrimary,
-                              size: 22,
+                    ),
+                  const SizedBox(height: 12),
+
+                  // ── Light Card 4: Voice Confirmations ────────────────────
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.verified_user_outlined,
+                    title: 'Voice Confirmations',
+                    subtitle:
+                        'Ask for confirmation before important actions (e.g. booking)',
+                    trailing: Switch(
+                      value: _voiceConfirmations,
+                      activeThumbColor: colors.onActionPrimary,
+                      activeTrackColor: colors.statusSuccess,
+                      onChanged: _settings.updateVoiceConfirmations,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Light Card 5: Gemini Live Voice Selection ────────────
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.record_voice_over_outlined,
+                    title: 'Gemini Live Voice',
+                    subtitle: 'Official Google voice: ${_settings.geminiVoice}',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _settings.geminiVoice,
+                          style: TextStyle(
+                            color: colors.actionPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
+                          color: colors.actionPrimary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    onTap: _showVoicePicker,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Light Card 6: Google AI Studio Live API Key ──────────
+                  _buildLightCard(
+                    colors: colors,
+                    icon: Icons.vpn_key_outlined,
+                    title: 'Gemini Live API',
+                    subtitle: _settings.geminiApiKey.isEmpty
+                        ? 'Tap to connect key from aistudio.google.com/live-api'
+                        : 'Key saved (${_settings.geminiModel.replaceAll('models/', '')}) • Ready for live voice',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _settings.geminiApiKey.isNotEmpty
+                                ? colors.statusSuccessBg
+                                : colors.surfaceSubtle,
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusSm,
                             ),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ask BusBuddy',
+                          child: _settings.geminiApiKey.isNotEmpty
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.bolt,
+                                      size: 16,
+                                      color: colors.statusSuccess,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'GEMINI LIVE',
+                                      style: TextStyle(
+                                        color: colors.statusSuccess,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  'NOT CONNECTED',
                                   style: TextStyle(
-                                    color: colors.onActionPrimary,
-                                    fontSize: 16,
+                                    color: colors.textSecondary,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                Text(
-                                  'Test the voice assistant.',
-                                  style: TextStyle(
-                                    color: colors.onActionPrimary
-                                        .withValues(alpha: 0.8),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
+                          color: colors.actionPrimary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    onTap: _showApiKeyDialog,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Gemini Live Launch Action Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(
+                          color: colors.actionPrimary,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
+                      ),
+                      onPressed: () {
+                        unawaited(
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => GeminiLiveScreen(
+                                ticketController: widget.ticketController,
+                                repository: widget.repository,
+                              ),
                             ),
                           ),
-                        ],
+                        );
+                      },
+                      icon: Icon(
+                        Icons.auto_awesome,
+                        color: colors.actionPrimary,
+                      ),
+                      label: Text(
+                        'Launch Gemini Live Voice Interface',
+                        style: TextStyle(
+                          color: colors.actionPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 14),
+
+                  // ── Dark Blue Example Box ────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: colors.actionPrimary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.info,
+                            color: colors.onActionPrimary,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Example',
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '"Find a bus to Katpadi"',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                              Text(
+                                '"Show my current ticket"',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                              Text(
+                                '"What\'s my next stop?"',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+            SettingsAskBusBuddyBar(
+              message: 'Test the voice assistant.',
+              onTap: _openAskBusBuddy,
             ),
           ],
         ),
@@ -943,7 +881,10 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: colors.actionSecondary,
+                  ),
                   items: _voiceOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -989,7 +930,10 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                  icon: Icon(Icons.arrow_drop_down, color: colors.actionSecondary),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: colors.actionSecondary,
+                  ),
                   items: _modelOptions.map((opt) {
                     return DropdownMenuItem<String>(
                       value: opt['id'],
@@ -1039,10 +983,7 @@ class _GeminiLiveSetupDialogState extends State<_GeminiLiveSetupDialog> {
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: colors.textSecondary),
-          ),
+          child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: () {

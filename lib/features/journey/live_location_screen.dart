@@ -171,6 +171,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     unawaited(
       showDialog<void>(
         context: context,
+        // Keep the dialog in the same tab navigator as this screen so the
+        // return-home popUntil also dismisses it.
+        useRootNavigator: false,
         barrierDismissible: false,
         builder: (ctx) {
           final colors = AppTheme.colors(ctx);
@@ -258,7 +261,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   @override
   void initState() {
     super.initState();
-    _scopeToken = AnnouncementCoordinator.instance.registerScope(widget.ticket.routeId);
+    _scopeToken = AnnouncementCoordinator.instance.registerScope(
+      widget.ticket.routeId,
+    );
     AudioSpeechEngine().unlockAudio();
     // Deferred past the first frame: recording notifies global listeners
     // (HomePage, AdaptiveShortcutsView), which must never run synchronously
@@ -316,7 +321,8 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             onPressed: () {
               setState(() {
                 _isVoiceMuted = !_isVoiceMuted;
-                AnnouncementCoordinator.instance.isSpeechEnabled = !_isVoiceMuted;
+                AnnouncementCoordinator.instance.isSpeechEnabled =
+                    !_isVoiceMuted;
               });
               if (!_isVoiceMuted) {
                 AnnouncementCoordinator.instance.announce(
@@ -389,12 +395,14 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                     child: Material(
                       elevation: 6,
                       color: colors.surface.withValues(alpha: 0.95),
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusPill),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusPill,
+                      ),
                       child: InkWell(
                         onTap: () => _toggleMapExpanded(false),
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusPill),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusPill,
+                        ),
                         child: Container(
                           constraints: const BoxConstraints(
                             minHeight: 48,
@@ -405,8 +413,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusPill),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusPill,
+                            ),
                             border: Border.all(color: colors.border),
                           ),
                           child: Row(
@@ -447,8 +456,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.82),
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           border: Border.all(color: Colors.white24),
                         ),
                         child: Row(
@@ -602,13 +612,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                     const SizedBox(height: 16),
 
                     // Small Map Window
-                    _buildMapWindow(
-                      context,
-                      stops,
-                      live,
-                      ticket,
-                      height: 260,
-                    ),
+                    _buildMapWindow(context, stops, live, ticket, height: 260),
                     const SizedBox(height: 16),
 
                     // Route-complete state: the bus parked at the destination.
@@ -989,11 +993,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.check_circle,
-            color: colors.statusSuccess,
-            size: 24,
-          ),
+          Icon(Icons.check_circle, color: colors.statusSuccess, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1266,18 +1266,19 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             itemCount: journeyStops.length,
             separatorBuilder: (_, _) => Padding(
               padding: const EdgeInsets.only(left: 15),
-              child: Container(
-                width: 2,
-                height: 14,
-                color: colors.border,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(width: 2, height: 14, color: colors.textMuted),
               ),
             ),
             itemBuilder: (context, index) {
               final stop = journeyStops[index];
               final isOrigin = index == 0 || stop.id == ticket.origin.id;
-              final isDestination = index == journeyStops.length - 1 ||
+              final isDestination =
+                  index == journeyStops.length - 1 ||
                   stop.id == ticket.destination.id;
-              final isNext = nextStopName.isNotEmpty &&
+              final isNext =
+                  nextStopName.isNotEmpty &&
                   (stop.name.toLowerCase().trim() == nextStopName ||
                       stop.name.toLowerCase().contains(nextStopName) ||
                       nextStopName.contains(stop.name.toLowerCase()));
@@ -1285,18 +1286,18 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               final Color nodeColor = isNext
                   ? colors.actionPrimary
                   : isOrigin
-                      ? colors.statusSuccess
-                      : isDestination
-                          ? const Color(0xFFE11D48)
-                          : colors.textMuted;
+                  ? colors.statusSuccess
+                  : isDestination
+                  ? const Color(0xFFE11D48)
+                  : colors.textMuted;
 
               final IconData nodeIcon = isNext
                   ? Icons.directions_bus
                   : isOrigin
-                      ? Icons.location_on
-                      : isDestination
-                          ? Icons.flag
-                          : Icons.radio_button_checked;
+                  ? Icons.location_on
+                  : isDestination
+                  ? Icons.flag
+                  : Icons.radio_button_checked;
 
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1308,10 +1309,10 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                       color: isNext
                           ? colors.statusInfoBg
                           : isOrigin
-                              ? colors.statusSuccessBg
-                              : isDestination
-                                  ? colors.statusAlertBg
-                                  : colors.surfaceSubtle,
+                          ? colors.statusSuccessBg
+                          : isDestination
+                          ? colors.statusAlertBg
+                          : colors.surfaceSubtle,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: nodeColor,
@@ -1333,8 +1334,8 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                                 style: textTheme.bodyMedium?.copyWith(
                                   fontWeight:
                                       (isNext || isOrigin || isDestination)
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
                                   color: isNext
                                       ? colors.actionPrimary
                                       : colors.textPrimary,
@@ -1496,9 +1497,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             live != null
                 ? 'Updated ${_formatUpdatedAt(live.receivedTimestamp ?? live.timestamp)}'
                 : 'Waiting for live data…',
-            style: textTheme.bodySmall?.copyWith(
-              color: colors.textMuted,
-            ),
+            style: textTheme.bodySmall?.copyWith(color: colors.textMuted),
           ),
         ],
       ),
@@ -1538,9 +1537,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Vellore Transit Route #23 • Verified Driver',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colors.textMuted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(color: colors.textMuted),
                 ),
               ],
             ),
@@ -1584,10 +1581,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             constraints: const BoxConstraints(minHeight: 52),
             child: OutlinedButton.icon(
               onPressed: () => _confirmEndTrip(context, ticket),
-              icon: Icon(
-                Icons.stop_circle_outlined,
-                color: colors.statusError,
-              ),
+              icon: Icon(Icons.stop_circle_outlined, color: colors.statusError),
               label: Text(
                 'End Trip Now',
                 style: textTheme.titleSmall?.copyWith(
@@ -1615,10 +1609,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               onPressed: () {
                 _showEmergencyShareDialog(context);
               },
-              icon: Icon(
-                Icons.share_location,
-                color: colors.actionPrimary,
-              ),
+              icon: Icon(Icons.share_location, color: colors.actionPrimary),
               label: Text(
                 'Share Live Location with Emergency Contacts',
                 style: textTheme.titleSmall?.copyWith(
@@ -1629,9 +1620,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: colors.border),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppSpacing.radiusMd,
-                  ),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
               ),
             ),
@@ -1653,11 +1642,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             ),
             title: Row(
               children: [
-                Icon(
-                  Icons.exit_to_app,
-                  color: colors.statusError,
-                  size: 26,
-                ),
+                Icon(Icons.exit_to_app, color: colors.statusError, size: 26),
                 const SizedBox(width: 10),
                 const Text('End Current Trip?'),
               ],
@@ -1713,9 +1698,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Trip ended for Ticket #${ticket.id}.'),
-      ),
+      SnackBar(content: Text('Trip ended for Ticket #${ticket.id}.')),
     );
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
