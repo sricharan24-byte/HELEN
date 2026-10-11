@@ -6,11 +6,19 @@ import '../../data/repositories/transport_repository.dart';
 import '../../domain/assistant/assistant_command.dart';
 import '../journey/journey_controller.dart';
 
+/// Where a booking-draft slot's value came from. Readiness rules depend on
+/// this: only [BookingValueSource.passenger] and [BookingValueSource.profileDefault]
+/// can satisfy a required slot — an app fallback or a merely staged recent-trip
+/// suggestion must never masquerade as a passenger choice (spec §"Booking
+/// dialogue and decision rules").
+enum BookingValueSource { unset, passenger, profileDefault, recentActivity, appDefault }
+
 /// Result of a single Live tool call applied to the booking draft.
 class AutomationResult {
   const AutomationResult({
     required this.spokenHint,
     required this.displayText,
+    this.success = true,
     this.actionType,
     this.actionLabel,
     this.missingSlots = const [],
@@ -20,11 +28,27 @@ class AutomationResult {
 
   final String spokenHint;
   final String displayText;
+
+  /// Whether the tool call actually applied (or validly evaluated). A
+  /// not-ready booking reports success=false with its missing slots, so the
+  /// session can never serialize a "done" envelope for an unconfirmed draft.
+  final bool success;
+
   final String? actionType;
   final String? actionLabel;
   final List<String> missingSlots;
   final bool isComplete;
   final bool needsGateway;
+
+  /// JSON-safe fields for the Gemini tool response: success, user-facing
+  /// summary, missing slots, and whether the confirmation gateway is needed.
+  Map<String, Object?> toToolResultJson() => {
+    'success': success,
+    'summary': spokenHint,
+    'missingSlots': List<String>.from(missingSlots),
+    'requiresConfirmation': needsGateway,
+    'draftComplete': isComplete,
+  };
 }
 
 /// Voice task-agent driver for the book-ticket flow (Live Gemini only).
@@ -47,6 +71,118 @@ class AppAutomationController extends ChangeNotifier {
   PassengerType passengerType = PassengerType.general;
   String passengerName = 'Passenger';
   PaymentMethod paymentMethod = PaymentMethod.upi;
+
+  /// Provenance for every booking slot. Starts [BookingValueSource.unset]:
+  /// the constructor fallbacks above (Bus 18B, UPI, general) are display
+  /// defaults only and can never satisfy readiness.
+  final Map<String, BookingValueSource> slotSources = {
+    'origin': BookingValueSource.unset,
+    'destination': BookingValueSource.unset,
+    'bus': BookingValueSource.unset,
+    'passengerName': BookingValueSource.unset,
+    'passengerType': BookingValueSource.unset,
+    'paymentMethod': BookingValueSource.unset,
+  };
+
+  /// The passenger's opted-in preferred name, used to ADDRESS them in spoken
+  /// replies. Never copied into [passengerName] — the ticket passenger is an
+  /// explicit choice, not an assumption.
+  String profilePreferredName = '';
+
+  /// Whether a recent-trip suggestion is staged in the draft awaiting the
+  /// passenger's acceptance.
+  bool _hasStagedSuggestion = false;
+
+  /// The six-slot draft in the exact shape [BookingContextBuilder] consumes:
+  /// every slot serialized as `{value, source}` and nothing else.
+  Map<String, Object?> bookingDraftSnapshot() => {
+    'slots': {
+      'origin': {
+        'value': origin?.name ?? '',
+        'source': slotSources['origin']!.name,
+      },
+      'destination': {
+        'value': destination?.name ?? '',
+        'source': slotSources['destination']!.name,
+      },
+      'bus': {'value': busId, 'source': slotSources['bus']!.name},
+      'passengerName': {
+        'value': passengerName,
+        'source': slotSources['passengerName']!.name,
+      },
+      'passengerType': {
+        'value': passengerType.name,
+        'source': slotSources['passengerType']!.name,
+      },
+      'paymentMethod': {
+        'value': _paymentLabel(),
+        'source': slotSources['paymentMethod']!.name,
+      },
+    },
+  };
+
+  /// Applies the passenger's saved profile defaults. The preferred name is
+  /// kept for addressing only; the default passenger type prefills the slot
+  /// only when the passenger has not chosen one, marked
+  /// [BookingValueSource.profileDefault] so the assistant can disclose it.
+  void applyProfileDefaults({
+    required String preferredName,
+    required PassengerType? passengerType,
+  }) {
+    profilePreferredName = preferredName.trim();
+    if (passengerType != null &&
+        slotSources['passengerType'] == BookingValueSource.unset) {
+      this.passengerType = passengerType;
+      slotSources['passengerType'] = BookingValueSource.profileDefault;
+    }
+    notifyListeners();
+  }
+
+  /// Stages at most one recent-route suggestion into the draft, marked
+  /// [BookingValueSource.recentActivity]. Staged values never overwrite a
+  /// passenger choice or a profile default, and never satisfy readiness —
+  /// the passenger must accept (or restate) them.
+  void stageRecentTripSuggestion({
+    required Stop origin,
+    required Stop destination,
+    required String busId,
+  }) {
+    _stageSlot('origin', origin);
+    _stageSlot('destination', destination);
+    _stageSlot('bus', busId);
+    _hasStagedSuggestion = true;
+    notifyListeners();
+  }
+
+  void _stageSlot(String slot, Object value) {
+    final current = slotSources[slot];
+    if (current == BookingValueSource.passenger ||
+        current == BookingValueSource.profileDefault) {
+      return;
+    }
+    switch (slot) {
+      case 'origin':
+        origin = value as Stop;
+      case 'destination':
+        destination = value as Stop;
+      case 'bus':
+        busId = value as String;
+    }
+    slotSources[slot] = BookingValueSource.recentActivity;
+  }
+
+  /// Passenger acceptance of the staged suggestion: promotes every
+  /// recentActivity slot to a passenger choice so readiness can count it.
+  void acceptStagedSuggestion() {
+    if (!_hasStagedSuggestion) return;
+    for (final slot in slotSources.keys) {
+      if (slotSources[slot] == BookingValueSource.recentActivity) {
+        slotSources[slot] = BookingValueSource.passenger;
+      }
+    }
+    _hasStagedSuggestion = false;
+    notifyListeners();
+  }
 
   void attach({
     TransportRepository? repo,
@@ -85,14 +221,28 @@ class AppAutomationController extends ChangeNotifier {
     final dRaw = (args?['destination'] as String?)?.trim();
     if (repo != null) {
       if (oRaw != null && oRaw.isNotEmpty) {
-        origin = _resolveStop(repo, oRaw) ?? origin;
+        final resolved = _resolveStop(repo, oRaw);
+        if (resolved != null) {
+          origin = resolved;
+          slotSources['origin'] = BookingValueSource.passenger;
+        }
       }
       if (dRaw != null && dRaw.isNotEmpty) {
-        destination = _resolveStop(repo, dRaw) ?? destination;
+        final resolved = _resolveStop(repo, dRaw);
+        if (resolved != null) {
+          destination = resolved;
+          slotSources['destination'] = BookingValueSource.passenger;
+        }
       }
-      // Corridor default: bare "Katpadi" means the railway terminus.
+      // Corridor default: bare "Katpadi" means the railway terminus. This is
+      // an app assumption, not a passenger choice — it cannot satisfy
+      // readiness, so the assistant still asks where exactly they are going.
       if (destination == null && dRaw != null && dRaw.isEmpty) {
-        destination = _resolveStop(repo, 'Katpadi Railway Station');
+        final fallback = _resolveStop(repo, 'Katpadi Railway Station');
+        if (fallback != null) {
+          destination = fallback;
+          slotSources['destination'] = BookingValueSource.appDefault;
+        }
       }
       _refreshRoute();
       _driveJourney();
@@ -100,19 +250,24 @@ class AppAutomationController extends ChangeNotifier {
       // Repository-less fallback (unit tests): synthesize minimal stops.
       if (oRaw != null && oRaw.isNotEmpty) {
         origin = Stop(id: _slug(oRaw), name: oRaw, area: 'Vellore');
+        slotSources['origin'] = BookingValueSource.passenger;
       }
       if (dRaw != null && dRaw.isNotEmpty) {
         destination = Stop(id: _slug(dRaw), name: dRaw, area: 'Katpadi');
+        slotSources['destination'] = BookingValueSource.passenger;
       }
     }
     notifyListeners();
+    final tripReady =
+        _slotSatisfied('origin') && _slotSatisfied('destination');
     final missing = _missingSlots();
-    if (missing.isEmpty) {
+    if (tripReady) {
       return AutomationResult(
         spokenHint:
             'Trip set from ${origin!.name} to ${destination!.name}. Which bus would you like — 18B in 4 minutes or 12A in 12 minutes?',
         displayText:
             '${origin!.name} → ${destination!.name}\nTap a bus or tell me which one.',
+        missingSlots: missing,
         actionType: 'search_route',
         actionLabel: AssistantCommandGateway.getMetadata('search_route')
                 ?.gatewayScreenPrompt ??
@@ -121,9 +276,9 @@ class AppAutomationController extends ChangeNotifier {
     }
     return AutomationResult(
       spokenHint:
-          'Got it. ${missing.contains('destination') ? 'Where would you like to go?' : 'Where are you starting from?'}',
-      displayText: 'Trip partially set.\nMissing: ${missing.join(', ')}.',
-      missingSlots: missing,
+          'Got it. ${_slotSatisfied('origin') ? 'Where would you like to go?' : 'Where are you starting from?'}',
+      displayText: 'Trip partially set.\nMissing: ${_missingSlots().join(', ')}.',
+      missingSlots: _missingSlots(),
     );
   }
 
@@ -149,6 +304,7 @@ class AppAutomationController extends ChangeNotifier {
         busId = 'Bus ${raw.toUpperCase()}';
       }
       hasCustomBus = true;
+      slotSources['bus'] = BookingValueSource.passenger;
     }
     notifyListeners();
     final missing = _missingSlots();
@@ -170,29 +326,25 @@ class AppAutomationController extends ChangeNotifier {
     );
   }
 
-  bool _passengerExplicit = false;
-
   AutomationResult _applyPassenger(Map<String, dynamic>? args) {
     final typeRaw =
         (args?['type'] as String?)?.trim().toLowerCase() ?? '';
     final nameRaw = (args?['name'] as String?)?.trim() ?? '';
     if (typeRaw.contains('student')) {
       passengerType = PassengerType.student;
-      _passengerExplicit = true;
+      slotSources['passengerType'] = BookingValueSource.passenger;
     } else if (typeRaw.contains('senior')) {
       passengerType = PassengerType.senior;
-      _passengerExplicit = true;
+      slotSources['passengerType'] = BookingValueSource.passenger;
     } else if (typeRaw.contains('general') ||
         typeRaw.contains('adult') ||
         typeRaw.contains('regular')) {
       passengerType = PassengerType.general;
-      _passengerExplicit = true;
-    } else if (typeRaw.isEmpty && nameRaw.isNotEmpty) {
-      _passengerExplicit = true;
+      slotSources['passengerType'] = BookingValueSource.passenger;
     }
     if (nameRaw.isNotEmpty) {
       passengerName = nameRaw;
-      _passengerExplicit = true;
+      slotSources['passengerName'] = BookingValueSource.passenger;
     }
     notifyListeners();
     final missing = _missingSlots();
@@ -226,7 +378,16 @@ class AppAutomationController extends ChangeNotifier {
       paymentMethod = PaymentMethod.card;
     } else if (raw.contains('wallet')) {
       paymentMethod = PaymentMethod.wallet;
+    } else {
+      // Unrecognized method: do not advance the draft, do not claim success.
+      return AutomationResult(
+        success: false,
+        spokenHint:
+            "I didn't catch that payment method. UPI, card or wallet?",
+        displayText: 'Payment method not recognized. Please say UPI, card or wallet.',
+      );
     }
+    slotSources['paymentMethod'] = BookingValueSource.passenger;
     notifyListeners();
     final readiness = bookingReadiness();
     if (readiness.isComplete) return readiness;
@@ -238,15 +399,20 @@ class AppAutomationController extends ChangeNotifier {
   }
 
   /// Readiness check for confirm_booking: complete or lists missing slots.
+  /// Requires an explicitly chosen trip, bus, passenger type, and payment —
+  /// app fallbacks and staged suggestions never satisfy it.
   AutomationResult bookingReadiness() {
     final missing = _missingSlots();
     if (missing.isNotEmpty) {
       final ask = missing.contains('trip')
           ? 'Tell me your origin and destination first.'
-          : missing.contains('passenger')
-              ? 'Is that a student, senior or general ticket?'
-              : 'UPI, card or wallet for payment?';
+          : missing.contains('bus')
+              ? 'Which bus would you like?'
+              : missing.contains('passenger')
+                  ? 'Is that a student, senior or general ticket?'
+                  : 'Which payment method — UPI, card or wallet?';
       return AutomationResult(
+        success: false,
         spokenHint: ask,
         displayText: 'Almost ready.\nMissing: ${missing.join(', ')}.',
         missingSlots: missing,
@@ -270,10 +436,21 @@ class AppAutomationController extends ChangeNotifier {
 
   // ── Helpers ────────────────────────────────────────────────────────
 
+  /// A slot can satisfy readiness only when the passenger chose it (or an
+  /// explicit profile default filled it). Unset, suggested, and app-default
+  /// values never count.
+  bool _slotSatisfied(String slot) =>
+      slotSources[slot] == BookingValueSource.passenger ||
+      slotSources[slot] == BookingValueSource.profileDefault;
+
   List<String> _missingSlots() {
     final missing = <String>[];
-    if (origin == null || destination == null) missing.add('trip');
-    if (!_passengerExplicit) missing.add('passenger');
+    if (!_slotSatisfied('origin') || !_slotSatisfied('destination')) {
+      missing.add('trip');
+    }
+    if (!_slotSatisfied('bus')) missing.add('bus');
+    if (!_slotSatisfied('passengerType')) missing.add('passenger');
+    if (!_slotSatisfied('paymentMethod')) missing.add('payment');
     return missing;
   }
 
