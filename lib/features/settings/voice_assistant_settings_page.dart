@@ -6,6 +6,7 @@ import 'settings_ask_bus_buddy_bar.dart';
 import '../ai_assistant/audio_speech_engine.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
+import '../../domain/ticketing/entities/ticket.dart';
 import '../tickets/ticket_controller.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
@@ -34,21 +35,33 @@ class VoiceAssistantSettingsPage extends StatefulWidget {
 class _VoiceAssistantSettingsPageState
     extends State<VoiceAssistantSettingsPage> {
   final AppSettingsController _settings = AppSettingsController.instance;
+  final TextEditingController _nameCtrl = TextEditingController();
+  final FocusNode _nameFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _nameCtrl.text = _settings.preferredPassengerName;
     _settings.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
     _settings.removeListener(_onSettingsChanged);
+    _nameCtrl.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
   void _onSettingsChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // Follow external name changes (e.g. reset) without fighting the keys
+    // the passenger is currently typing into.
+    if (!_nameFocus.hasFocus &&
+        _nameCtrl.text != _settings.preferredPassengerName) {
+      _nameCtrl.text = _settings.preferredPassengerName;
+    }
+    setState(() {});
   }
 
   String get _language => _settings.preferredLanguage;
@@ -569,13 +582,16 @@ class _VoiceAssistantSettingsPageState
                     ),
                     onTap: _showApiKeyDialog,
                   ),
+                  const SizedBox(height: 12),
+
+                  // ── Booking profile: name, default type, opt-in ─────────
+                  _buildBookingProfileSection(colors),
                   const SizedBox(height: 14),
 
                   // Gemini Live Launch Action Button
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
+                    child: OutlinedButton.icon(                      style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(
                           color: colors.actionPrimary,
@@ -746,6 +762,289 @@ class _VoiceAssistantSettingsPageState
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  String get _defaultTypeLabel {
+    switch (_settings.defaultPassengerType) {
+      case PassengerType.student:
+        return 'Student';
+      case PassengerType.senior:
+        return 'Senior';
+      case PassengerType.general:
+        return 'General';
+      case null:
+        return 'Not set (ask every time)';
+    }
+  }
+
+  void _showPassengerTypePicker() {
+    final colors = AppTheme.colors(context);
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: colors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
+        ),
+        builder: (sheetContext) {
+          Widget option(String label, PassengerType? value) {
+            final isSelected = _settings.defaultPassengerType == value;
+            return ListTile(
+              title: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected
+                      ? colors.actionSecondary
+                      : colors.textPrimary,
+                  fontWeight: isSelected
+                      ? FontWeight.w800
+                      : FontWeight.w500,
+                ),
+              ),
+              trailing: isSelected
+                  ? Icon(Icons.check, color: colors.actionSecondary)
+                  : null,
+              onTap: () {
+                _settings.updateDefaultPassengerType(value);
+                Navigator.pop(sheetContext);
+              },
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Default Passenger Type',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Prefills new bookings — you can always change it at checkout.',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                option('Not set (ask every time)', null),
+                option('General', PassengerType.general),
+                option('Student', PassengerType.student),
+                option('Senior', PassengerType.senior),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBookingProfileSection(AppSemanticColors colors) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.badge_outlined,
+                  color: colors.actionPrimary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Booking profile',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'How the assistant greets you and what tickets default to.',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const Key('preferredNameField'),
+            controller: _nameCtrl,
+            focusNode: _nameFocus,
+            style: TextStyle(color: colors.textPrimary, fontSize: 15),
+            decoration: InputDecoration(
+              labelText: 'Preferred name (optional)',
+              labelStyle: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 13,
+              ),
+              filled: true,
+              fillColor: colors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              // ≥48dp tap target for the clear control.
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 14,
+              ),
+              suffixIcon: _settings.preferredPassengerName.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('clearPreferredName'),
+                      tooltip: 'Clear preferred name',
+                      iconSize: 22,
+                      splashRadius: 24,
+                      icon: Icon(
+                        Icons.cancel_outlined,
+                        color: colors.textSecondary,
+                      ),
+                      onPressed: () =>
+                          _settings.updatePreferredPassengerName(''),
+                    ),
+            ),
+            onChanged: _settings.updatePreferredPassengerName,
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            key: const Key('defaultPassengerTypeRow'),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            onTap: _showPassengerTypePicker,
+            child: Semantics(
+              button: true,
+              label: 'Default passenger type, current value: '
+                  '$_defaultTypeLabel. Double tap to change.',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.confirmation_number_outlined,
+                      color: colors.actionPrimary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Default passenger type',
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _defaultTypeLabel,
+                            style: TextStyle(
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: colors.actionPrimary,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Use profile and recent trips for voice booking',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'When you ask to book, relevant details — your name, '
+                      'saved places, recent trips, and accessibility '
+                      'preferences — are sent to Gemini to fill the booking '
+                      'faster. Off by default; turn it off any time.',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Switch(
+                key: const Key('bookingPersonalizationSwitch'),
+                value: _settings.useBookingPersonalization,
+                activeThumbColor: colors.onActionPrimary,
+                activeTrackColor: colors.statusSuccess,
+                onChanged: (val) {
+                  _settings.updateBookingPersonalization(val);
+                  AnnouncementCoordinator.instance.announce(
+                    val
+                        ? 'Booking personalization enabled. Profile and '
+                              'recent trips may be shared with Gemini during '
+                              'bookings.'
+                        : 'Booking personalization disabled.',
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

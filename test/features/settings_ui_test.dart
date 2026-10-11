@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
 import 'package:busbuddy/data/repositories/transport_repository.dart';
+import 'package:busbuddy/core/settings/app_settings_controller.dart';
 import 'package:busbuddy/core/theme/app_theme.dart';
 import 'package:busbuddy/core/tokens/app_semantic_colors.dart';
+import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/features/settings/accessibility_settings_page.dart';
 import 'package:busbuddy/features/settings/home_screen_customization_page.dart';
 import 'package:busbuddy/features/settings/personalization_settings_page.dart';
@@ -178,6 +180,130 @@ void main() {
 
       expect(find.text('Tamil'), findsOneWidget);
       expect(find.text('Hindi'), findsOneWidget);
+    });
+
+    testWidgets('booking profile renders with personalization off by default',
+        (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 3200);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        AppSettingsController.instance.updateBookingPersonalization(false);
+        AppSettingsController.instance.updatePreferredPassengerName('');
+        AppSettingsController.instance.updateDefaultPassengerType(null);
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(home: VoiceAssistantSettingsPage()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Booking profile'), findsOneWidget);
+      expect(
+        find.text('Use profile and recent trips for voice booking'),
+        findsOneWidget,
+      );
+      final optIn = tester.widget<Switch>(
+        find.byKey(const Key('bookingPersonalizationSwitch')),
+      );
+      // Global constraint: personalization is OFF by default.
+      expect(optIn.value, isFalse);
+      expect(
+        tester.widget<TextField>(
+          find.byKey(const Key('preferredNameField')),
+        ),
+        isNotNull,
+      );
+      expect(find.text('Not set (ask every time)'), findsOneWidget);
+    });
+
+    testWidgets('booking profile values can be edited and cleared',
+        (tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 3200);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        AppSettingsController.instance.updateBookingPersonalization(false);
+        AppSettingsController.instance.updatePreferredPassengerName('');
+        AppSettingsController.instance.updateDefaultPassengerType(null);
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(home: VoiceAssistantSettingsPage()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('preferredNameField')),
+        'Pavan',
+      );
+      await tester.pumpAndSettle();
+      expect(AppSettingsController.instance.preferredPassengerName, 'Pavan');
+
+      await tester.tap(find.byKey(const Key('clearPreferredName')));
+      await tester.pumpAndSettle();
+      expect(AppSettingsController.instance.preferredPassengerName, '');
+
+      await tester.tap(find.byKey(const Key('defaultPassengerTypeRow')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Student').last);
+      await tester.pumpAndSettle();
+      expect(
+        AppSettingsController.instance.defaultPassengerType,
+        PassengerType.student,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('bookingPersonalizationSwitch')),
+      );
+      await tester.pumpAndSettle();
+      expect(AppSettingsController.instance.useBookingPersonalization, isTrue);
+    });
+
+    testWidgets('booking profile remains usable at 300% text scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(800, 1600);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        AppSettingsController.instance.updateBookingPersonalization(false);
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              textScaler: TextScaler.linear(3.0),
+            ),
+            child: Builder(
+              builder: (context) => Directionality(
+                textDirection: TextDirection.ltr,
+                child: MediaQuery(
+                  data: MediaQuery.of(context),
+                  child: const VoiceAssistantSettingsPage(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The opt-in control must be reachable by scroll and tappable at 300% —
+      // no overflow exception and no clipped-away switch.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('bookingPersonalizationSwitch')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bookingPersonalizationSwitch')));
+      await tester.pumpAndSettle();
+      expect(AppSettingsController.instance.useBookingPersonalization, isTrue);
     });
   });
 

@@ -106,6 +106,59 @@ void main() {
       expect(reloadedSearch.isVisible, false);
       expect(reloadedItems[1].id, HomeScreenItem.idRouteSearch);
     });
+
+    test('bookingProfileRoundTripsLocally', () async {
+      final controller = AppSettingsController.local();
+      final store = await LocalJsonStore.open();
+      await controller.hydrate(store);
+      controller.updatePreferredPassengerName('Pavan');
+      controller.updateDefaultPassengerType(PassengerType.student);
+      controller.updateBookingPersonalization(true);
+      await store.flush();
+
+      final reloaded = AppSettingsController.local();
+      await reloaded.hydrate(store);
+      expect(reloaded.preferredPassengerName, 'Pavan');
+      expect(reloaded.defaultPassengerType, PassengerType.student);
+      expect(reloaded.useBookingPersonalization, isTrue);
+
+      // Clearing works and round-trips the cleared values.
+      reloaded.updatePreferredPassengerName('');
+      reloaded.updateDefaultPassengerType(null);
+      reloaded.updateBookingPersonalization(false);
+      await store.flush();
+      final cleared = AppSettingsController.local();
+      await cleared.hydrate(store);
+      expect(cleared.preferredPassengerName, '');
+      expect(cleared.defaultPassengerType, isNull);
+      expect(cleared.useBookingPersonalization, isFalse);
+    });
+
+    test('legacySettingsDefaultBookingPersonalizationOff', () async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.busbuddy.settings.v1': jsonEncode({'textSize': 'Medium'}),
+      });
+      final controller = AppSettingsController.local();
+      await controller.hydrate(await LocalJsonStore.open());
+      expect(controller.useBookingPersonalization, isFalse);
+      expect(controller.preferredPassengerName, '');
+      expect(controller.defaultPassengerType, isNull);
+    });
+
+    test('invalidBookingProfileValuesAreIgnored', () async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.busbuddy.settings.v1': jsonEncode({
+          'preferredPassengerName': 42,
+          'defaultPassengerType': 'ultra',
+          'useBookingPersonalization': 'yes',
+        }),
+      });
+      final controller = AppSettingsController.local();
+      await controller.hydrate(await LocalJsonStore.open());
+      expect(controller.preferredPassengerName, '');
+      expect(controller.defaultPassengerType, isNull);
+      expect(controller.useBookingPersonalization, isFalse);
+    });
   });
 
   group('LocalTicketRepository persistence', () {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/datasources/local_json_store.dart';
 import '../../data/models/home_screen_item.dart';
+import '../../domain/ticketing/entities/ticket.dart';
 
 /// Global application settings and accessibility controller.
 class AppSettingsController extends ChangeNotifier {
@@ -78,6 +79,23 @@ class AppSettingsController extends ChangeNotifier {
         }
       }
 
+      // Booking profile: every field validates independently, so a corrupt
+      // payload can never break hydration — invalid values just keep defaults.
+      final nameRaw = value['preferredPassengerName'];
+      if (nameRaw is String) {
+        preferredPassengerName = nameRaw.trim();
+      }
+      final typeRaw = value['defaultPassengerType'];
+      if (typeRaw is String) {
+        for (final t in PassengerType.values) {
+          if (t.name == typeRaw) defaultPassengerType = t;
+        }
+      }
+      useBookingPersonalization = flag(
+        'useBookingPersonalization',
+        useBookingPersonalization,
+      );
+
       final layoutRaw = value['homeScreenLayout'];
       if (layoutRaw is List) {
         final loaded = <HomeScreenItem>[];
@@ -131,6 +149,9 @@ class AppSettingsController extends ChangeNotifier {
     'geminiVoice': geminiVoice,
     'savedPlaceStopIds': savedPlaceStopIds.toList(),
     'homeScreenLayout': homeScreenItems.map((e) => e.toJson()).toList(),
+    'preferredPassengerName': preferredPassengerName,
+    if (defaultPassengerType case final t?) 'defaultPassengerType': t.name,
+    'useBookingPersonalization': useBookingPersonalization,
   };
 
   @override
@@ -175,6 +196,21 @@ class AppSettingsController extends ChangeNotifier {
     'green-circle',
     'katpadi-bus-stand',
   ];
+
+  /// Optional name the passenger wants the assistant to address them by.
+  /// Never copied into a ticket's passenger field — the checkout passenger
+  /// name is always an explicit choice.
+  String preferredPassengerName = '';
+
+  /// Optional default passenger type the passenger explicitly saved. Only
+  /// ever prefills an unset booking slot, marked as a profile default so it
+  /// can be disclosed and corrected.
+  PassengerType? defaultPassengerType;
+
+  /// Opt-in gate for booking personalization (off by default). When false,
+  /// no profile, accessibility-setting, saved-place, or recent-history data
+  /// may reach Gemini — only the current booking draft facts.
+  bool useBookingPersonalization = false;
 
   /// True when [stopId] is in the passenger's saved places.
   bool isPlaceSaved(String stopId) => savedPlaceStopIds.contains(stopId);
@@ -296,6 +332,21 @@ class AppSettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updatePreferredPassengerName(String value) {
+    preferredPassengerName = value.trim();
+    notifyListeners();
+  }
+
+  void updateDefaultPassengerType(PassengerType? value) {
+    defaultPassengerType = value;
+    notifyListeners();
+  }
+
+  void updateBookingPersonalization(bool enabled) {
+    useBookingPersonalization = enabled;
+    notifyListeners();
+  }
+
   void updateGeminiModel(String model) {
     geminiModel = model.trim();
     notifyListeners();
@@ -385,6 +436,9 @@ class AppSettingsController extends ChangeNotifier {
       'green-circle',
       'katpadi-bus-stand',
     ];
+    preferredPassengerName = '';
+    defaultPassengerType = null;
+    useBookingPersonalization = false;
     homeScreenItems = List.from(HomeScreenItem.defaultItems);
     notifyListeners();
   }
