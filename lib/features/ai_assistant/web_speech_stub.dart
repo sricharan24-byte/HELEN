@@ -33,8 +33,12 @@ void startSpeechRecognition({
   required void Function(String text, bool isFinal) onResult,
   required void Function(String error) onError,
   required VoidCallback onEnd,
+  VoidCallback? onStarted,
 }) {
   if (enableSimulatedVoiceInput) {
+    // Simulation "opens capture" successfully, so onStarted fires first —
+    // matching the real bridge's onstart contract.
+    onStarted?.call();
     onResult('Where is my bus?', true);
     onEnd();
   } else {

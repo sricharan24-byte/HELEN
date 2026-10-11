@@ -223,18 +223,27 @@ class AudioSpeechEngine {
   Future<void> closeLiveMicrophone() => _native.stopMicrophone();
 
   /// Starts listening to the user's microphone for live voice speech recognition.
+  ///
+  /// [onStarted] fires only once capture is genuinely open (Chrome's
+  /// recognition `onstart`), which is the point at which a caller may claim to
+  /// be listening (BUS-P1-08). Paths that never produce a transcript (Android
+  /// fallback, unsupported platforms) never call it — they report through
+  /// [onError] instead.
   void startListening({
     required void Function(String text, bool isFinal) onResult,
     required void Function(String error) onError,
     required VoidCallback onEnd,
+    VoidCallback? onStarted,
   }) {
     if (kIsWeb) {
       speech_impl.startSpeechRecognition(
         onResult: onResult,
         onError: onError,
         onEnd: onEnd,
+        onStarted: onStarted,
       );
     } else if (enableSimulatedVoiceInput) {
+      onStarted?.call();
       onResult('Where is my bus?', true);
       onEnd();
     } else if (_native.isSupported) {

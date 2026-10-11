@@ -25,6 +25,7 @@ class FakeAudioSpeechEngine extends AudioSpeechEngine {
     required void Function(String text, bool isFinal) onResult,
     required void Function(String error) onError,
     required VoidCallback onEnd,
+    VoidCallback? onStarted,
   }) {
     isListeningStarted = true;
     lastOnResult = onResult;
@@ -56,6 +57,7 @@ class _RecordingEngine extends AudioSpeechEngine {
     required void Function(String text, bool isFinal) onResult,
     required void Function(String error) onError,
     required VoidCallback onEnd,
+    VoidCallback? onStarted,
   }) {
     isListeningStarted = true;
   }

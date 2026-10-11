@@ -58,7 +58,21 @@ bool _jsBridgeInitialized = false;
 ///    no text to speak (see the handshake in `gemini_live_session.dart`), which
 ///    is why the turn was silent rather than merely robotic.
 /// v9: setup handshake schema alignment and robust AudioContext priming.
-const int kJsBridgeVersion = 9;
+/// v10: earned microphone on the web (BUS-P1-08). `__bb_start_recognition`
+///    gained a fifth argument, [onStarted], fired from recognition `onstart` —
+///    the point where Chrome has actually opened capture (the permission
+///    prompt sits between `start()` and `onstart`). Callers that claimed to be
+///    listening before this fired were promising an unearned state; the screen
+///    now shows "Preparing the microphone…" until it fires. `audio-capture`
+///    and `service-not-allowed` errors also name their real causes instead of
+///    a generic error string.
+/// v11: model-audio jitter cushion. A dry queue now schedules its first
+///    chunk 0.2 s ahead of now instead of at exactly now, so the next
+///    chunk's decode (done on arrival, on the main thread) can no longer
+///    finish after the current buffer ends — the audible stutter reported
+///    from Chrome on 2026-10-11. Healthy queues schedule unchanged; the
+///    cushion never stacks and costs at most 0.2 s per dry spell.
+const int kJsBridgeVersion = 11;
 
 int _pageBridgeVersion() {
   try {
@@ -372,9 +386,16 @@ void _ensureJsBridge() {
             var source = ctx.createBufferSource();
             source.buffer = buffer;
             source.connect(ctx.destination);
-            // Catch up when scheduling fell behind (tab throttling, a late
-            // gesture unlock) instead of replaying a backlog out of order.
-            var startAt = Math.max(window.__bb_model_audio_next, ctx.currentTime);
+            // Jitter cushion: when the queue has run dry (turn start, a
+            // network hiccup, tab throttling), start this chunk slightly
+            // AHEAD of now instead of at exactly now. Each chunk is decoded
+            // on arrival, so a start-at-exactly-now schedule means the next
+            // chunk's decode finishes after the current one ends — an audible
+            // hole, the "stuttering reply" report (2026-10-11). A healthy
+            // queue (next still in the future) schedules at next unchanged,
+            // so the cushion costs at most ~0.2 s once per dry spell and
+            // never stacks.
+            var startAt = Math.max(window.__bb_model_audio_next, ctx.currentTime + 0.2);
             source.start(startAt);
             window.__bb_model_audio_next = startAt + buffer.duration;
             window.__bb_model_audio_sources.push(source);
@@ -493,7 +514,7 @@ void _ensureJsBridge() {
           window.__bb_active_utterance = null;
         };
 
-        window.__bb_start_recognition = function(lang, onResult, onError, onEnd) {
+        window.__bb_start_recognition = function(lang, onResult, onError, onEnd, onStarted) {
           window.__bb_stop_recognition();
 
           var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -512,6 +533,7 @@ void _ensureJsBridge() {
 
             rec.onstart = function() {
               console.log("[WebSpeech] Microphone recognition started (" + rec.lang + ")");
+              if (onStarted) onStarted();
             };
 
             rec.onresult = function(event) {
@@ -534,6 +556,10 @@ void _ensureJsBridge() {
               if (err === "no-speech" || err === "aborted") return;
               var msg = err === "not-allowed"
                 ? "Microphone permission blocked. Please allow microphone access in your browser address bar."
+                : err === "audio-capture"
+                ? "No microphone input was found. Please connect a microphone or check the browser's input device settings."
+                : err === "service-not-allowed"
+                ? "The browser blocked the speech recognition service for this page."
                 : ("Voice recognition error: " + err);
               if (onError) onError(msg);
             };
@@ -702,10 +728,16 @@ void stopSpeech() {
 }
 
 /// Listens to real microphone input using Web SpeechRecognition API in Chrome.
+///
+/// [onStarted] fires from recognition `onstart` — the moment capture is
+/// genuinely open. Chrome shows the permission prompt between `start()` and
+/// `onstart`, so a caller that claims to be listening before [onStarted] is
+/// promising something it has not earned (BUS-P1-08).
 void startSpeechRecognition({
   required void Function(String text, bool isFinal) onResult,
   required void Function(String error) onError,
   required VoidCallback onEnd,
+  VoidCallback? onStarted,
 }) {
   try {
     _ensureJsBridge();
@@ -723,11 +755,18 @@ void startSpeechRecognition({
       onEnd();
     });
 
+    final onStartedInterop = onStarted == null
+        ? null
+        : js_util.allowInterop(([dynamic _]) {
+            onStarted();
+          });
+
     js.context.callMethod('__bb_start_recognition', [
       langCode,
       onResultInterop,
       onErrorInterop,
       onEndInterop,
+      ?onStartedInterop,
     ]);
   } catch (e) {
     debugPrint('[WebSpeech] startSpeechRecognition error: $e');

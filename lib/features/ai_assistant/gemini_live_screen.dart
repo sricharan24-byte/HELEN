@@ -275,6 +275,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         setState(() {
           _liveStatus = status;
         });
+        // The mic never opens before the handshake (see
+        // _gatedMicrophoneStart). Now that the session is genuinely ready,
+        // a continuous-listening passenger gets the microphone they were
+        // promised — including the first-run case where the screen opened
+        // before any key was set and continuous mode had to wait.
+        if (status == 'Live Ready' &&
+            _continuousListening &&
+            !_isListening &&
+            !_isSpeaking) {
+          _startMicrophoneListening(playChimeTone: true);
+        }
       },
     );
 
@@ -353,6 +364,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
 
   String _lastInterimTranscript = '';
   bool _processedFinal = false;
+
+  /// Consecutive recognition cycles that ended with no transcript at all.
+  /// Cleared the moment any speech is heard; three in a row means the
+  /// microphone almost certainly cannot hear the passenger, and saying so
+  /// beats restarting "Listening…" forever.
+  int _silentListenCycles = 0;
   bool _actionExecutedThisTurn = false;
   DateTime? _lastVoiceInputTime;
   String _lastProcessedQuery = '';
@@ -360,6 +377,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   bool _continuousListening = true;
   Timer? _restartListenTimer;
   Timer? _speechTimer;
+  Timer? _micStartGuard;
   StreamSubscription<void>? _modelDrainSub;
 
   /// Last connection inputs the socket was opened (or gated) with; the
@@ -395,6 +413,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _isListening = false;
     _isSpeaking = false;
     _continuousListening = false;
+    _restartListenTimer?.cancel();
+    _micStartGuard?.cancel();
     // A validation round-trip that lands after dispose must not touch state.
     _connectGeneration++;
     runDisposeSteps([
@@ -510,34 +530,91 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _restartListenTimer?.cancel();
     _lastInterimTranscript = '';
     _processedFinal = false;
+    // A fresh start (open, orb tap, Try Again) clears the silent-cycle count;
+    // an automatic restart must not, or the counter would never climb above
+    // one and the silence feedback could never fire.
+    if (!isRestart) _silentListenCycles = 0;
+
+    // BUS-P1-08 applies to every platform, not only Android: never open (or
+    // promise) the microphone on a socket that cannot hear it. The web path
+    // used to skip this gate entirely, so a first-run passenger with no API
+    // key saw "Continuous Mic Active" / "Listening…" under a NOT CONNECTED
+    // banner — the mic orb lit up while the app had no way to answer.
+    unawaited(_gatedMicrophoneStart(playChimeTone: playChimeTone));
+  }
+
+  /// The awaited body of [_startMicrophoneListening]: waits out the Live
+  /// handshake, then opens capture on whichever platform path applies.
+  Future<void> _gatedMicrophoneStart({required bool playChimeTone}) async {
+    if (!await _awaitLiveReady()) {
+      // Name the real reason. "Still connecting" is a guess, and a wrong one
+      // when no key is configured at all — which is the common first-run case,
+      // and the passenger can fix it in seconds from the banner above.
+      final noKey = AppSettingsController.instance.geminiApiKey.isEmpty;
+      final keyRejected = !noKey &&
+          (_liveStatus.contains('Invalid') || _liveStatus.contains('Error'));
+      _releaseAndroidVoiceTurnUi(
+        noKey
+            ? 'BusBuddy needs a Gemini Live key before it can listen, so the '
+                  'microphone stayed off. Please type your question, or tap Connect '
+                  'to add your key.'
+            : keyRejected
+            ? 'Your Gemini API key was rejected, so the microphone stayed off. '
+                  'Tap Change above to check the key — get a fresh one from '
+                  'aistudio.google.com/apikey — or type your question.'
+            : 'BusBuddy is not connected yet, so the microphone stayed off. '
+                  'Check the connection status above, or type your question.',
+        false,
+      );
+      return;
+    }
+    if (!mounted) return;
 
     if (_audioEngine.supportsLiveAudioInput) {
       // Android has no on-device speech-to-text, so the microphone PCM itself is
       // streamed into the live session instead of a locally recognised string.
-      //
-      // `_isListening` deliberately stays false here: this path awaits a
-      // permission dialog and up to 4 s of Live handshake, and promising
-      // "Listening…" / "Continuous Mic Active" across that window would tell a
-      // TalkBack user the microphone is live while it is not. The turn sets the
-      // flag only once capture is genuinely open.
-      unawaited(_startAndroidVoiceTurn(playChimeTone: playChimeTone));
+      await _startAndroidVoiceTurn(playChimeTone: playChimeTone);
       return;
-    }
-
-    if (playChimeTone) {
-      _audioEngine.playChime(isListening: true);
     }
 
     setState(() {
       _isPermissionBlocked = false;
-      _isListening = true;
       _isSpeaking = false;
-      _liveTranscription = 'Listening... Speak into your microphone.';
+      // Deliberately NOT claiming listening yet: Chrome may be about to show a
+      // permission prompt, or recognition may fail to start. _isListening
+      // flips only in onStarted, once capture is genuinely open.
+      _liveTranscription = 'Preparing the microphone...';
+    });
+
+    // Chrome can leave rec.start() hanging indefinitely while a permission
+    // decision is pending (a site on "ask" whose prompt went unanswered, or a
+    // prompt suppressed by browser policy). An 8 s guard names that instead of
+    // letting "Preparing the microphone…" sit on screen forever.
+    _micStartGuard?.cancel();
+    _micStartGuard = Timer(const Duration(seconds: 8), () {
+      if (!mounted || _isListening || _isSpeaking) return;
+      _liveTranscription =
+          'Chrome never answered the microphone prompt. Check the icon at the '
+          'left of the address bar — Microphone must be Allowed for this site '
+          '— then tap the microphone orb again.';
     });
 
     _audioEngine.startListening(
+      onStarted: () {
+        if (!mounted) return;
+        _micStartGuard?.cancel();
+        // Capture is genuinely open now, so only now may the UI say so — the
+        // chime that marks the passenger's turn comes here too, not at the
+        // request.
+        if (playChimeTone) _audioEngine.playChime(isListening: true);
+        setState(() {
+          _isListening = true;
+          _liveTranscription = 'Listening... Speak into your microphone.';
+        });
+      },
       onResult: (text, isFinal) {
         if (!mounted) return;
+        _silentListenCycles = 0;
         if (isFinal) {
           _processedFinal = true;
           _handleVoiceInput(text);
@@ -550,6 +627,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
       onError: (err) {
         if (!mounted) return;
+        _micStartGuard?.cancel();
         debugPrint('[GeminiLiveScreen] Speech recognition error: $err');
         final isPermissionError =
             err.toLowerCase().contains('blocked') ||
@@ -583,7 +661,27 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _processedFinal = true;
           _handleVoiceInput(_lastInterimTranscript);
         } else if (!_processedFinal) {
-          if (_continuousListening && !_isSpeaking) {
+          // A cycle that ended with no transcript at all means the recognizer
+          // never heard anything — typically the wrong input device or a muted
+          // mic. A "Listening…" promise that silently restarts forever is the
+          // same lie as claiming listening before capture: after a few empty
+          // cycles, say what is actually happening instead.
+          if (_lastInterimTranscript.trim().isEmpty) {
+            _silentListenCycles++;
+          }
+          if (_continuousListening &&
+              !_isSpeaking &&
+              _silentListenCycles >= 3) {
+            _continuousListening = false;
+            _restartListenTimer?.cancel();
+            setState(() {
+              _isListening = false;
+              _liveTranscription =
+                  "I couldn't hear anything. If a microphone is connected, "
+                  'check that the browser is using the right input device, or '
+                  'type your question below.';
+            });
+          } else if (_continuousListening && !_isSpeaking) {
             // Silence timeout occurred without speech: seamlessly restart continuous listening!
             _scheduleRestartListening(delayMs: 150);
           } else {
@@ -618,6 +716,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   void _stopMicrophoneListening() {
     _continuousListening = false;
     _restartListenTimer?.cancel();
+    _micStartGuard?.cancel();
+    _silentListenCycles = 0;
     unawaited(_releaseAndroidVoiceTurn());
     _audioEngine.stopListening();
     if (mounted) {

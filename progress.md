@@ -1,5 +1,60 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-11: Web Microphone Honesty — the mic never lies about listening
+
+> **Trigger**: User testing in Chrome (the `flutter run -d web-server` debug session) reported "the microphone isn't working at all — I can't speak to it". Reproduced in a controlled browser: with no API key set, the Gemini Live screen rendered **"Continuous Mic Active"** and **"Listening… Speak into your microphone."** directly under a NOT CONNECTED header and a "key not set" banner. The web mic path had skipped the BUS-P1-08 gate entirely — the exact lie Chunk 45 fixed on Android, alive on Chrome.
+
+### 🔴 The gate — no microphone promise without a connectable session
+
+* `_startMicrophoneListening` now routes every start (post-frame auto-start, orb tap, Try Again, restart timer) through `_gatedMicrophoneStart`, which awaits `_awaitLiveReady` **on every platform**. Not ready → the honest message (no key → "BusBuddy needs a Gemini Live key before it can listen…"; connecting/failed → "not connected yet…"), microphone stays off, no listening claim. The old web path set `_isListening = true` *before* `startListening` was even called.
+* **Auto-resume**: `onStatusChanged('Live Ready')` now opens the continuous mic, so the first-run flow (screen opens keyless → key dialog → key saved → handshake completes) ends with a genuinely listening microphone instead of the orb staying dark while continuous mode believed it was on.
+
+### 🎙️ Earned on the web — bridge v10 `onStarted`
+
+* Chrome shows the mic permission prompt *between* `rec.start()` and `onstart`; the old code claimed "Listening…" across that window (and forever if the prompt was never answered). `__bb_start_recognition` gained a fifth argument, `onStarted`, fired from recognition `onstart`; only that callback flips `_isListening`, plays the turn chime and shows "Listening… Speak into your microphone.". Until then the screen honestly shows "Preparing the microphone…". `kJsBridgeVersion` 9 → 10; verified in Node (6/6: onstart fires onStarted, onStarted optional, no-speech still swallowed, stop aborts, new error strings).
+* `audio-capture` and `service-not-allowed` now name their real causes ("No microphone input was found…" / "The browser blocked the speech recognition service…") instead of a generic "Voice recognition error: …".
+
+### 🤫 Silence feedback — the "Listening…" loop that heard nothing
+
+* Chrome fires `no-speech` + `onend` after every silent cycle, and the bridge deliberately ignores `no-speech` (it is a timeout, not a failure) — so a passenger whose browser was capturing the wrong input device (here: the default source was the USB-C earphones mic) got an endless silent restart loop with a "Listening…" promise and zero feedback. Three consecutive transcript-less cycles now end continuous mode with "I couldn't hear anything. If a microphone is connected, check that the browser is using the right input device, or type your question below." Any heard speech resets the counter; fresh starts (orb tap, Try Again) reset it, automatic restarts do not (the reset-on-every-start bug was caught by the new test before the fix did too).
+
+### 🧪 Tests
+
+* `voice_session_lifecycle_test.dart` (*BUS-P1-08 Microphone State Honesty*): the "first open actually starts capture" pin was legitimately re-aimed — first open with no key now pins the key-needed honesty (no listening claim, no pill); new pins for a ready session opening the mic path while only *earning* the listening claim ("Preparing the microphone…" with no recognizer), and for three silent cycles ending the promise. `_RecordingEngine`/`FakeAudioSpeechEngine` overrides in `wake_word_service_test.dart` carry the optional `onStarted`.
+* `ai_control_glow_test.dart`: the glow is now driven by a *real* owned voice turn — the two screen tests pump a connected, handshake-complete session with simulated input and assert the screen (not anything else) lights the glow and dispose still lands on idle. Pinning `AiGlowMode.listening` after the post-frame start was itself the lie.
+* Node bridge simulation 6/6; `flutter analyze` clean; **`flutter test` 435/435 green**.
+
+### ⚠️ Still not verifiable here
+
+* Chrome mic *permission grant* → spoken question → `realtimeInput` → spoken reply round trip: needs the user's real Chrome profile with a granted permission and a valid Gemini API key (the controlled reproduction browser has no permission UI and no microphone hardware).
+* Whether the user's original "mic isn't working" was permission-blocked, wrong-input-device silence, or the keyless lie — all three now surface their honest reason instead of "Listening…".
+
+* **Files**: `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/features/ai_assistant/audio_speech_engine.dart` · `lib/features/ai_assistant/web_speech_real.dart` · `lib/features/ai_assistant/web_speech_stub.dart` · `test/features/ai_assistant/voice_session_lifecycle_test.dart` · `test/features/ai_assistant/ai_control_glow_test.dart` · `test/features/ai_assistant/wake_word_service_test.dart` · `AGENTS.md` · `progress.md`
+* **Verification**: `flutter analyze` clean · `flutter test` 435/435 green · Node bridge checks 6/6 · live UI re-check in controlled Chrome after rebuild.
+
+### 🔁 Addendum (same day): "even if I connect the API key" triage
+
+* Reproduced the user's follow-up with a deliberately invalid key: after a failed validation the orb message said only "not connected yet… check the status above" while the actual failure ("Key Invalid" chip + Google's raw 400) sat higher up. The gate now names it: with the status showing Invalid/Error the orb says **"Your Gemini API key was rejected… Tap Change above to check the key — get a fresh one from aistudio.google.com/apikey"**.
+* Key hygiene re-checked (no bug): the dialog and `validateApiKey` both strip quotes/whitespace before saving/validating; `_connectValidated` never opens a socket on a failed check.
+* Last honesty gap closed: Chrome can leave `rec.start()` hanging forever on an unanswered permission prompt, so "Preparing the microphone…" got an 8 s guard that names the address-bar permission fix and re-arms via the orb.
+* Observed live in the controlled browser: a *valid* key reaching "Live Ready" auto-opens the mic and earns the pill — the auto-resume path works end to end.
+* `flutter analyze` clean; `flutter test` 435/435 green after both changes.
+
+### 🔊 Addendum 2 (same day): reply latency + stuttering voice
+
+* User confirmed the flow works but reported slow replies and a stuttering voice. Two causes addressed:
+  * **Debug build**: the test server ran a DDC debug build, which inflates every main-thread cost — base64→PCM decode per chunk, scheduling, UI. Test sessions now run `flutter run -d web-server --release` (dart2js); user testing should never judge latency from a debug web build again.
+  * **No jitter buffer (bridge v11)**: each chunk was scheduled at `max(next, ctx.currentTime)`, so the first late-arriving chunk after a dry spell started *exactly now* and the next chunk's on-arrival decode finished after the current buffer ended — an audible hole ("voice is striking"). A dry queue now schedules its first chunk 0.2 s ahead of now (jitter cushion); healthy queues schedule at `next` unchanged, so the cushion never stacks and costs at most 0.2 s per dry spell. Node-verified 5/5 (dry-start cushion, gapless healthy queue, single cushion per dry spell, chain-off-cushion).
+* Remaining latency is inherent to the web turn design: Chrome's speech recognition finalizes the transcript (~1–2 s after speech ends), then the text turn goes to the model. True realtime voice on web (mic PCM streamed as `realtimeInput` like Android, no local STT round trip) is a candidate future chunk.
+
+* **Files**: `lib/features/ai_assistant/web_speech_real.dart` (bridge v11)
+* **Verification**: `flutter analyze` clean · `flutter test` 435/435 green · Node scheduling checks 5/5.
+
+* **Files**: `lib/features/ai_assistant/gemini_live_screen.dart`
+* **Verification**: see above.
+
+---
+
 ## 🛠️ Session Log — 2026-10-09: Android Microphone Startup Handoff
 
 > **Trigger**: Continue Android optimization with the microphone as the active issue.
