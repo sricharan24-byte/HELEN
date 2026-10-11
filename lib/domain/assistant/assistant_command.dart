@@ -165,6 +165,18 @@ class AssistantCommandGateway {
           'Opening booking confirmation. Please review and confirm on your screen.',
       gatewayScreenPrompt: '🎫 Review & Confirm Booking',
     ),
+    // ── Booking personalization (read-only context retrieval) ──────────
+    // Only after a clear booking intent: returns the opted-in profile,
+    // communication preferences, saved places, recent trips, and the current
+    // draft with slot provenance. Read-only, no arguments.
+    'get_booking_context': AssistantToolMetadata(
+      name: 'get_booking_context',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description:
+          'Loads the passenger\u2019s booking context: preferred name and default passenger type (only if saved), communication preferences, saved places, up to three recent trips, and the current booking draft showing which values the passenger already chose. Call ONLY once the passenger clearly wants to book a ticket, and only once per booking attempt; do not call for general questions.',
+      promptSummary: 'Booking context loaded.',
+      gatewayScreenPrompt: '🧾 Booking Context Loaded',
+    ),
   };
 
   static bool requiresConfirmation(String actionType) {
@@ -180,6 +192,7 @@ class AssistantCommandGateway {
     'select_bus',
     'set_passenger',
     'set_payment',
+    'get_booking_context',
   };
 
   static bool isSilentProtocol(String? actionType) =>

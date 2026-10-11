@@ -1,15 +1,23 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/core/settings/app_settings_controller.dart';
 import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
 import 'package:busbuddy/features/ai_assistant/audio_speech_engine.dart';
+import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/models/ticket_model.dart';
 import 'package:busbuddy/data/models/transport_models.dart';
 import 'package:busbuddy/data/repositories/ticket_repository.dart';
+import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_screen.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_service.dart';
+import 'package:busbuddy/features/ai_assistant/gemini_live_transport.dart';
+import 'package:busbuddy/features/ai_assistant/gemini_live_session.dart';
+import 'package:busbuddy/features/tickets/ticket_booking_suite_page.dart';
 import 'package:busbuddy/features/tickets/ticket_controller.dart';
+import '../helpers/map_test_tiles.dart';
 
 void main() {
   // GeminiLiveScreen mutes process-wide offline TTS while open: always start
@@ -18,6 +26,7 @@ void main() {
     AudioSpeechEngine.muteOfflineTts(false);
     AnnouncementCoordinator.instance.reset();
   });
+  setUpAll(stubMapTiles);
   group('GeminiLiveService Unit Tests', () {
     const service = GeminiLiveService();
 
@@ -204,4 +213,252 @@ void main() {
       expect(find.text('Where is my bus?'), findsWidgets);
     });
   });
+
+  group('booking personalization integration (Live tool results)', () {
+    late _RecordingTransport transport;
+    late LocalTransportRepository repository;
+    late TicketController ticketController;
+
+    Ticket nonDemoTicket(String id, String bus) => Ticket(
+          id: id,
+          routeId: 'vit-to-katpadi',
+          routeName: 'VIT Main Gate → Katpadi',
+          origin: const Stop(
+            id: 'vit-main-gate',
+            name: 'VIT Main Gate',
+            area: 'VIT University',
+          ),
+          destination: const Stop(
+            id: 'katpadi-railway-station',
+            name: 'Katpadi Railway Station',
+            area: 'Katpadi',
+          ),
+          busId: bus,
+          passengerName: 'Passholder',
+          passengerType: PassengerType.general,
+          fareQuote: FareQuote.fromPaise(
+            basePaise: 2500,
+            passengerType: PassengerType.general,
+            discountPercentage: 0,
+          ),
+          paymentMethod: PaymentMethod.upi,
+          issuedAt: DateTime(2026, 10, 9, 10),
+          validUntil: DateTime(2026, 10, 9, 14),
+          qrCodeData: 'BUSBUDDY::secret-qr-$id',
+          isDemo: false,
+        );
+
+    setUp(() {
+      GeminiLiveSession.testValidateOverride = (key) async => null;
+      AppSettingsController.instance.updateGeminiApiKey('test-key');
+      AppSettingsController.instance.updateBookingPersonalization(false);
+      AppSettingsController.instance.updatePreferredPassengerName('');
+      AppSettingsController.instance.updateDefaultPassengerType(null);
+      AppSettingsController.instance.savedPlaceStopIds = ['vit-main-gate'];
+      repository = LocalTransportRepository(
+        dataSource: LocalTransportDataSource(),
+      );
+      ticketController = TicketController(LocalTicketRepository());
+    });
+
+    tearDown(() {
+      GeminiLiveSession.testValidateOverride = null;
+      AppSettingsController.instance.updateGeminiApiKey('');
+      AppSettingsController.instance.updateBookingPersonalization(false);
+      AppSettingsController.instance.updatePreferredPassengerName('');
+      AppSettingsController.instance.updateDefaultPassengerType(null);
+    });
+
+    Future<void> pumpConnectedScreen(WidgetTester tester) async {
+      transport = _RecordingTransport();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeminiLiveScreen(
+            transportFactory: () => transport,
+            repository: repository,
+            ticketController: ticketController,
+          ),
+        ),
+      );
+      await tester.pump();
+      transport.serverSay!('{"setupComplete":{}}');
+      // Let the gated mic path run and its silent-cycle guard settle so no
+      // timer is left pending later.
+      await tester.pump(const Duration(milliseconds: 4300));
+    }
+
+    List<Map<dynamic, dynamic>> toolOutputs() => transport.frames
+        .map((f) => jsonDecode(f) as Map<String, dynamic>)
+        .where((m) => m.containsKey('toolResponse'))
+        .expand(
+          (m) => (m['toolResponse'] as Map)['functionResponses'] as List,
+        )
+        .map((fr) => (fr as Map)['response']['output'] as Map)
+        .toList();
+
+    void serverSayToolCall(
+      String id,
+      String name, [
+      Map<String, dynamic> args = const {},
+    ]) {
+      transport.serverSay!(jsonEncode({
+        'toolCall': {
+          'functionCalls': [
+            {'id': id, 'name': name, 'args': args},
+          ],
+        },
+      }));
+    }
+
+    testWidgets('bookingUsesOptedInContextAndNamesSuggestionSource', (
+      tester,
+    ) async {
+      AppSettingsController.instance
+        ..updateBookingPersonalization(true)
+        ..updatePreferredPassengerName('Pavan')
+        ..updateDefaultPassengerType(PassengerType.student);
+      ticketController.addTicket(nonDemoTicket('TKT-ND9', 'Bus ND9'));
+
+      await pumpConnectedScreen(tester);
+      serverSayToolCall('bc-1', 'get_booking_context');
+      await tester.pump();
+
+      final output = toolOutputs().last;
+      expect(output['success'], isTrue);
+      final context = output['bookingContext'] as Map;
+      // Profile fields arrive only because personalization is opted in.
+      expect((context['profile'] as Map)['preferredName'], 'Pavan');
+      expect(
+        (context['profile'] as Map)['defaultPassengerType'],
+        'student',
+      );
+      // The recent trip is suggested and NAMED as a suggestion through the
+      // slot provenance, never as a passenger choice.
+      expect(
+        ((context['draft'] as Map)['slots'] as Map)['destination'],
+        {'value': 'Katpadi Railway Station', 'source': 'recentActivity'},
+      );
+      expect(
+        ((context['draft'] as Map)['slots'] as Map)['passengerType'],
+        {'value': 'student', 'source': 'profileDefault'},
+      );
+      final trips = context['recentTrips'] as List;
+      expect((trips.single as Map)['bus'], 'Bus ND9');
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+
+    testWidgets('optedOutBookingSendsNoProfileOrHistoryContext', (tester) async {
+      AppSettingsController.instance
+        ..updatePreferredPassengerName('Pavan')
+        ..updateDefaultPassengerType(PassengerType.student);
+      ticketController.addTicket(nonDemoTicket('TKT-ND9', 'Bus ND9'));
+
+      await pumpConnectedScreen(tester);
+      serverSayToolCall('bc-2', 'get_booking_context');
+      await tester.pump();
+
+      final output = toolOutputs().last;
+      expect(output['success'], isTrue);
+      final context = output['bookingContext'] as Map;
+      // Opted out: nothing but the current draft facts.
+      expect(context.keys, ['draft']);
+      expect(
+        context.toString().contains('Pavan'),
+        isFalse,
+        reason: 'the preferred name must never leak when opted out',
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+
+    testWidgets('bookingCorrectionUpdatesVisibleDraft', (tester) async {
+      await pumpConnectedScreen(tester);
+      serverSayToolCall('t-1', 'set_trip', {
+        'origin': 'VIT Main Gate',
+        'destination': 'Katpadi Railway Station',
+      });
+      await tester.pump();
+      serverSayToolCall('t-2', 'set_trip', {'origin': 'Katpadi Bus Stand'});
+      await tester.pump();
+      serverSayToolCall('bc-3', 'get_booking_context');
+      await tester.pump();
+
+      final context = toolOutputs().last['bookingContext'] as Map;
+      final slots = (context['draft'] as Map)['slots'] as Map;
+      // The correction replaced both the value and its provenance.
+      expect(slots['origin'], {
+        'value': 'Katpadi Bus Stand',
+        'source': 'passenger',
+      });
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+
+    testWidgets('checkoutWaitsForExplicitPaymentMethod', (tester) async {
+      await pumpConnectedScreen(tester);
+      serverSayToolCall('t-1', 'set_trip', {
+        'origin': 'VIT Main Gate',
+        'destination': 'Katpadi Railway Station',
+      });
+      await tester.pump();
+      serverSayToolCall('b-1', 'select_bus', {'busId': '18B'});
+      await tester.pump();
+      serverSayToolCall('p-1', 'set_passenger', {'type': 'student'});
+      await tester.pump();
+
+      // The passenger never chose a payment method — confirm must not open
+      // checkout even though the UPI fallback value sits in the draft.
+      serverSayToolCall('c-1', 'confirm_booking');
+      await tester.pump();
+
+      final output = toolOutputs().last;
+      expect(output['success'], isFalse);
+      expect((output['missingSlots'] as List), contains('payment'));
+      expect(output['draftComplete'], isFalse);
+      expect(output['requiresConfirmation'], isFalse);
+      expect(find.byType(TicketBookingSuitePage), findsNothing);
+
+      // Only an explicit payment choice completes the booking.
+      serverSayToolCall('pay-1', 'set_payment', {'method': 'card'});
+      await tester.pump();
+      serverSayToolCall('c-2', 'confirm_booking');
+      await tester.pump();
+      final ready = toolOutputs().last;
+      expect(ready['draftComplete'], isTrue);
+      expect(ready['requiresConfirmation'], isTrue);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+  });
+}
+
+/// Records every frame the screen's session sends and lets the test speak as
+/// the Gemini server (same shape as the fake in key_connect_gate_test.dart).
+class _RecordingTransport implements GeminiLiveTransport {
+  final frames = <String>[];
+  bool _open = false;
+  void Function(String message)? serverSay;
+
+  @override
+  bool get isConnected => _open;
+
+  @override
+  void connect(
+    String url, {
+    required void Function() onOpen,
+    required void Function(String message) onMessage,
+    required void Function(Object error) onError,
+    required void Function(int? code, String? reason) onClose,
+  }) {
+    _open = true;
+    serverSay = onMessage;
+    onOpen();
+  }
+
+  @override
+  void send(String data) => frames.add(data);
+
+  @override
+  void close() => _open = false;
 }

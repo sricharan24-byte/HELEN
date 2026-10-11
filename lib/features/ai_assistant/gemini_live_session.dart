@@ -16,6 +16,7 @@ class GeminiLiveSession {
     this.onAudioPcmChunk,
     this.onTurnComplete,
     this.onAction,
+    this.onToolCall,
     this.onError,
     this.onStatusChanged,
     this.onInterrupted,
@@ -27,6 +28,15 @@ class GeminiLiveSession {
   final void Function(String pcmBase64)? onAudioPcmChunk;
   final void Function(String fullText, String? actionType)? onTurnComplete;
   final void Function(String actionType, Map<String, dynamic>? args)? onAction;
+
+  /// Result-bearing tool handoff: whatever the app returns here is serialized
+  /// verbatim into `toolResponse.functionResponses[*].response.output` for the
+  /// matching call (id and name preserved). Returning null falls back to the
+  /// generic gateway envelope for known tools; a thrown error or an unknown
+  /// tool name yields a bounded failure result that never claims success.
+  final Map<String, Object?> Function(String name, Map<String, dynamic>? args)?
+  onToolCall;
+
   final void Function(String error)? onError;
   final void Function(String status, bool isConnected)? onStatusChanged;
   final VoidCallback? onInterrupted;
@@ -151,7 +161,13 @@ CRITICAL CONVERSATIONAL RULES:
    - To book, chain: set_trip(origin, destination) -> select_bus(busId) -> set_passenger(type, name?) -> set_payment(method) -> confirm_booking().
    - Fill slots from the user's words; ask naturally for anything missing (e.g. "Which bus — 18B in 4 min or 12A in 12 min?", "Student, senior or general?", "UPI, card or wallet?").
    - Default corridor is VIT Main Gate to Katpadi Railway Station when the user says "Katpadi" without detail.
-   - confirm_booking only OPENS the review screen; payment happens only after the passenger taps confirm.''';
+   - confirm_booking only OPENS the review screen; payment happens only after the passenger taps confirm.
+8. BOOKING CONTEXT (personalization):
+   - Only once a booking intent is clear, call get_booking_context (no arguments, at most once per booking attempt) to load the passenger's saved preferences, saved places, recent trips, and the current draft.
+   - Use the returned context ONLY within this booking: greet by preferred name if present, prefill the saved default passenger type, and treat saved places and recent trips as SUGGESTIONS — say where a suggestion came from ("from your saved places" / "from your recent trips") and get the passenger's OK before using it. Never treat a suggestion as a confirmed choice.
+   - The draft shows which values the passenger chose versus defaults or suggestions: ask about anything defaulted or ambiguous, and restate corrections after they are applied.
+   - If the passenger opted out (no profile fields returned), run the plain generic booking flow without mentioning preferences or history.
+   - Never claim a booking or payment is complete, never invent schedules, GPS positions, or seat availability that the context did not give you. Never reveal, repeat, or list the raw context contents aloud — use it silently to ask better questions.''';
 
   static String _resolveLiveModel(String requested) {
     var model = requested.trim();
@@ -529,13 +545,12 @@ CRITICAL CONVERSATIONAL RULES:
               );
               onAction?.call(name, args);
 
-              final outputContext =
-                  AssistantCommandGateway.buildToolResponseContext(name, args);
+              final output = _resolveToolOutput(name, args);
 
               functionResponses.add({
                 'id': callId,
                 'name': name,
-                'response': {'output': outputContext},
+                'response': {'output': output},
               });
             }
           }
@@ -563,6 +578,37 @@ CRITICAL CONVERSATIONAL RULES:
     } catch (e) {
       debugPrint('[GeminiLive] Message parse error: $e');
     }
+  }
+
+  /// Resolves the output envelope for one tool call: the app's [onToolCall]
+  /// result when provided, else the gateway metadata for known tools, and a
+  /// bounded failure that never claims success for unknown tools or callback
+  /// errors.
+  Map<String, Object?> _resolveToolOutput(
+    String name,
+    Map<String, dynamic>? args,
+  ) {
+    final meta = AssistantCommandGateway.getMetadata(name);
+    Map<String, Object?> output;
+    try {
+      final result = onToolCall?.call(name, args);
+      output = result ??
+          (meta != null
+              ? AssistantCommandGateway.buildToolResponseContext(name, args)
+              : const {
+                  'success': false,
+                  'error': 'Unknown tool',
+                });
+    } catch (e) {
+      debugPrint('[GeminiLive] Tool $name callback failed: $e');
+      output = {'success': false, 'error': 'Tool unavailable'};
+    }
+    // An unregistered tool name can never carry a success envelope, whatever
+    // the callback returned.
+    if (meta == null && output['success'] == true) {
+      output = {'success': false, 'error': 'Unknown tool'};
+    }
+    return output;
   }
 
   /// REST fallback to Google AI Studio Gemini 2.5 Flash endpoint

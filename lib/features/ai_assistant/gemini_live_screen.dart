@@ -18,6 +18,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/widgets/bus_buddy_logo.dart';
 import '../../domain/assistant/assistant_command.dart';
+import 'booking_context.dart';
 import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
@@ -255,6 +256,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           _scheduleRestartListening(delayMs: 300, playChimeTone: true);
         }
       },
+      onToolCall: _handleLiveToolCall,
       onError: (err) {
         if (!mounted) return;
         debugPrint('[GeminiLiveScreen] Session error: $err');
@@ -1025,6 +1027,67 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         ),
       ),
     );
+  }
+
+  /// Result-bearing Live tool handoff: returns the validated application
+  /// result for the matching call. The screen effects themselves still run
+  /// through onAction — one action execution per turn, checkout confirmation
+  /// intact.
+  Map<String, Object?> _handleLiveToolCall(
+    String name,
+    Map<String, dynamic>? args,
+  ) {
+    switch (name) {
+      case 'get_booking_context':
+        final settings = AppSettingsController.instance;
+        if (settings.useBookingPersonalization) {
+          _automation.applyProfileDefaults(
+            preferredName: settings.preferredPassengerName,
+            passengerType: settings.defaultPassengerType,
+          );
+          _maybeStageRecentTripSuggestion();
+        }
+        final context = BookingContextBuilder.build(
+          settings: settings,
+          repository: _repository,
+          ticketController: _ticketController,
+          bookingDraft: _automation.bookingDraftSnapshot(),
+        ).toJson();
+        return {'success': true, 'bookingContext': context};
+      case 'set_trip':
+      case 'select_bus':
+      case 'set_passenger':
+      case 'set_payment':
+      case 'confirm_booking':
+        return _automation.handleToolCall(name, args).toToolResultJson();
+      default:
+        final meta = AssistantCommandGateway.getMetadata(name);
+        if (meta == null) {
+          return {'success': false, 'error': 'Unknown tool'};
+        }
+        return AssistantCommandGateway.buildToolResponseContext(name, args);
+    }
+  }
+
+  /// Stages at most one recent-trip suggestion, and only while no passenger
+  /// choice (or prior suggestion) occupies the trip. The staged values never
+  /// satisfy readiness — see AppAutomationController.stageRecentTripSuggestion.
+  void _maybeStageRecentTripSuggestion() {
+    if (_automation.slotSources['origin'] != BookingValueSource.unset) {
+      return;
+    }
+    if (_automation.slotSources['destination'] != BookingValueSource.unset) {
+      return;
+    }
+    for (final ticket in _ticketController.tickets) {
+      if (ticket.isDemo) continue;
+      _automation.stageRecentTripSuggestion(
+        origin: ticket.origin,
+        destination: ticket.destination,
+        busId: ticket.busId,
+      );
+      return;
+    }
   }
 
   void _executeAction(String actionType, [Map<String, dynamic>? args]) {

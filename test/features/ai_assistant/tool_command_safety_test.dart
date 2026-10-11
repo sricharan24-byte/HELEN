@@ -3,6 +3,23 @@ import 'package:busbuddy/domain/assistant/assistant_command.dart';
 import 'package:busbuddy/features/ai_assistant/gemini_live_service.dart';
 
 void main() {
+  group('get_booking_context declaration (booking personalization)', () {
+    test('getBookingContextIsDeclaredReadOnlyWithoutArguments', () {
+      final meta = AssistantCommandGateway.getMetadata('get_booking_context');
+      expect(meta, isNotNull, reason: 'get_booking_context must be registered');
+      expect(meta!.safetyLevel, CommandSafetyLevel.readOnly);
+      expect(meta.isConfirmable, isFalse);
+      // Read-only with no arguments: the declaration carries no parameters.
+      final decl = meta.toFunctionDeclaration();
+      expect(decl['name'], equals('get_booking_context'));
+      expect(decl.containsKey('parameters'), isFalse);
+      expect(
+        AssistantCommandGateway.requiresConfirmation('get_booking_context'),
+        isFalse,
+      );
+    });
+  });
+
   group('Assistant Command Safety Gateway Tests (BUS-P0-05)', () {
     test(
       'strictly categorizes mutating and safety commands as requiresUserConfirmation',
