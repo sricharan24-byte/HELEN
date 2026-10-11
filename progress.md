@@ -1,5 +1,27 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-11: Booking Draft Preview — make the agent's work visible
+
+> **Trigger**: "optimize the preview of the agent work" — during voice booking the draft was invisible until checkout; provenance and suggestions had no visual surface, and `acceptStagedSuggestion()` had no UI caller at all.
+
+### 🧾 BookingDraftPreview (`lib/features/ai_assistant/booking_draft_preview.dart`)
+
+* Live card on the Gemini Live screen (between the transcript and the prompt chips), driven by a plain `ListenableBuilder` on `AppAutomationController` — hidden until the agent touches a slot. No changes to audio/session/single-speaker contracts.
+* Four slot rows (Trip / Bus / Passenger / Payment), each with a provenance chip: **You chose** (passenger), **Your default** (profileDefault), **Suggestion** (recentActivity, statusWarning — never red), **App default**, **Not set yet**. Fallback values (Bus 18B / UPI / general) honestly render as "Not set yet" instead of pretending to be choices.
+* Header lists what is still missing in guidance order; `Ready to review` once all four are explicit.
+* **Staged-suggestion banner with Use this trip / Not now buttons** — closes the gap where `acceptStagedSuggestion()` existed but nothing in the UI could call it. New `AppAutomationController.dismissStagedSuggestion()` reverts recentActivity slots to unset (nothing was ever a choice).
+* **Estimated fare row** from `FareEngine.calculateByStopCount` (integer paise, `formattedAmount`) — shown only when the trip is a real passenger choice on a known route; hops are mirrored from `bookTicket`'s computation, no invented numbers, "final at checkout" label.
+* Judgment call: deliberate **no live region** on the card — the assistant already narrates every slot change; a second announcement channel is the overlap class of bug Chunks 41/42 killed. Rows carry plain Semantics labels. Revert freely if TalkBack testing says otherwise.
+
+### ✅ Verification
+
+* 6 widget tests (`booking_draft_preview_test`): hidden-when-idle, provenance chips, profile-default labelling (name never shown as ticket passenger), accept promotes + banner clears, dismiss reverts to unset and re-hides the card, fare equals `FareEngine`'s exact quote for the same hops. Plus the `dismissStagedSuggestionRevertsToUnset` controller test. Suite **470/470 green**, analyze clean, docs gate passed. Test-font note: the header label needed a `Flexible` — widget tests render every Ahem glyph at full fontSize width, which surfaced a real 300%-scale wrap risk.
+
+* **Files**: `lib/features/ai_assistant/booking_draft_preview.dart` (new) · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/features/ai_assistant/app_automation_controller.dart` · `test/features/ai_assistant/booking_draft_preview_test.dart` (new) · `test/features/ai_assistant/app_automation_controller_test.dart`
+* **Verification**: `flutter analyze` clean · `flutter test` 470/470 green · docs gate passed.
+
+---
+
 ## 🛠️ Session Log — 2026-10-11: Gemini Booking Personalization (plan executed, Tasks 1–5)
 
 > **Trigger**: "move to the next chunk" — executed `docs/superpowers/plans/2026-10-09-gemini-booking-personalization.md` task-by-task against its spec.

@@ -184,6 +184,35 @@ class AppAutomationController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Passenger rejects the staged suggestion: recentActivity slots revert to
+  /// unset (values back to their fallbacks), so nothing was ever a choice.
+  void dismissStagedSuggestion() {
+    if (!_hasStagedSuggestion) return;
+    if (slotSources['origin'] == BookingValueSource.recentActivity) {
+      origin = null;
+      slotSources['origin'] = BookingValueSource.unset;
+    }
+    if (slotSources['destination'] == BookingValueSource.recentActivity) {
+      destination = null;
+      slotSources['destination'] = BookingValueSource.unset;
+    }
+    if (slotSources['bus'] == BookingValueSource.recentActivity) {
+      busId = '18B';
+      hasCustomBus = false;
+      slotSources['bus'] = BookingValueSource.unset;
+    }
+    _hasStagedSuggestion = false;
+    notifyListeners();
+  }
+
+  /// Whether [slot] can satisfy readiness right now — a passenger choice or
+  /// an explicit profile default. Public for the draft preview UI, which
+  /// mirrors the same readiness rules the voice flow enforces.
+  bool isSlotSatisfied(String slot) => _slotSatisfied(slot);
+
+  /// The booking slots still missing for checkout, in guidance order.
+  List<String> get missingBookingSlots => _missingSlots();
+
   void attach({
     TransportRepository? repo,
     JourneyController? journeyCtrl,

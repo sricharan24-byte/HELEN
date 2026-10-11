@@ -19,6 +19,7 @@ import '../../core/tokens/app_spacing.dart';
 import '../../core/widgets/bus_buddy_logo.dart';
 import '../../domain/assistant/assistant_command.dart';
 import 'booking_context.dart';
+import 'booking_draft_preview.dart';
 import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
@@ -1817,7 +1818,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // Live booking draft preview: what the voice agent has built so
+              // far, with slot provenance. Pure listener on the automation
+              // controller — hidden until the agent starts filling slots.
+              BookingDraftPreview(automation: _automation),
+
+              const SizedBox(height: 12),
 
               // Let prompts wrap to the next line so every option stays
               // visible at narrow widths and large text sizes.

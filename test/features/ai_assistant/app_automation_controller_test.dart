@@ -146,6 +146,41 @@ void main() {
       expect(ready.needsGateway, isTrue);
     });
 
+    test('dismissStagedSuggestionRevertsToUnset', () {
+      final automation = AppAutomationController();
+      const origin = Stop(
+        id: 'vit-main-gate',
+        name: 'VIT Main Gate',
+        area: 'VIT',
+      );
+      const destination = Stop(
+        id: 'katpadi-railway-station',
+        name: 'Katpadi Railway Station',
+        area: 'Katpadi',
+      );
+
+      automation.stageRecentTripSuggestion(
+        origin: origin,
+        destination: destination,
+        busId: 'Bus 18B',
+      );
+      automation.dismissStagedSuggestion();
+
+      // Rejected values are gone entirely — not silently kept as choices.
+      expect(automation.slotSources['origin'], BookingValueSource.unset);
+      expect(automation.slotSources['destination'], BookingValueSource.unset);
+      expect(automation.slotSources['bus'], BookingValueSource.unset);
+      expect(automation.origin, isNull);
+      expect(automation.destination, isNull);
+      expect(automation.hasCustomBus, isFalse);
+      // A later passenger restatement starts clean as a passenger choice.
+      automation.handleToolCall('set_trip', {
+        'origin': 'VIT Main Gate',
+        'destination': 'Katpadi Railway Station',
+      });
+      expect(automation.slotSources['origin'], BookingValueSource.passenger);
+    });
+
     test('appFallbacksDoNotSatisfyReadiness', () {
       final automation = AppAutomationController();
       // Fresh controller carries app fallback values (Bus 18B / UPI).
