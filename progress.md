@@ -1,5 +1,28 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-11: Gemini Booking Personalization (plan executed, Tasks 1–5)
+
+> **Trigger**: "move to the next chunk" — executed `docs/superpowers/plans/2026-10-09-gemini-booking-personalization.md` task-by-task against its spec.
+
+* **Task 1 (`32e7d8e`)** — Booking profile in `AppSettingsController` (`preferredPassengerName`, `defaultPassengerType`, `useBookingPersonalization=false`), independent hydration validation, and the Booking profile section in Voice Assistant settings (editable/clearable name, type picker, opt-in switch with what-gets-shared supporting text). 48dp targets, semantics pinned at 300% scale.
+* **Task 2 (`d8ff0aa`)** — `BookingContextBuilder` / immutable `BookingContext`: allowlisted JSON (profile / communication / savedPlaces / ≤3 non-demo recentTrips / draft), opt-out sends draft only, stale stop IDs skipped, demo tickets filtered, draft slots reduced to `{value, source}` so credentials cannot escape. Six redaction/privacy tests.
+* **Task 3 (`f503ef0`)** — `BookingValueSource` provenance on all six slots; readiness now requires trip + bus + passenger type + payment, satisfied only by passenger choices or explicit profile defaults — the `18B`/`UPI`/`general` constructor fallbacks no longer masquerade as choices. `applyProfileDefaults` prefills only unset passenger type; `stageRecentTripSuggestion` → `acceptStagedSuggestion` keeps suggestions readiness-invisible until accepted. `bookingDraftSnapshot()` serializes the exact Task 2 shape; `AutomationResult.success` + `toToolResultJson()`.
+* **Task 4 (`f19ab49`)** — Read-only `get_booking_context` tool (silent protocol, no args); result-bearing `GeminiLiveSession.onToolCall` — app result serialized into `toolResponse.functionResponses[*].response.output` with id/name preserved; callback failures and unknown tools return bounded failures that never claim success. Screen callback builds context, applies the profile default, stages ≤1 recent-trip suggestion. System instruction: request context only after booking intent, name suggestion sources, ask for uncertain values, honor corrections, never claim completion. Integration tests drive the real session dispatch + screen callback through a recording transport (opt-in context, opt-out, correction, checkout-waits-for-payment).
+* **Task 5 (`1b43714`)** — AGENTS.md runtime contract note; spec acceptance-criteria diff review (API keys / demo tickets / ticket IDs / QR / fares / timestamps / contacts / location never serialize — verified by grep + tests); all focused suites + docs gate green.
+
+### ✅ Verification
+
+* `flutter analyze` clean; **`flutter test` 463/463 green**; `tool/ci/verify_docs.sh` passed before every commit.
+
+### ⚠️ Not verified here
+
+* Live end-to-end voice booking with a real Gemini session and a valid key (the new tool call flow has never run against Google's servers — only against the recording-transport fakes). First live run should watch for the model actually calling `get_booking_context` after booking intent and honoring the returned context.
+
+* **Files**: `lib/core/settings/app_settings_controller.dart` · `lib/features/settings/voice_assistant_settings_page.dart` · `lib/features/ai_assistant/booking_context.dart` (new) · `lib/features/ai_assistant/app_automation_controller.dart` · `lib/features/ai_assistant/gemini_live_session.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/domain/assistant/assistant_command.dart` · tests: `persistence_test`, `settings_ui_test`, `booking_context_test` (new), `app_automation_controller_test` (new), `booking_agent_test`, `tool_command_safety_test`, `gemini_live_transport_frames_test`, `gemini_live_test`, `wake_word_service_test` · `AGENTS.md` · `progress.md`
+* **Verification**: analyze clean · 463/463 · docs gate passed per commit.
+
+---
+
 ## 🛠️ Session Log — 2026-10-11: Web Microphone Honesty — the mic never lies about listening
 
 > **Trigger**: User testing in Chrome (the `flutter run -d web-server` debug session) reported "the microphone isn't working at all — I can't speak to it". Reproduced in a controlled browser: with no API key set, the Gemini Live screen rendered **"Continuous Mic Active"** and **"Listening… Speak into your microphone."** directly under a NOT CONNECTED header and a "key not set" banner. The web mic path had skipped the BUS-P1-08 gate entirely — the exact lie Chunk 45 fixed on Android, alive on Chrome.
