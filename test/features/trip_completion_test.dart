@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' hide Route;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -235,6 +237,80 @@ void main() {
       // The booking armed an expiry Timer: dispose before the body ends
       // (testWidgets verifies timers before teardowns run).
       ticketController.dispose();
+    });
+
+    testWidgets(
+        'voice flow: wallet auto-issues the ticket and arrival returns to the assistant surface',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final dataSource = LocalTransportDataSource();
+      AppServiceLocator.instance.overrideForTesting(
+        transportRepo: _TerminalTransportRepository(dataSource),
+      );
+      addTearDown(AppServiceLocator.instance.resetForTesting);
+
+      // The route stack mirrors the live voice flow: the (unnamed) assistant
+      // surface at the bottom, then the booking suite and live map pushed
+      // under the 'voice-booking-flow' name.
+      const assistantSurfaceKey = Key('assistant-surface');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ColoredBox(
+            key: assistantSurfaceKey,
+            color: Colors.black,
+            child: const Text('Assistant surface'),
+          ),
+        ),
+      );
+      final navigator = Navigator.of(
+        tester.element(find.byKey(assistantSurfaceKey)),
+      );
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'voice-booking-flow'),
+            builder: (_) => TicketBookingSuitePage(
+              ticketController: ticketController,
+              initialOrigin: dataSource.stopById('vit-main-gate'),
+              initialDestination: dataSource.stopById('katpadi-railway-station'),
+              initialBusId: 'Bus 18B',
+              initialPassengerName: 'Pavan',
+              initialPassengerType: PassengerType.general,
+              initialPaymentMethod: PaymentMethod.wallet,
+              autoOpenCheckout: true,
+              autoConfirmPayment: true,
+              voiceFlow: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Wallet auto-pay: the ticket was issued with no confirm tap at all.
+      // (The repository also seeds demo history, so filter to the booking.)
+      final issued = ticketController.tickets
+          .where((t) => t.passengerName == 'Pavan')
+          .toList();
+      expect(issued, hasLength(1));
+      expect(issued.single.paymentMethod, PaymentMethod.wallet);
+      expect(issued.single.busId, 'Bus 18B');
+      expect(find.byType(LiveLocationScreen), findsOneWidget);
+
+      // The simulated bus reaches the destination and the arrival dialog
+      // appears.
+      expect(find.text('Destination Reached'), findsOneWidget);
+      await tester.tap(find.text('Back to Home now'));
+      await tester.pumpAndSettle();
+
+      // The named voice-flow routes pop — but the assistant surface beneath
+      // survives (previously popUntil(isFirst) closed the whole stack and
+      // killed the open Gemini Live session).
+      expect(find.text('Assistant surface'), findsOneWidget);
+      expect(find.byType(LiveLocationScreen), findsNothing);
+      expect(find.byType(TicketBookingSuitePage), findsNothing);
     });
 
     testWidgets('arrival banner appears when the bus stream terminates', (

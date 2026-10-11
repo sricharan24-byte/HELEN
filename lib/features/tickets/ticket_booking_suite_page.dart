@@ -35,6 +35,8 @@ class TicketBookingSuitePage extends StatefulWidget {
     this.initialPassengerName,
     this.autoOpenCheckout = false,
     this.showBackButton = true,
+    this.autoConfirmPayment = false,
+    this.voiceFlow = false,
   });
 
   final TicketController ticketController;
@@ -49,6 +51,16 @@ class TicketBookingSuitePage extends StatefulWidget {
   final String? initialPassengerName;
   final bool autoOpenCheckout;
   final bool showBackButton;
+
+  /// Wallet auto-pay (voice booking): the auto-opened checkout issues the
+  /// ticket immediately. UPI/card still show the confirmation widget.
+  final bool autoConfirmPayment;
+
+  /// Marks the voice-agent flow: routes pushed by this suite are named
+  /// 'voice-booking-flow', so the live-location arrival returns to the
+  /// assistant surface instead of popping everything to home (which killed
+  /// the open Gemini Live session).
+  final bool voiceFlow;
 
   @override
   State<TicketBookingSuitePage> createState() => _TicketBookingSuitePageState();
@@ -180,6 +192,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           busId: _selectedBusId,
           routeName: _resolveRouteDisplayName(),
           routeId: _resolveRouteId(),
+          autoConfirm: widget.autoConfirmPayment,
         );
       });
     }
@@ -470,6 +483,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     required String routeName,
     FareQuote? fareQuote,
     String? routeId,
+    bool autoConfirm = false,
   }) {
     final quote = fareQuote ?? _calculateCurrentFareQuote();
     Ticket? ticketToTrack;
@@ -489,6 +503,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
           initialPassengerType: widget.initialPassengerType,
           initialPaymentMethod: widget.initialPaymentMethod,
           initialPassengerName: widget.initialPassengerName,
+          autoConfirm: autoConfirm,
           onTicketBooked: (ticket) {
             AdaptiveUiService.instance.recordTicketBooking(
               originName: ticket.origin.name,
@@ -514,10 +529,14 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         unawaited(
           Navigator.of(context).push(
             MaterialPageRoute<void>(
+              settings: widget.voiceFlow
+                  ? const RouteSettings(name: 'voice-booking-flow')
+                  : null,
               builder: (_) => LiveLocationScreen(
                 ticket: ticket,
                 repository: _repository,
                 ticketController: widget.ticketController,
+                popToFirstOnArrival: !widget.voiceFlow,
               ),
             ),
           ),

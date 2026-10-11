@@ -28,6 +28,7 @@ class BookingCheckoutDialog extends StatefulWidget {
     this.initialPassengerType = PassengerType.general,
     this.initialPaymentMethod = PaymentMethod.upi,
     this.initialPassengerName,
+    this.autoConfirm = false,
   });
 
   final String busId;
@@ -42,6 +43,12 @@ class BookingCheckoutDialog extends StatefulWidget {
   final PassengerType initialPassengerType;
   final PaymentMethod initialPaymentMethod;
   final String? initialPassengerName;
+
+  /// Wallet auto-pay (owner decision, 2026-10-11): when the passenger
+  /// explicitly chose wallet in the voice booking flow, the checkout issues
+  /// the ticket immediately without the confirm tap. UPI and card always
+  /// keep the explicit confirmation gate (BUS-P0-05).
+  final bool autoConfirm;
 
   @override
   State<BookingCheckoutDialog> createState() => _BookingCheckoutDialogState();
@@ -63,6 +70,11 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     _passengerNameController = TextEditingController(
       text: widget.initialPassengerName ?? '',
     );
+    if (widget.autoConfirm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isIssuing) _issueTicket();
+      });
+    }
   }
 
   @override

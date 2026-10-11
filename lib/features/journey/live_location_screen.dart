@@ -20,10 +20,18 @@ class LiveLocationScreen extends StatefulWidget {
     required this.ticket,
     required this.repository,
     this.ticketController,
+    this.popToFirstOnArrival = true,
   });
 
   final Ticket ticket;
   final TransportRepository repository;
+
+  /// Arrival behaviour: when true (every non-voice flow), arrival pops all the
+  /// way to the first route (home), as designed in the arrival contract. When
+  /// false (the voice-booking flow), arrival pops only the routes named
+  /// 'voice-booking-flow' — the assistant surface underneath stays open, so a
+  /// live Gemini session is no longer killed the moment the passenger pays.
+  final bool popToFirstOnArrival;
 
   /// Expires the ticket on arrival. Falls back to the shared instance so
   /// callers that only have a ticket snapshot still complete the trip.
@@ -171,6 +179,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     unawaited(
       showDialog<void>(
         context: context,
+        routeSettings: const RouteSettings(name: 'voice-booking-flow'),
         // Keep the dialog in the same tab navigator as this screen so the
         // return-home popUntil also dismisses it.
         useRootNavigator: false,
@@ -236,9 +245,14 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     _tickets.completeTicket(widget.ticket.id, reason: 'Reached destination');
     _tickets.completeActiveTrip(reason: 'Reached destination');
     final navigator = Navigator.of(context);
-    // The dialog is a route above this screen: close it first, then pop
-    // everything back to the first (home) route.
-    navigator.popUntil((route) => route.isFirst);
+    // The dialog is a route above this screen: close it first, then pop back
+    // home — or, in the voice-booking flow, only to the assistant surface,
+    // which pushed its routes under the 'voice-booking-flow' name.
+    navigator.popUntil(
+      widget.popToFirstOnArrival
+          ? (route) => route.isFirst
+          : (route) => route.settings.name != 'voice-booking-flow',
+    );
   }
 
   void _resubscribe() {
@@ -1700,6 +1714,10 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Trip ended for Ticket #${ticket.id}.')),
     );
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context).popUntil(
+      widget.popToFirstOnArrival
+          ? (route) => route.isFirst
+          : (route) => route.settings.name != 'voice-booking-flow',
+    );
   }
 }

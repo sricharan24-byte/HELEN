@@ -78,9 +78,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Your default'), findsOneWidget);
-      expect(find.text('Student'), findsOneWidget);
-      // The profile name is never presented as the ticket passenger.
-      expect(find.textContaining('Pavan'), findsNothing);
+      // Owner decision 2026-10-11: the ticket passenger name prefills from
+      // the profile, visibly labelled as a default rather than a choice.
+      expect(find.text('Student • Pavan'), findsOneWidget);
     });
 
     testWidgets('suggestionBannerAcceptPromotes', (tester) async {

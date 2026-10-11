@@ -1,5 +1,31 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-11: Voice booking fixes — name prefill, wallet auto-pay, arrival no longer kills the assistant
+
+> **Trigger**: three live-testing reports: the passenger name was never filled; the passenger wanted wallet to pay automatically (UPI/card keep the widget); and paying closed the Gemini Live screen ("stales") because the trip's arrival popped the whole navigation stack.
+
+### 👤 Profile name prefills the ticket
+
+* `applyProfileDefaults` now prefills the passenger-NAME slot from the saved preferred name (source `profileDefault`), not just the passenger type — the earlier address-only rule made the passenger restate their name every booking. Corrections still win: an explicit `set_passenger` name is never overwritten. The checkout receives it via `initialPassengerName`, the preview shows "Student • Pavan" under a "Your default" chip. The old address-only pin was legitimately re-aimed (owner decision).
+
+### 💳 Wallet auto-pays; UPI/card keep the widget
+
+* `BookingCheckoutDialog.autoConfirm` (post-frame `_issueTicket`) — the wallet booking issues with no confirm tap. Threaded: `GeminiLiveScreen.confirm_booking` → `TicketBookingSuitePage(autoConfirmPayment:, voiceFlow:)` → dialog. **Owner decision that deliberately narrows BUS-P0-05 for wallet only**: UPI and card always open the payment widget and keep the explicit confirmation gate. The model instruction now says wallet is settled automatically once confirm_booking completes; UPI/card must never be claimed paid until the passenger confirms on screen.
+
+### 🧭 Arrival no longer kills the assistant session
+
+* Root cause: `LiveLocationScreen`'s arrival and End-Trip paths called `popUntil(isFirst)` — the voice flow's stack (Gemini Live → booking suite → live map) collapsed all the way to Home the moment the demo bus arrived, closing the session.
+* Fix: routes pushed by the voice flow are named `voice-booking-flow` (suite push from the screen, suite's live-map push, and the arrival dialog). `LiveLocationScreen.popToFirstOnArrival` (default **true** — every non-voice flow keeps the exact pop-to-home contract) makes arrival pop only until the top route is no longer named `voice-booking-flow`, landing back on the still-open assistant.
+
+### ✅ Verification
+
+* New integration test in `trip_completion_test`: voice-flow stack + terminal-repo arrival — wallet ticket issued with zero taps, arrival pops the named routes, and the assistant surface beneath survives. Profile-default and preview pins re-aimed for the name prefill. Suite **471/471 green**, analyze clean, docs gate passed.
+
+* **Files**: `lib/features/ai_assistant/app_automation_controller.dart` · `lib/features/ai_assistant/gemini_live_screen.dart` · `lib/features/ai_assistant/gemini_live_session.dart` · `lib/features/tickets/booking_checkout_dialog.dart` · `lib/features/tickets/ticket_booking_suite_page.dart` · `lib/features/journey/live_location_screen.dart` · `test/features/ai_assistant/app_automation_controller_test.dart` · `test/features/ai_assistant/booking_draft_preview_test.dart` · `test/features/trip_completion_test.dart`
+* **Verification**: `flutter analyze` clean · `flutter test` 471/471 green · docs gate passed.
+
+---
+
 ## 🛠️ Session Log — 2026-10-11: Booking Draft Preview — make the agent's work visible
 
 > **Trigger**: "optimize the preview of the agent work" — during voice booking the draft was invisible until checkout; provenance and suggestions had no visual surface, and `acceptStagedSuggestion()` had no UI caller at all.

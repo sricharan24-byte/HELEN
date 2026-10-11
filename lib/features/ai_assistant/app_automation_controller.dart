@@ -121,19 +121,29 @@ class AppAutomationController extends ChangeNotifier {
     },
   };
 
-  /// Applies the passenger's saved profile defaults. The preferred name is
-  /// kept for addressing only; the default passenger type prefills the slot
-  /// only when the passenger has not chosen one, marked
-  /// [BookingValueSource.profileDefault] so the assistant can disclose it.
+  /// Applies the passenger's saved profile defaults. Both the preferred name
+  /// and the default passenger type prefill their slots — but only when the
+  /// passenger has not chosen a value — marked
+  /// [BookingValueSource.profileDefault] so the assistant discloses them and
+  /// the checkout shows them for review (owner decision, 2026-10-11: the
+  /// ticket passenger name comes from the profile too; the earlier
+  /// address-only rule kept leaving the name blank and the passenger had to
+  /// restate it every time).
   void applyProfileDefaults({
     required String preferredName,
     required PassengerType? passengerType,
   }) {
-    profilePreferredName = preferredName.trim();
+    final name = preferredName.trim();
+    profilePreferredName = name;
     if (passengerType != null &&
         slotSources['passengerType'] == BookingValueSource.unset) {
       this.passengerType = passengerType;
       slotSources['passengerType'] = BookingValueSource.profileDefault;
+    }
+    if (name.isNotEmpty &&
+        slotSources['passengerName'] == BookingValueSource.unset) {
+      passengerName = name;
+      slotSources['passengerName'] = BookingValueSource.profileDefault;
     }
     notifyListeners();
   }

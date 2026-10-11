@@ -68,20 +68,25 @@ void main() {
         preferredName: 'Pavan',
         passengerType: PassengerType.student,
       );
-      // The profile default prefills the slot, marked as such…
+      // Profile defaults prefill both slots, marked as such (owner decision
+      // 2026-10-11: the ticket passenger name comes from the profile too —
+      // the earlier address-only rule made the passenger restate their name
+      // every booking).
       expect(automation.passengerType, PassengerType.student);
       expect(
         automation.slotSources['passengerType'],
         BookingValueSource.profileDefault,
       );
-      // …the preferred name is stored for assistant address only and is
-      // never assumed to be the ticket passenger's name…
-      expect(automation.profilePreferredName, 'Pavan');
-      expect(automation.passengerName, isNot('Pavan'));
+      expect(automation.passengerName, 'Pavan');
+      expect(
+        automation.slotSources['passengerName'],
+        BookingValueSource.profileDefault,
+      );
 
-      // …and an explicit passenger choice is never overwritten by a later
-      // profile default.
+      // An explicit passenger choice is never overwritten by a later profile
+      // default — for the type or the name.
       automation.handleToolCall('set_passenger', {'type': 'senior'});
+      automation.handleToolCall('set_passenger', {'name': 'Arun'});
       automation.applyProfileDefaults(
         preferredName: 'Pavan',
         passengerType: PassengerType.student,
@@ -89,6 +94,11 @@ void main() {
       expect(automation.passengerType, PassengerType.senior);
       expect(
         automation.slotSources['passengerType'],
+        BookingValueSource.passenger,
+      );
+      expect(automation.passengerName, 'Arun');
+      expect(
+        automation.slotSources['passengerName'],
         BookingValueSource.passenger,
       );
     });

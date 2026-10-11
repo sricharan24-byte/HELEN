@@ -1113,9 +1113,16 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       }
       if (_actionExecutedThisTurn) return;
       _actionExecutedThisTurn = true;
+      // Wallet is settled automatically (owner decision, 2026-10-11): the
+      // passenger explicitly said "wallet" for this booking, so the auto-opened
+      // checkout issues the ticket without a second tap. UPI/card keep the
+      // explicit payment widget. Routes are named so the trip's arrival returns
+      // HERE instead of popping this session away.
+      final walletAutoPay = _automation.paymentMethod == PaymentMethod.wallet;
       unawaited(
         Navigator.of(context).push(
           MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'voice-booking-flow'),
             builder: (_) => TicketBookingSuitePage(
               ticketController: _ticketController,
               journeyController: widget.journeyController,
@@ -1128,6 +1135,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   ? null
                   : _automation.passengerName,
               autoOpenCheckout: true,
+              autoConfirmPayment: walletAutoPay,
+              voiceFlow: true,
             ),
           ),
         ),
