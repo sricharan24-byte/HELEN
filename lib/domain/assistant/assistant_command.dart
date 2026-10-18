@@ -50,7 +50,8 @@ class AssistantCommandGateway {
     'track_bus': AssistantToolMetadata(
       name: 'track_bus',
       safetyLevel: CommandSafetyLevel.readOnly,
-      description: 'Opens the live GPS map tracker for the active bus route.',
+      description:
+          'Opens the live GPS map for the active ticket when the passenger asks to open, show, or view the map or track the bus. If no active ticket exists, explain that tracking requires one.',
       promptSummary: 'Live bus tracker is now open.',
       gatewayScreenPrompt: '📍 Open Live Bus Map',
     ),
@@ -66,10 +67,9 @@ class AssistantCommandGateway {
       name: 'emergency_sos',
       safetyLevel: CommandSafetyLevel.requiresUserConfirmation,
       description:
-          'Presents the emergency safety broadcast confirmation gateway on screen. Requires explicit passenger tap before transmitting alerts.',
-      promptSummary:
-          'Opening Emergency Safety Broadcast. Please tap confirm on your screen to notify contacts.',
-      gatewayScreenPrompt: '🚨 Review & Confirm SOS',
+          'Opens the emergency location sharing screen. Requires explicit passenger confirmation and a recipient choice before any message is sent.',
+      promptSummary: 'Opening emergency location sharing for review.',
+      gatewayScreenPrompt: 'Review emergency location sharing',
     ),
     'share_location': AssistantToolMetadata(
       name: 'share_location',
@@ -91,7 +91,8 @@ class AssistantCommandGateway {
     ),
     // ── Voice task-agent booking tools (Live Gemini only, Chunk 41) ──
     // Read-only slot setters drive JourneyController + checkout pre-fill.
-    // Only confirm_booking is confirmable; it opens BookingCheckoutDialog.
+    // Booking tools prepare a draft; checkout is the ticket-creation source
+    // of truth.
     'set_trip': AssistantToolMetadata(
       name: 'set_trip',
       safetyLevel: CommandSafetyLevel.readOnly,
@@ -129,7 +130,7 @@ class AssistantCommandGateway {
       name: 'set_passenger',
       safetyLevel: CommandSafetyLevel.readOnly,
       description:
-          'Sets passenger type and optional name for the checkout. Student and senior get 40% concession.',
+          'Sets passenger type and name for the checkout. Student and senior get 40% concession; the passenger name is required before checkout.',
       promptSummary: 'Passenger details updated.',
       gatewayScreenPrompt: '🧾 Passenger Updated',
       parameters: {
@@ -139,7 +140,7 @@ class AssistantCommandGateway {
         },
         'name': {
           'type': 'string',
-          'description': 'Passenger display name (optional)',
+          'description': 'Required passenger display name',
         },
       },
     ),
@@ -156,11 +157,47 @@ class AssistantCommandGateway {
         },
       },
     ),
+    'prepare_booking': AssistantToolMetadata(
+      name: 'prepare_booking',
+      safetyLevel: CommandSafetyLevel.readOnly,
+      description:
+          'Atomically prepares one complete ticket request. Provide every value the passenger stated. Use busPreference earliest to select the soonest listed demo estimate. This never issues a ticket or processes payment.',
+      promptSummary: 'Booking request checked.',
+      gatewayScreenPrompt: '🎫 Review Booking',
+      parameters: {
+        'origin': {'type': 'string', 'description': 'Exact origin stop name'},
+        'destination': {
+          'type': 'string',
+          'description':
+              'Exact destination stop name; Vellore Fort may be recognized as Bello Fort',
+        },
+        'busPreference': {
+          'type': 'string',
+          'description':
+              'Use earliest when the passenger asks for the first/earliest bus',
+        },
+        'busId': {'type': 'string', 'description': 'Explicit available bus id'},
+        'passengerType': {
+          'type': 'string',
+          'description': 'Student, senior, or general',
+        },
+        'passengerName': {'type': 'string', 'description': 'Passenger name'},
+        'paymentMethod': {
+          'type': 'string',
+          'description': 'UPI, card, or wallet',
+        },
+        'openMapAfterBooking': {
+          'type': 'boolean',
+          'description':
+              'True only when the passenger asked to open the map after ticket creation',
+        },
+      },
+    ),
     'confirm_booking': AssistantToolMetadata(
       name: 'confirm_booking',
       safetyLevel: CommandSafetyLevel.requiresUserConfirmation,
       description:
-          'Opens the ticket booking confirmation gateway with the current trip, bus, passenger and payment pre-filled. Requires explicit passenger tap before payment is taken.',
+          'Opens the demo ticket checkout with the current trip, bus, passenger and payment choice pre-filled. Ticket creation may follow the passenger confirmation; no real payment is processed.',
       promptSummary:
           'Opening booking confirmation. Please review and confirm on your screen.',
       gatewayScreenPrompt: '🎫 Review & Confirm Booking',
@@ -192,6 +229,7 @@ class AssistantCommandGateway {
     'select_bus',
     'set_passenger',
     'set_payment',
+    'prepare_booking',
     'get_booking_context',
   };
 

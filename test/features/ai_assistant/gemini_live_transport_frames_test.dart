@@ -192,6 +192,43 @@ group('tool dispatch returns application results (booking personalization)', () 
       expect(utf8.decode(bytes), payload);
     });
   });
+
+  group('Gemini Live realtime audio input', () {
+    test('sends microphone PCM with the current audio field', () {
+      final transport = _RecordingTransport();
+      final session = GeminiLiveSession(transportFactory: () => transport);
+      addTearDown(session.dispose);
+
+      session.connect(customApiKey: 'test-key');
+      transport.serverSay!('{"setupComplete":{}}');
+
+      expect(session.sendRealtimeAudio('AQIDBA=='), isTrue);
+      final frame = jsonDecode(transport.frames.last) as Map<String, dynamic>;
+      final realtimeInput = frame['realtimeInput'] as Map<String, dynamic>;
+      final audio = realtimeInput['audio'] as Map<String, dynamic>;
+
+      expect(audio['mimeType'], 'audio/pcm;rate=16000');
+      expect(audio['data'], 'AQIDBA==');
+      expect(realtimeInput.containsKey('mediaChunks'), isFalse);
+    });
+
+    test('forwards interim input transcription to the screen callback', () {
+      final transport = _RecordingTransport();
+      final heard = <String>[];
+      final session = GeminiLiveSession(
+        transportFactory: () => transport,
+        onUserTranscription: heard.add,
+      );
+      addTearDown(session.dispose);
+
+      session.connect(customApiKey: 'test-key');
+      transport.serverSay!('''
+        {"serverContent":{"interimInputTranscription":{"text":"where is my"}}}
+      ''');
+
+      expect(heard, <String>['where is my']);
+    });
+  });
 }
 
 /// Records every frame the session sends and lets the test speak as the

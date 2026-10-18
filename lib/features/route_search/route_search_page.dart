@@ -7,7 +7,6 @@ import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
 import '../journey/journey_controller.dart';
@@ -58,12 +57,14 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
         AnnouncementCoordinator.instance.announce(
           'Selected starting stop: ${selected.name}.',
           priority: AnnouncementPriority.low,
+          speak: false,
         );
       } else {
         _ctrl.selectDestination(selected);
         AnnouncementCoordinator.instance.announce(
           'Selected destination stop: ${selected.name}.',
           priority: AnnouncementPriority.low,
+          speak: false,
         );
       }
       setState(() {});
@@ -80,6 +81,7 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
     AnnouncementCoordinator.instance.announce(
       'Found ${routes.length} routes connecting ${_ctrl.state.origin?.name} to ${_ctrl.state.destination?.name}.',
       priority: AnnouncementPriority.normal,
+      speak: false,
     );
   }
 
@@ -97,10 +99,7 @@ class _RouteSearchPageState extends State<RouteSearchPage> {
         return Scaffold(
           backgroundColor: colors.background,
           appBar: AppBar(
-            title: const BusBuddyLogo(
-              fontSize: 20,
-              subtitle: 'Route Search',
-            ),
+            title: const Text('Route Search'),
             centerTitle: true,
             backgroundColor: colors.background,
             foregroundColor: colors.textPrimary,
@@ -444,6 +443,34 @@ class _StopPickerSheetState extends State<_StopPickerSheet> {
                         color: colors.border,
                         borderRadius: BorderRadius.circular(2),
                       ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Back to route search',
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
+                          ),
+                          icon: Icon(
+                            Icons.arrow_back,
+                            color: colors.textPrimary,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          'Select a Stop',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                   // Saved places — one tap picks the stop for whichever field

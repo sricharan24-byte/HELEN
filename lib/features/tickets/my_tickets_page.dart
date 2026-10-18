@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/a11y/route_speech_label.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/transport_repository.dart';
@@ -65,7 +65,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                     ),
                   )
                 : null,
-            title: const BusBuddyLogo(fontSize: 20, subtitle: 'My Tickets'),
+            title: const Text('My Tickets'),
             centerTitle: true,
           ),
           body: SafeArea(
@@ -100,6 +100,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                     AnnouncementCoordinator.instance.announce(
                                       'Showing Current Ticket',
                                       priority: AnnouncementPriority.low,
+                                      speak: false,
                                     );
                                   },
                                   borderRadius: BorderRadius.circular(
@@ -147,6 +148,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                     AnnouncementCoordinator.instance.announce(
                                       'Showing Previous Tickets',
                                       priority: AnnouncementPriority.low,
+                                      speak: false,
                                     );
                                   },
                                   borderRadius: BorderRadius.circular(
@@ -381,6 +383,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                           ),
                           Text(
                             '${activeTicket.origin.name} → ${activeTicket.destination.name}',
+                            semanticsLabel: routeSpeechLabel(
+                              origin: activeTicket.origin.name,
+                              destination: activeTicket.destination.name,
+                            ),
                             style: TextStyle(
                               color: colors.textSecondary,
                               fontSize: 14,
@@ -811,8 +817,11 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Semantics(
             button: true,
-            label:
-                '${ticket.busId}, ${ticket.routeName}, Fare ${ticket.fareQuote.formattedAmount}.',
+            label: '${routeSpeechLabel(
+              busId: ticket.busId,
+              origin: ticket.origin.name,
+              destination: ticket.destination.name,
+            )}, Fare ${ticket.fareQuote.formattedAmount}.',
             excludeSemantics: true,
             child: InkWell(
               onTap: () {

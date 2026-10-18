@@ -183,7 +183,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
     widget.onTicketBooked(ticket);
 
     AnnouncementCoordinator.instance.announce(
-      'Ticket confirmed for $passengerName. Paid ₹${(quote.finalPaise / 100).toStringAsFixed(0)}. Bus ${widget.busId}.',
+      'Demo ticket created for $passengerName. No real payment was processed. Bus ${widget.busId}.',
       priority: AnnouncementPriority.high,
     );
 
@@ -239,7 +239,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       Semantics(
                         header: true,
                         child: Text(
-                          'Confirm Ticket & Pay',
+                          'Review Demo Ticket',
                           style: TextStyle(
                             color: colors.textPrimary,
                             fontSize: 20,
@@ -279,7 +279,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                'DEMO MODE • Simulated UPI Gateway',
+                                'DEMO MODE • No real payment provider connected',
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w700,
@@ -333,7 +333,10 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                 ),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: colors.statusError.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -510,7 +513,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               method: PaymentMethod.upi,
               icon: Icons.qr_code_2,
               title: 'UPI (GPay / PhonePe / Paytm)',
-              subtitle: 'Instant 1-tap UPI payment',
+              subtitle: 'Demo selection; no payment will be processed',
               colors: colors,
             ),
             const SizedBox(height: 8),
@@ -518,7 +521,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               method: PaymentMethod.card,
               icon: Icons.credit_card,
               title: 'Credit / Debit Card',
-              subtitle: 'Visa, Mastercard, RuPay',
+              subtitle: 'Demo selection; no payment will be processed',
               colors: colors,
             ),
             const SizedBox(height: 8),
@@ -526,7 +529,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
               method: PaymentMethod.wallet,
               icon: Icons.account_balance_wallet_outlined,
               title: 'BusBuddy Wallet',
-              subtitle: 'Balance: ₹250.00',
+              subtitle: 'Demo selection; wallet will not be charged',
               colors: colors,
             ),
             const SizedBox(height: 24),
@@ -547,7 +550,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'TOTAL FARE',
+                          'DEMO FARE',
                           style: TextStyle(
                             color: colors.textSecondary,
                             fontSize: 11,
@@ -586,9 +589,7 @@ class _BookingCheckoutDialogState extends State<BookingCheckoutDialog> {
                               size: 20,
                             ),
                       label: Text(
-                        _isIssuing
-                            ? 'Processing...'
-                            : 'Pay ${_currentFareQuote.formattedAmount} & Issue',
+                        _isIssuing ? 'Processing...' : 'Create Demo Ticket',
                         style: TextStyle(
                           color: colors.actionPrimaryText,
                           fontSize: 15,

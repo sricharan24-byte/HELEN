@@ -114,11 +114,13 @@ void main() {
       await tester.pump();
 
       // Handshake complete: the mic path now runs, but the listening claim is
-      // earned — the test environment has no recognizer, so capture never
-      // reports onstart and the honest "Preparing the microphone…" holds
-      // instead of "Listening…" or the pill.
+      // earned — this host has no recognizer, so the engine reports its honest
+      // fallback reason (2026-10-18: shown and the loop stopped, instead of
+      // being swallowed into a silent restart cycle) and neither "Listening…"
+      // nor the pill ever appears.
       expect(find.textContaining('Live Ready'), findsOneWidget);
-      expect(find.text('Preparing the microphone...'), findsOneWidget);
+      expect(find.text('Preparing the microphone...'), findsNothing);
+      expect(find.textContaining('optimized for Web/Chrome'), findsOneWidget);
       expect(find.text('Continuous Mic Active'), findsNothing);
       expect(find.text(active), findsNothing);
 
@@ -135,6 +137,23 @@ void main() {
       addTearDown(() => GeminiLiveSession.testValidateOverride = null);
       AppSettingsController.instance.updateGeminiApiKey('test-key');
       addTearDown(() => AppSettingsController.instance.updateGeminiApiKey(''));
+      // Pure silence: capture opens, then the cycle ends with no transcript and
+      // no error at all — the muted-mic / wrong-input-device case, which has no
+      // other visible symptom.
+      AudioSpeechEngine.testStartListeningOverride = ({
+        required onResult,
+        required onError,
+        required onEnd,
+        onStarted,
+      }) {
+        onStarted?.call();
+        onEnd();
+      };
+      AudioSpeechEngine.testInputDeviceSummaryOverride = 'USB Audio (Samsung)';
+      addTearDown(() {
+        AudioSpeechEngine.testStartListeningOverride = null;
+        AudioSpeechEngine.testInputDeviceSummaryOverride = null;
+      });
       final fake = _FakeTransport();
 
       await tester.pumpWidget(
@@ -144,17 +163,79 @@ void main() {
       fake.serverSay!('{"setupComplete":{}}');
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Every cycle ends with no transcript at all (no recognizer here), the
-      // continuous mode restarts — and after three empty cycles the screen
-      // must say the microphone heard nothing instead of looping "Listening…"
-      // forever (the wrong-input-device case has no other visible symptom).
+      // Every cycle ends with no transcript at all, the continuous mode
+      // restarts — and after three empty cycles the screen must say the
+      // microphone heard nothing (naming the devices the browser can see)
+      // instead of looping "Listening…" forever.
+      await tester.pump(const Duration(milliseconds: 200));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.textContaining("couldn't hear anything"), findsOneWidget);
+      expect(
+        find.textContaining('Chrome sees: USB Audio (Samsung)'),
+        findsOneWidget,
+      );
       expect(find.text(active), findsNothing);
       expect(find.text('Continuous Mic Active'), findsNothing);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    });
+
+    testWidgets('a named recognition failure stops the loop and says the reason', (tester) async {
+      GeminiLiveSession.testValidateOverride = (key) async => null;
+      addTearDown(() => GeminiLiveSession.testValidateOverride = null);
+      AppSettingsController.instance.updateGeminiApiKey('test-key');
+      addTearDown(() => AppSettingsController.instance.updateGeminiApiKey(''));
+      // Chrome's `audio-capture` case, as the bridge maps it. Reported on
+      // 2026-10-18: the mic lit up for a moment, popped in and out on silent
+      // restarts, then stopped with the wrong-input-device message — the real
+      // reason was never shown (reproduced headlessly against this bridge's own
+      // JS: onstart, then audio-capture, then restarts every ~150 ms).
+      AudioSpeechEngine.testStartListeningOverride = ({
+        required onResult,
+        required onError,
+        required onEnd,
+        onStarted,
+      }) {
+        onError(
+          'No microphone input was found. Please connect a microphone or check '
+          "the browser's input device settings.",
+        );
+        onEnd();
+      };
+      AudioSpeechEngine.testInputDeviceSummaryOverride = 'USB Audio (Samsung)';
+      addTearDown(() {
+        AudioSpeechEngine.testStartListeningOverride = null;
+        AudioSpeechEngine.testInputDeviceSummaryOverride = null;
+      });
+      final fake = _FakeTransport();
+
+      await tester.pumpWidget(
+        MaterialApp(home: GeminiLiveScreen(transportFactory: () => fake)),
+      );
+      await tester.pump();
+      fake.serverSay!('{"setupComplete":{}}');
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // The reason leads, the devices name what Chrome can see, and the
+      // trailing recognition end must not overwrite either.
+      expect(find.textContaining('No microphone input was found'), findsOneWidget);
+      expect(
+        find.textContaining("Chrome's input devices: USB Audio (Samsung)"),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Tap the microphone orb to try again'),
+        findsOneWidget,
+      );
+      expect(find.textContaining("couldn't hear anything"), findsNothing);
+      expect(find.text(active), findsNothing);
+
+      // Listening stopped: no restart is pending, so the message holds.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.textContaining('No microphone input was found'), findsOneWidget);
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
     });

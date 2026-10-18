@@ -10,13 +10,16 @@ import 'native_platform_stub.dart'
 
 /// Outcome of a just-in-time microphone permission request.
 class NativeMicPermission {
-  const NativeMicPermission({required this.granted, this.permanentlyDenied = false});
+  const NativeMicPermission({
+    required this.granted,
+    this.permanentlyDenied = false,
+  });
 
   /// Marks the no-engine case (non-Android or a build without native audio) so
   /// callers can tell "not available here" apart from "the user said no".
   const NativeMicPermission.unavailable()
-      : granted = false,
-        permanentlyDenied = false;
+    : granted = false,
+      permanentlyDenied = false;
 
   final bool granted;
   final bool permanentlyDenied;
@@ -34,7 +37,7 @@ class NativeMicPermission {
 /// inert there ([isSupported] is false) so the single-voice contract holds.
 class NativeAudioChannel {
   NativeAudioChannel({bool Function()? isPlatformSupported})
-      : _isPlatformSupported = isPlatformSupported ?? _defaultPlatformSupported;
+    : _isPlatformSupported = isPlatformSupported ?? _defaultPlatformSupported;
 
   static const String methodChannelName = 'busbuddy/voice';
   static const String micChannelName = 'busbuddy/voice/mic';
@@ -46,9 +49,12 @@ class NativeAudioChannel {
 
   final bool Function() _isPlatformSupported;
 
-  final StreamController<String> _nativeEvents = StreamController<String>.broadcast();
-  final StreamController<Uint8List> _micChunks = StreamController<Uint8List>.broadcast();
-  final StreamController<String> _micErrors = StreamController<String>.broadcast();
+  final StreamController<String> _nativeEvents =
+      StreamController<String>.broadcast();
+  final StreamController<Uint8List> _micChunks =
+      StreamController<Uint8List>.broadcast();
+  final StreamController<String> _micErrors =
+      StreamController<String>.broadcast();
   // Cancelled by stopMicrophone(), which is the documented stop call.
   // ignore: cancel_subscriptions
   StreamSubscription<dynamic>? _micSub;
@@ -106,7 +112,10 @@ class NativeAudioChannel {
     }
   }
 
-  Future<bool> _invokeResult(String method, [Map<String, Object?>? args]) async {
+  Future<bool> _invokeResult(
+    String method, [
+    Map<String, Object?>? args,
+  ]) async {
     if (!isSupported) return false;
     _ensureHandler();
     try {
@@ -145,7 +154,9 @@ class NativeAudioChannel {
     if (!isSupported) return const NativeMicPermission.unavailable();
     _ensureHandler();
     try {
-      final reply = await _methods.invokeMethod<Map<dynamic, dynamic>>('requestMicPermission');
+      final reply = await _methods.invokeMethod<Map<dynamic, dynamic>>(
+        'requestMicPermission',
+      );
       if (reply == null) return const NativeMicPermission.unavailable();
       return NativeMicPermission(
         granted: reply['granted'] == true,
@@ -196,14 +207,15 @@ class NativeAudioChannel {
   Stream<Uint8List> get microphone => _micChunks.stream;
 
   // ── Model audio playback (Gemini Live 24 kHz PCM16) ──────────────────────
-  // NOT wired to a reply producer today, on purpose. Chunk 43's single-voice
-  // contract makes AudioSpeechEngine.speak (device TTS here) the only speech
-  // producer in the app. These calls exist for the day streamed model audio
-  // replaces TTS; wiring them alongside speak() would reintroduce two voices.
+  // Gemini Live replies use this PCM path as their sole spoken reply source.
   Future<bool> startPlayback() => _invoke('startPlayback');
 
   Future<bool> writePlaybackChunk(String base64Pcm16) =>
       _invoke('writePlayback', <String, Object?>{'pcmBase64': base64Pcm16});
+
+  /// Marks the last PCM chunk of a Gemini response. Native playback drains
+  /// only after this signal, so packet gaps cannot resume the microphone early.
+  Future<bool> finishPlayback() => _invoke('finishPlayback');
 
   /// Drops everything queued (barge-in) and reports drained playback.
   Future<bool> stopPlayback() => _invoke('stopPlayback');
@@ -215,12 +227,11 @@ class NativeAudioChannel {
     required String text,
     String languageCode = 'en-IN',
     double rate = 1.0,
-  }) =>
-      _invokeResult('speakTts', <String, Object?>{
-        'text': text,
-        'languageCode': languageCode,
-        'rate': rate,
-      });
+  }) => _invokeResult('speakTts', <String, Object?>{
+    'text': text,
+    'languageCode': languageCode,
+    'rate': rate,
+  });
 
   Future<bool> stopTts() => _invoke('stopTts');
 
@@ -245,4 +256,3 @@ class NativeAudioChannel {
     if (!_micErrors.isClosed) await _micErrors.close();
   }
 }
-

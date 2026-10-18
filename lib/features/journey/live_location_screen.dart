@@ -3,13 +3,13 @@ import 'package:flutter/material.dart' hide Route;
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/location/location_share_service.dart';
 import '../ai_assistant/audio_speech_engine.dart';
 import 'live_location_map_widget.dart';
 import '../tickets/ticket_controller.dart';
@@ -42,6 +42,9 @@ class LiveLocationScreen extends StatefulWidget {
 }
 
 class _LiveLocationScreenState extends State<LiveLocationScreen> {
+  final _locationShare = LocationShareService();
+  bool _locationRequestPending = false;
+
   /// Bumped by the AppBar refresh action (and the error-card Retry button)
   /// to re-subscribe the live GPS stream.
   int _streamKey = 0;
@@ -91,6 +94,9 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
 
   @override
   void dispose() {
+    if (_locationRequestPending) {
+      unawaited(_locationShare.cancelCurrentLocation());
+    }
     _scopeToken?.dispose();
     _scopeToken = null;
     _countdownTimer?.cancel();
@@ -313,12 +319,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
-        title: BusBuddyLogo(
-          fontSize: 20,
-          subtitle: _isMapExpanded
-              ? 'Full Screen Map • Bus ${ticket.busId}'
-              : 'Live Location • Bus ${ticket.busId}',
-        ),
+        title: Text(_isMapExpanded ? 'Full Screen Map' : 'Live Location'),
         centerTitle: true,
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,
@@ -346,15 +347,6 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                 );
               }
             },
-          ),
-          IconButton(
-            icon: Icon(
-              _isMapExpanded ? Icons.fullscreen_exit : Icons.fullscreen,
-            ),
-            tooltip: _isMapExpanded
-                ? 'Exit full screen map'
-                : 'Expand map to full screen',
-            onPressed: _toggleMapExpanded,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -398,7 +390,6 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
                     destinationStopId: ticket.destination.id,
                     height: double.infinity,
                     isFullScreen: true,
-                    onToggleFullScreen: () => _toggleMapExpanded(false),
                   ),
                 ),
                 // Floating Exit Full Screen pill button
@@ -855,7 +846,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   void _showEmergencyShareDialog(BuildContext context) {
     final ticket = widget.ticket;
     final shareMessage =
-        '🚨 BusBuddy Safety Alert: I am riding bus ${ticket.busId} from ${ticket.origin.name} to ${ticket.destination.name}.\nTrack my live trip: https://busbuddy.app/track/${ticket.id}';
+        'BusBuddy location snapshot: I am riding bus ${ticket.busId} from ${ticket.origin.name} to ${ticket.destination.name}.';
 
     unawaited(
       showDialog<void>(
@@ -870,7 +861,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               children: [
                 Icon(Icons.security, color: colors.actionPrimary),
                 const SizedBox(width: 10),
-                const Text('Share Live Location'),
+                const Text('Share Location Snapshot'),
               ],
             ),
             content: Column(
@@ -878,7 +869,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Trip safety status message to share with emergency contacts:',
+                  'BusBuddy will request your current phone location and add a one-time map link. Your coordinates are not saved. Android will let you choose an app and recipient; nothing is sent until you confirm there.',
                   style: TextStyle(fontSize: 13, color: colors.textMuted),
                 ),
                 const SizedBox(height: 10),
@@ -908,18 +899,50 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               // Red is reserved exclusively for Emergency SOS; this share
               // action uses the single action accent via the theme default.
               FilledButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Opening WhatsApp / Messages to share safety link...',
-                      ),
-                    ),
-                  );
+                  _locationRequestPending = true;
+                  late final LocationShareResult result;
+                  try {
+                    result = await _locationShare.shareCurrentLocation(
+                      message: shareMessage,
+                      chooserTitle: 'Share trip location snapshot',
+                    );
+                  } finally {
+                    _locationRequestPending = false;
+                  }
+                  if (!mounted || !context.mounted) return;
+                  final message = switch (result.status) {
+                    LocationShareStatus.chooserOpened =>
+                      'Share menu opened. Choose an app and recipient; the message has not been sent yet.',
+                    LocationShareStatus.permissionDenied =>
+                      'Location permission was denied. No location was shared.',
+                    LocationShareStatus.permanentlyDenied =>
+                      'Location permission is blocked. Enable it in Android Settings > Apps > BusBuddy > Permissions.',
+                    LocationShareStatus.locationDisabled =>
+                      'Turn on Location in Android settings, then try again.',
+                    LocationShareStatus.timeout =>
+                      'Could not get a location fix in time. Move to an area with a location signal and try again.',
+                    LocationShareStatus.unavailable =>
+                      'Phone location is unavailable. No location was shared.',
+                    LocationShareStatus.unsupported =>
+                      'Location sharing is available on Android only.',
+                    LocationShareStatus.cancelled =>
+                      'Location request cancelled.',
+                  };
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                  if (result.status == LocationShareStatus.chooserOpened) {
+                    AnnouncementCoordinator.instance.announce(
+                      'Location share menu opened. Choose a recipient to continue.',
+                      priority: AnnouncementPriority.normal,
+                      routeId: ticket.routeId,
+                    );
+                  }
                 },
                 icon: const Icon(Icons.share, size: 16),
-                label: const Text('Share Now'),
+                label: const Text('Continue to share'),
               ),
             ],
           );
@@ -989,7 +1012,6 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
           destinationStopId: ticket.destination.id,
           height: height,
           isFullScreen: false,
-          onToggleFullScreen: () => _toggleMapExpanded(true),
         ),
       ],
     );
@@ -1557,10 +1579,13 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
             ),
           ),
           IconButton(
+            tooltip: 'Driver phone number unavailable',
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Calling Driver M. Ramanathan...'),
+                  content: Text(
+                    'The driver phone number is not available for this trip.',
+                  ),
                 ),
               );
             },
@@ -1625,7 +1650,7 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
               },
               icon: Icon(Icons.share_location, color: colors.actionPrimary),
               label: Text(
-                'Share Live Location with Emergency Contacts',
+                'Share Current Phone Location',
                 style: textTheme.titleSmall?.copyWith(
                   color: colors.actionPrimary,
                   fontWeight: FontWeight.w700,

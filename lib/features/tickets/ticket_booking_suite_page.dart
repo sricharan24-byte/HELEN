@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/a11y/route_speech_label.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/transport_models.dart';
@@ -38,6 +38,7 @@ class TicketBookingSuitePage extends StatefulWidget {
     this.autoOpenCheckout = false,
     this.showBackButton = true,
     this.autoConfirmPayment = false,
+    this.openMapAfterBooking = true,
     this.voiceFlow = false,
   });
 
@@ -57,6 +58,9 @@ class TicketBookingSuitePage extends StatefulWidget {
   /// Wallet auto-pay (voice booking): the auto-opened checkout issues the
   /// ticket immediately. UPI/card still show the confirmation widget.
   final bool autoConfirmPayment;
+
+  /// Only voice requests that explicitly ask for the map enable this.
+  final bool openMapAfterBooking;
 
   /// Marks the voice-agent flow: routes pushed by this suite are named
   /// 'voice-booking-flow', so the live-location arrival returns to the
@@ -240,15 +244,34 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Select Origin Stop',
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Back to booking',
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            icon: Icon(
+                              Icons.arrow_back,
+                              color: colors.textPrimary,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Select Origin Stop',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       Material(
                         color: Colors.transparent,
                         child: ListTile(
@@ -365,15 +388,34 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Select Destination Stop',
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Back to booking',
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            icon: Icon(
+                              Icons.arrow_back,
+                              color: colors.textPrimary,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Select Destination Stop',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       Expanded(
                         child: ListView(
                           children: _allStops.map((stop) {
@@ -527,7 +569,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     unawaited(
       checkout.whenComplete(() {
         final ticket = ticketToTrack;
-        if (!mounted || ticket == null) return;
+        if (!mounted || ticket == null || !widget.openMapAfterBooking) return;
         unawaited(
           Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -556,7 +598,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
         return route.id;
       }
     }
-    return 'vit-to-katpadi';
+    return '';
   }
 
   /// Starts the journey session the moment a ticket is issued so the trip,
@@ -633,28 +675,14 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                 ),
                 const SizedBox(width: AppSpacing.sm),
               ],
-              // Bounded so the brand mark can break onto its own line at large
-              // text scales instead of overflowing the header.
               Expanded(
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: AppSpacing.sm,
-                  runSpacing: 4,
-                  children: [
-                    const BusBuddyLogo(fontSize: 20),
-                    Text(
-                      _activeStepIndex == 0
-                          ? 'Book a Ticket'
-                          : 'Available Buses',
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        color: colors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  _activeStepIndex == 0 ? 'Book a Ticket' : 'Available Buses',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -888,6 +916,7 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
                       AnnouncementCoordinator.instance.announce(
                         'Destination set to ${stop.name}.',
                         priority: AnnouncementPriority.normal,
+                        speak: false,
                       );
                     },
                   ),
@@ -1185,63 +1214,36 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               final summaryRouteName = '$shortOrigin → $shortDest';
               final dynamicQuote = _calculateCurrentFareQuote();
 
+              final options = _repository.availableBusesForRoute(
+                _resolveRouteId(),
+              );
+              if (options.isEmpty) {
+                return const Text('No bus options are listed for this route.');
+              }
               return Column(
                 children: [
-                  // Bus Card 1 (Arriving Soon — success-tinted emphasis, Bus 18B)
-                  _buildAvailableBusCard(
-                    busId: '18B',
-                    badgeText: 'Arriving Soon',
-                    routeName: summaryRouteName,
-                    fareText: dynamicQuote.formattedAmount,
-                    statusText: '4 minutes away',
-                    serviceNote: 'Frequent service',
-                    buttonLabel: 'Select This Bus >',
-                    isHighlighted: true,
-                    onSelect: () => _openCheckoutDialog(
-                      busId: '18B',
+                  for (final option in options) ...[
+                    _buildAvailableBusCard(
+                      busId: option.busId,
+                      badgeText: option.etaMinutes == 4
+                          ? 'Soonest demo estimate'
+                          : 'Demo estimate',
                       routeName: summaryRouteName,
-                      fareQuote: dynamicQuote,
-                      routeId: _resolveRouteId(),
+                      fareText: dynamicQuote.formattedAmount,
+                      statusText:
+                          'About ${option.etaMinutes} minutes (estimate)',
+                      serviceNote: option.serviceNote,
+                      buttonLabel: 'Select This Bus',
+                      isHighlighted: option == options.first,
+                      onSelect: () => _openCheckoutDialog(
+                        busId: option.busId,
+                        routeName: summaryRouteName,
+                        fareQuote: dynamicQuote,
+                        routeId: _resolveRouteId(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bus Card 2 (Bus 12A)
-                  _buildAvailableBusCard(
-                    busId: '12A',
-                    badgeText: 'In 12 min',
-                    routeName: summaryRouteName,
-                    fareText: dynamicQuote.formattedAmount,
-                    statusText: '12 minutes away',
-                    serviceNote: 'Frequent service',
-                    buttonLabel: 'Select This Bus',
-                    isHighlighted: false,
-                    onSelect: () => _openCheckoutDialog(
-                      busId: '12A',
-                      routeName: summaryRouteName,
-                      fareQuote: dynamicQuote,
-                      routeId: _resolveRouteId(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bus Card 3 (Bus 20C)
-                  _buildAvailableBusCard(
-                    busId: '20C',
-                    badgeText: 'In 18 min',
-                    routeName: summaryRouteName,
-                    fareText: dynamicQuote.formattedAmount,
-                    statusText: '18 minutes away',
-                    serviceNote: 'Limited stops',
-                    buttonLabel: 'Select This Bus',
-                    isHighlighted: false,
-                    onSelect: () => _openCheckoutDialog(
-                      busId: '20C',
-                      routeName: summaryRouteName,
-                      fareQuote: dynamicQuote,
-                      routeId: _resolveRouteId(),
-                    ),
-                  ),
+                    if (option != options.last) const SizedBox(height: 16),
+                  ],
                 ],
               );
             },
@@ -1329,6 +1331,10 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               Expanded(
                 child: Text(
                   routeName,
+                  semanticsLabel: routeSpeechLabel(
+                    origin: _origin.name,
+                    destination: _destination.name,
+                  ),
                   style: TextStyle(
                     color: colors.textPrimary,
                     fontSize: 15,
@@ -1377,6 +1383,8 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
               ),
               child: Text(
                 buttonLabel,
+                semanticsLabel:
+                    '$buttonLabel, ${routeSpeechLabel(origin: _origin.name, destination: _destination.name, busId: busId)}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,

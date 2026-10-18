@@ -11,7 +11,13 @@ import '../journey/journey_controller.dart';
 /// can satisfy a required slot — an app fallback or a merely staged recent-trip
 /// suggestion must never masquerade as a passenger choice (spec §"Booking
 /// dialogue and decision rules").
-enum BookingValueSource { unset, passenger, profileDefault, recentActivity, appDefault }
+enum BookingValueSource {
+  unset,
+  passenger,
+  profileDefault,
+  recentActivity,
+  appDefault,
+}
 
 /// Result of a single Live tool call applied to the booking draft.
 class AutomationResult {
@@ -24,6 +30,7 @@ class AutomationResult {
     this.missingSlots = const [],
     this.isComplete = false,
     this.needsGateway = false,
+    this.status,
   });
 
   final String spokenHint;
@@ -39,6 +46,7 @@ class AutomationResult {
   final List<String> missingSlots;
   final bool isComplete;
   final bool needsGateway;
+  final String? status;
 
   /// JSON-safe fields for the Gemini tool response: success, user-facing
   /// summary, missing slots, and whether the confirmation gateway is needed.
@@ -48,6 +56,9 @@ class AutomationResult {
     'missingSlots': List<String>.from(missingSlots),
     'requiresConfirmation': needsGateway,
     'draftComplete': isComplete,
+    'draftReady': isComplete,
+    'ticketIssued': false,
+    'status': status ?? (isComplete ? 'draft_ready' : 'needs_clarification'),
   };
 }
 
@@ -88,6 +99,7 @@ class AppAutomationController extends ChangeNotifier {
   /// replies. Never copied into [passengerName] — the ticket passenger is an
   /// explicit choice, not an assumption.
   String profilePreferredName = '';
+  bool openMapAfterBooking = false;
 
   /// Whether a recent-trip suggestion is staged in the draft awaiting the
   /// passenger's acceptance.
@@ -223,10 +235,7 @@ class AppAutomationController extends ChangeNotifier {
   /// The booking slots still missing for checkout, in guidance order.
   List<String> get missingBookingSlots => _missingSlots();
 
-  void attach({
-    TransportRepository? repo,
-    JourneyController? journeyCtrl,
-  }) {
+  void attach({TransportRepository? repo, JourneyController? journeyCtrl}) {
     if (repo != null) repository = repo;
     if (journeyCtrl != null) journeyController = journeyCtrl;
   }
@@ -242,6 +251,8 @@ class AppAutomationController extends ChangeNotifier {
         return _applyPassenger(args);
       case 'set_payment':
         return _applyPayment(args);
+      case 'prepare_booking':
+        return prepareBooking(args);
       case 'confirm_booking':
         return bookingReadiness();
       default:
@@ -259,31 +270,59 @@ class AppAutomationController extends ChangeNotifier {
     final oRaw = (args?['origin'] as String?)?.trim();
     final dRaw = (args?['destination'] as String?)?.trim();
     if (repo != null) {
-      if (oRaw != null && oRaw.isNotEmpty) {
-        final resolved = _resolveStop(repo, oRaw);
-        if (resolved != null) {
-          origin = resolved;
-          slotSources['origin'] = BookingValueSource.passenger;
-        }
-      }
-      if (dRaw != null && dRaw.isNotEmpty) {
-        final resolved = _resolveStop(repo, dRaw);
-        if (resolved != null) {
-          destination = resolved;
-          slotSources['destination'] = BookingValueSource.passenger;
-        }
-      }
+      final nextOrigin = oRaw != null && oRaw.isNotEmpty
+          ? _resolveStop(repo, oRaw)
+          : origin;
+      Stop? nextDestination = dRaw != null && dRaw.isNotEmpty
+          ? _resolveStop(repo, dRaw)
+          : destination;
       // Corridor default: bare "Katpadi" means the railway terminus. This is
       // an app assumption, not a passenger choice — it cannot satisfy
       // readiness, so the assistant still asks where exactly they are going.
-      if (destination == null && dRaw != null && dRaw.isEmpty) {
-        final fallback = _resolveStop(repo, 'Katpadi Railway Station');
-        if (fallback != null) {
-          destination = fallback;
-          slotSources['destination'] = BookingValueSource.appDefault;
-        }
+      final usesCorridorDefault =
+          nextDestination == null && dRaw != null && dRaw.isEmpty;
+      if (usesCorridorDefault) {
+        nextDestination = _resolveStop(repo, 'Katpadi Railway Station');
       }
-      _refreshRoute();
+      final invalidStop = oRaw != null && oRaw.isNotEmpty && nextOrigin == null
+          ? oRaw
+          : dRaw != null && dRaw.isNotEmpty && nextDestination == null
+          ? dRaw
+          : null;
+      if (invalidStop != null) {
+        return AutomationResult(
+          success: false,
+          spokenHint:
+              'I could not match $invalidStop to a stop. Which stop did you mean?',
+          displayText: 'Stop not found. The booking draft was not changed.',
+        );
+      }
+      final routes = nextOrigin != null && nextDestination != null
+          ? repo.findRoutes(
+              originId: nextOrigin.id,
+              destinationId: nextDestination.id,
+            )
+          : const <Route>[];
+      if (nextOrigin != null && nextDestination != null && routes.isEmpty) {
+        return AutomationResult(
+          success: false,
+          spokenHint:
+              'There is no listed route between those stops. Please choose another destination.',
+          displayText: 'Route not found. The booking draft was not changed.',
+        );
+      }
+      if (oRaw != null && oRaw.isNotEmpty) {
+        origin = nextOrigin;
+        slotSources['origin'] = BookingValueSource.passenger;
+      }
+      if (dRaw != null && dRaw.isNotEmpty) {
+        destination = nextDestination;
+        slotSources['destination'] = BookingValueSource.passenger;
+      } else if (usesCorridorDefault) {
+        destination = nextDestination;
+        slotSources['destination'] = BookingValueSource.appDefault;
+      }
+      route = routes.isEmpty ? null : routes.first;
       _driveJourney();
     } else {
       // Repository-less fallback (unit tests): synthesize minimal stops.
@@ -297,51 +336,50 @@ class AppAutomationController extends ChangeNotifier {
       }
     }
     notifyListeners();
-    final tripReady =
-        _slotSatisfied('origin') && _slotSatisfied('destination');
+    final tripReady = _slotSatisfied('origin') && _slotSatisfied('destination');
     final missing = _missingSlots();
     if (tripReady) {
       return AutomationResult(
         spokenHint:
-            'Trip set from ${origin!.name} to ${destination!.name}. Which bus would you like — 18B in 4 minutes or 12A in 12 minutes?',
+            'Trip set from ${origin!.name} to ${destination!.name}. I can check the listed bus options.',
         displayText:
             '${origin!.name} → ${destination!.name}\nTap a bus or tell me which one.',
         missingSlots: missing,
         actionType: 'search_route',
-        actionLabel: AssistantCommandGateway.getMetadata('search_route')
-                ?.gatewayScreenPrompt ??
+        actionLabel:
+            AssistantCommandGateway.getMetadata(
+              'search_route',
+            )?.gatewayScreenPrompt ??
             '🚌 View Route Options',
       );
     }
     return AutomationResult(
       spokenHint:
           'Got it. ${_slotSatisfied('origin') ? 'Where would you like to go?' : 'Where are you starting from?'}',
-      displayText: 'Trip partially set.\nMissing: ${_missingSlots().join(', ')}.',
+      displayText:
+          'Trip partially set.\nMissing: ${_missingSlots().join(', ')}.',
       missingSlots: _missingSlots(),
     );
   }
 
   AutomationResult _applyBus(Map<String, dynamic>? args) {
     var raw = (args?['busId'] as String?)?.trim() ?? '';
-    raw = raw
-        .replaceAll(RegExp(r'^bus\s*', caseSensitive: false), '')
-        .trim();
+    raw = raw.replaceFirst(RegExp(r'^bus\s*', caseSensitive: false), '').trim();
     if (raw.isNotEmpty) {
-      final upper = raw.toUpperCase();
-      if (upper.startsWith('BUS')) {
-        busId = raw;
-      } else if (RegExp(r'\d').hasMatch(upper)) {
-        busId = 'Bus $upper'.replaceAll(
-          RegExp(r'^bus bus ', caseSensitive: false),
-          'Bus ',
+      final normalized = raw.toUpperCase();
+      final options = route == null
+          ? const <BusDepartureOption>[]
+          : repository?.availableBusesForRoute(route!.id) ??
+                const <BusDepartureOption>[];
+      if (!options.any((option) => option.busId == normalized)) {
+        return AutomationResult(
+          success: false,
+          spokenHint:
+              'Bus $normalized is not in the listed options for this route. Which listed bus would you like?',
+          displayText: 'Bus not available for the selected route.',
         );
-      } else {
-        busId = raw;
       }
-      // Normalize common forms: "18b" -> "Bus 18B", "Bus 18B" stays.
-      if (!busId.toLowerCase().startsWith('bus ')) {
-        busId = 'Bus ${raw.toUpperCase()}';
-      }
+      busId = normalized;
       hasCustomBus = true;
       slotSources['bus'] = BookingValueSource.passenger;
     }
@@ -359,15 +397,16 @@ class AppAutomationController extends ChangeNotifier {
           'Bus $busId selected. Is that a student, senior or general ticket?',
       displayText: 'Bus: $busId selected.\nNext: passenger type.',
       actionType: 'book_ticket',
-      actionLabel: AssistantCommandGateway.getMetadata('book_ticket')
-              ?.gatewayScreenPrompt ??
+      actionLabel:
+          AssistantCommandGateway.getMetadata(
+            'book_ticket',
+          )?.gatewayScreenPrompt ??
           '🎫 Review & Confirm Booking',
     );
   }
 
   AutomationResult _applyPassenger(Map<String, dynamic>? args) {
-    final typeRaw =
-        (args?['type'] as String?)?.trim().toLowerCase() ?? '';
+    final typeRaw = (args?['type'] as String?)?.trim().toLowerCase() ?? '';
     final nameRaw = (args?['name'] as String?)?.trim() ?? '';
     if (typeRaw.contains('student')) {
       passengerType = PassengerType.student;
@@ -401,8 +440,10 @@ class AppAutomationController extends ChangeNotifier {
           '${_passengerLabel()} ticket noted. UPI, card or wallet for payment?',
       displayText: 'Passenger: ${_passengerLabel()}.\nNext: payment method.',
       actionType: 'book_ticket',
-      actionLabel: AssistantCommandGateway.getMetadata('book_ticket')
-              ?.gatewayScreenPrompt ??
+      actionLabel:
+          AssistantCommandGateway.getMetadata(
+            'book_ticket',
+          )?.gatewayScreenPrompt ??
           '🎫 Review & Confirm Booking',
     );
   }
@@ -421,9 +462,9 @@ class AppAutomationController extends ChangeNotifier {
       // Unrecognized method: do not advance the draft, do not claim success.
       return AutomationResult(
         success: false,
-        spokenHint:
-            "I didn't catch that payment method. UPI, card or wallet?",
-        displayText: 'Payment method not recognized. Please say UPI, card or wallet.',
+        spokenHint: "I didn't catch that payment method. UPI, card or wallet?",
+        displayText:
+            'Payment method not recognized. Please say UPI, card or wallet.',
       );
     }
     slotSources['paymentMethod'] = BookingValueSource.passenger;
@@ -438,7 +479,7 @@ class AppAutomationController extends ChangeNotifier {
   }
 
   /// Readiness check for confirm_booking: complete or lists missing slots.
-  /// Requires an explicitly chosen trip, bus, passenger type, and payment —
+  /// Requires an explicitly chosen trip, bus, passenger name/type, and payment —
   /// app fallbacks and staged suggestions never satisfy it.
   AutomationResult bookingReadiness() {
     final missing = _missingSlots();
@@ -446,10 +487,12 @@ class AppAutomationController extends ChangeNotifier {
       final ask = missing.contains('trip')
           ? 'Tell me your origin and destination first.'
           : missing.contains('bus')
-              ? 'Which bus would you like?'
-              : missing.contains('passenger')
-                  ? 'Is that a student, senior or general ticket?'
-                  : 'Which payment method — UPI, card or wallet?';
+          ? 'Which bus would you like?'
+          : missing.contains('passenger')
+          ? 'Is that a student, senior or general ticket?'
+          : missing.contains('passenger name')
+          ? 'What name should I put on the ticket?'
+          : 'Which payment method — UPI, card or wallet?';
       return AutomationResult(
         success: false,
         spokenHint: ask,
@@ -457,19 +500,208 @@ class AppAutomationController extends ChangeNotifier {
         missingSlots: missing,
       );
     }
-    final concession =
-        passengerType == PassengerType.general ? '' : ' with 40% concession';
+    final concession = passengerType == PassengerType.general
+        ? ''
+        : ' with 40% concession';
     return AutomationResult(
       spokenHint:
           'I have your ${passengerType.name} ticket$concession on $busId from ${origin!.name} to ${destination!.name}, paying by ${_paymentLabel()}. I am opening the confirmation screen — please review and tap confirm.',
       displayText:
           '${origin!.name} → ${destination!.name}\n$busId • ${_passengerLabel()}$concession • ${_paymentLabel()}\nReview and confirm below.',
       actionType: 'confirm_booking',
-      actionLabel: AssistantCommandGateway.getMetadata('confirm_booking')
-              ?.gatewayScreenPrompt ??
+      actionLabel:
+          AssistantCommandGateway.getMetadata(
+            'confirm_booking',
+          )?.gatewayScreenPrompt ??
           '🎫 Review & Confirm Booking',
       isComplete: true,
       needsGateway: true,
+      status: 'checkout_pending',
+    );
+  }
+
+  /// Resolves and validates a compound booking request without changing the
+  /// current draft until every supplied and required value is valid.
+  AutomationResult prepareBooking(Map<String, dynamic>? args) {
+    final repo = repository;
+    if (repo == null) {
+      return const AutomationResult(
+        success: false,
+        spokenHint: 'I cannot check the route right now. Please try again.',
+        displayText: 'Transport data is unavailable.',
+      );
+    }
+
+    final rawOrigin = args?['origin']?.toString().trim() ?? '';
+    final rawDestination = args?['destination']?.toString().trim() ?? '';
+    final nextOrigin = rawOrigin.isEmpty
+        ? (_slotSatisfied('origin') ? origin : null)
+        : _resolveStop(repo, rawOrigin);
+    final nextDestination = rawDestination.isEmpty
+        ? (_slotSatisfied('destination') ? destination : null)
+        : _resolveStop(repo, rawDestination);
+    final invalid = <String>[];
+    if (rawOrigin.isNotEmpty && nextOrigin == null) invalid.add('origin stop');
+    if (rawDestination.isNotEmpty && nextDestination == null) {
+      invalid.add('destination stop');
+    }
+
+    final nextRoutes = nextOrigin != null && nextDestination != null
+        ? repo.findRoutes(
+            originId: nextOrigin.id,
+            destinationId: nextDestination.id,
+          )
+        : const <Route>[];
+    final nextRoute = nextRoutes.isNotEmpty ? nextRoutes.first : null;
+    if (nextOrigin != null && nextDestination != null && nextRoute == null) {
+      invalid.add('route');
+    }
+
+    final rawPreference =
+        args?['busPreference']?.toString().trim().toLowerCase() ?? '';
+    final rawBus = args?['busId']?.toString().trim() ?? '';
+    final available = nextRoute == null
+        ? const <BusDepartureOption>[]
+        : repo.availableBusesForRoute(nextRoute.id);
+    BusDepartureOption? selectedOption;
+    if (rawPreference == 'earliest' ||
+        rawPreference == 'soonest' ||
+        rawPreference == 'first') {
+      if (available.isEmpty) {
+        invalid.add('available bus');
+      } else {
+        selectedOption = available.reduce(
+          (a, b) => a.etaMinutes <= b.etaMinutes ? a : b,
+        );
+      }
+    } else if (rawPreference.isNotEmpty) {
+      invalid.add('bus preference');
+    } else if (rawBus.isNotEmpty) {
+      final normalized = rawBus
+          .replaceFirst(RegExp(r'^bus\s*', caseSensitive: false), '')
+          .trim()
+          .toUpperCase();
+      for (final option in available) {
+        if (option.busId == normalized) selectedOption = option;
+      }
+      if (selectedOption == null) invalid.add('listed bus');
+    } else if (busId.isNotEmpty && _slotSatisfied('bus')) {
+      for (final option in available) {
+        if (option.busId == busId) selectedOption = option;
+      }
+    }
+
+    final rawType =
+        args?['passengerType']?.toString().trim().toLowerCase() ?? '';
+    PassengerType? nextType;
+    if (rawType.isEmpty) {
+      if (_slotSatisfied('passengerType')) nextType = passengerType;
+    } else if (rawType.contains('student')) {
+      nextType = PassengerType.student;
+    } else if (rawType.contains('senior')) {
+      nextType = PassengerType.senior;
+    } else if (rawType.contains('general') ||
+        rawType.contains('adult') ||
+        rawType.contains('regular')) {
+      nextType = PassengerType.general;
+    } else {
+      invalid.add('passenger type');
+    }
+
+    final rawName =
+        (args?['passengerName'] ?? args?['name'])?.toString().trim() ?? '';
+    final nextName = rawName.isNotEmpty
+        ? rawName
+        : _slotSatisfied('passengerName')
+        ? passengerName.trim()
+        : '';
+    if (rawName.isNotEmpty && rawName.length > 80) {
+      invalid.add('passenger name');
+    }
+
+    final rawPayment =
+        args?['paymentMethod']?.toString().trim().toLowerCase() ?? '';
+    PaymentMethod? nextPayment;
+    if (rawPayment.isEmpty) {
+      if (_slotSatisfied('paymentMethod')) nextPayment = paymentMethod;
+    } else if (rawPayment.contains('upi')) {
+      nextPayment = PaymentMethod.upi;
+    } else if (rawPayment.contains('card') ||
+        rawPayment.contains('credit') ||
+        rawPayment.contains('debit')) {
+      nextPayment = PaymentMethod.card;
+    } else if (rawPayment.contains('wallet')) {
+      nextPayment = PaymentMethod.wallet;
+    } else {
+      invalid.add('payment method');
+    }
+    if (args != null &&
+        args.containsKey('openMapAfterBooking') &&
+        args['openMapAfterBooking'] is! bool) {
+      invalid.add('map request');
+    }
+
+    final missing = <String>[];
+    if (nextOrigin == null || nextDestination == null) {
+      missing.add('origin and destination');
+    }
+    if (nextRoute == null && nextOrigin != null && nextDestination != null) {
+      // An invalid route is reported above, not as a missing value.
+    }
+    if (selectedOption == null) missing.add('bus preference or bus');
+    if (nextType == null) missing.add('passenger type');
+    if (nextName.isEmpty) missing.add('passenger name');
+    if (nextPayment == null) missing.add('payment method');
+    final missingUnique = missing.toSet().toList();
+    if (invalid.isNotEmpty || missingUnique.isNotEmpty) {
+      final details = [...invalid, ...missingUnique].join(', ');
+      return AutomationResult(
+        success: false,
+        spokenHint: invalid.isNotEmpty
+            ? 'I could not verify ${invalid.join(', ')}. ${missingUnique.isEmpty ? 'Please check those details.' : 'I still need ${missingUnique.join(', ')}.'}'
+            : 'I still need ${missingUnique.join(', ')} before I can open checkout.',
+        displayText:
+            'Booking not prepared. Please provide or correct: $details.',
+        missingSlots: missingUnique,
+        status: 'needs_clarification',
+      );
+    }
+
+    origin = nextOrigin;
+    destination = nextDestination;
+    route = nextRoute;
+    busId = selectedOption!.busId;
+    hasCustomBus = true;
+    passengerType = nextType!;
+    passengerName = nextName;
+    paymentMethod = nextPayment!;
+    for (final slot in [
+      'origin',
+      'destination',
+      'bus',
+      'passengerName',
+      'passengerType',
+      'paymentMethod',
+    ]) {
+      slotSources[slot] = BookingValueSource.passenger;
+    }
+    _driveJourney();
+    notifyListeners();
+    openMapAfterBooking = args?['openMapAfterBooking'] == true;
+    return AutomationResult(
+      spokenHint:
+          'Your ${_passengerLabel()} trip from ${origin!.name} to ${destination!.name} on bus $busId is ready for checkout. The listed bus time is a demo estimate. No ticket or payment has been issued yet.',
+      displayText:
+          '${origin!.name} → ${destination!.name}\n$busId • ${_passengerLabel()} • ${_paymentLabel()}\nReady for checkout; ticket not issued.',
+      isComplete: true,
+      needsGateway: true,
+      actionType: 'confirm_booking',
+      actionLabel:
+          AssistantCommandGateway.getMetadata(
+            'confirm_booking',
+          )?.gatewayScreenPrompt ??
+          '🎫 Review Booking',
+      status: 'draft_ready',
     );
   }
 
@@ -487,15 +719,19 @@ class AppAutomationController extends ChangeNotifier {
     if (!_slotSatisfied('origin') || !_slotSatisfied('destination')) {
       missing.add('trip');
     }
+    if (origin != null && destination != null && route == null) {
+      missing.add('route');
+    }
     if (!_slotSatisfied('bus')) missing.add('bus');
+    if (!_slotSatisfied('passengerName')) missing.add('passenger name');
     if (!_slotSatisfied('passengerType')) missing.add('passenger');
     if (!_slotSatisfied('paymentMethod')) missing.add('payment');
     return missing;
   }
 
   String _passengerLabel() {
-    final base = passengerType.name[0].toUpperCase() +
-        passengerType.name.substring(1);
+    final base =
+        passengerType.name[0].toUpperCase() + passengerType.name.substring(1);
     return passengerName == 'Passenger' ? base : '$base • $passengerName';
   }
 
@@ -512,16 +748,6 @@ class AppAutomationController extends ChangeNotifier {
     }
   }
 
-  void _refreshRoute() {
-    final repo = repository;
-    if (repo == null || origin == null || destination == null) return;
-    final routes = repo.findRoutes(
-      originId: origin!.id,
-      destinationId: destination!.id,
-    );
-    route = routes.isNotEmpty ? routes.first : null;
-  }
-
   void _driveJourney() {
     final journey = journeyController;
     if (journey == null || origin == null || destination == null) return;
@@ -533,12 +759,18 @@ class AppAutomationController extends ChangeNotifier {
   Stop? _resolveStop(TransportRepository repo, String query) {
     final q = query.trim();
     if (q.isEmpty) return null;
+    final normalized = q
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim();
+    if (normalized == 'bello fort') return repo.getStop('vat-vellore-fort');
     // 1. Exact id match.
     final byId = repo.getStop(_slug(q));
     if (byId != null) return byId;
     final direct = repo.getStop(q);
     if (direct != null) return direct;
-    // 2. Name search (case-insensitive substring).
+    // 2. Exact name match only. Partial search hits must not silently choose
+    // the first stop with a similar name.
     final hits = repo.findStops(q);
     if (hits.isEmpty) return null;
     final lower = q.toLowerCase();
@@ -551,7 +783,7 @@ class AppAutomationController extends ChangeNotifier {
         if (s.id == 'katpadi-railway-station') return s;
       }
     }
-    return hits.first;
+    return null;
   }
 
   String _slug(String s) {

@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 import '../../data/models/transport_models.dart' as models;
 import '../../data/repositories/transport_repository.dart';
@@ -53,10 +52,7 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
         if (route == null) {
           return Scaffold(
             appBar: AppBar(
-              title: const BusBuddyLogo(
-                fontSize: 20,
-                subtitle: 'Route Details',
-              ),
+              title: const Text('Route Details'),
               centerTitle: true,
             ),
             body: Center(
@@ -93,10 +89,7 @@ class _RouteDetailsPageState extends State<RouteDetailsPage> {
         return Scaffold(
           backgroundColor: colors.background,
           appBar: AppBar(
-            title: const BusBuddyLogo(
-              fontSize: 20,
-              subtitle: 'Route Details & Live GPS',
-            ),
+            title: const Text('Route Details'),
             centerTitle: true,
             backgroundColor: colors.background,
             foregroundColor: colors.textPrimary,

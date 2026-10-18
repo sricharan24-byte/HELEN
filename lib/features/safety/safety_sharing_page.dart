@@ -3,15 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/a11y/announcement_coordinator.dart';
+import '../../core/location/location_share_service.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 import '../../data/models/ticket_model.dart';
-import '../../data/models/adaptive_shortcut.dart';
 import '../../data/repositories/emergency_contact_repository.dart';
-import '../adaptive_ui/adaptive_ui_service.dart';
 
 /// Safety & Emergency Sharing page.
 /// Fully conforms to Astra Gate 12 (Privacy & Safety Boundaries) and Step 2.5
@@ -29,6 +27,8 @@ class SafetySharingPage extends StatefulWidget {
 class _SafetySharingPageState extends State<SafetySharingPage> {
   final _contacts = EmergencyContactRepository.instance;
   final _settings = AppSettingsController.instance;
+  final _locationShare = LocationShareService();
+  bool _locationRequestPending = false;
 
   @override
   void initState() {
@@ -37,6 +37,103 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
   }
 
   void _contactsChanged() => setState(() {});
+
+  Future<void> _shareLocation({required bool emergency}) async {
+    final colors = AppTheme.colors(context);
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        title: Text(
+          emergency ? 'Share emergency location?' : 'Share your location?',
+          style: TextStyle(color: colors.textPrimary),
+        ),
+        content: Text(
+          'BusBuddy will request foreground location access and create one map link for your current location. Your coordinates are not saved. Android will let you choose an app and recipient; nothing is sent until you confirm there.',
+          style: TextStyle(color: colors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(48, AppSpacing.minTouchTarget),
+            ),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+
+    final trip = widget.activeTicket;
+    final contextText = trip == null
+        ? ''
+        : ' I am riding bus ${trip.busId} from ${trip.origin.name} to ${trip.destination.name}.';
+    _locationRequestPending = true;
+    late final LocationShareResult result;
+    try {
+      result = await _locationShare.shareCurrentLocation(
+        message: emergency
+            ? 'Emergency: I need assistance.$contextText'
+            : 'My current location snapshot.$contextText',
+        chooserTitle: emergency ? 'Share emergency location' : 'Share location',
+      );
+    } finally {
+      _locationRequestPending = false;
+    }
+    if (!mounted) return;
+
+    final message = switch (result.status) {
+      LocationShareStatus.chooserOpened =>
+        'Share menu opened. Choose an app and recipient; the message has not been sent yet.',
+      LocationShareStatus.permissionDenied =>
+        'Location permission was denied. Allow it when you want to share a location snapshot.',
+      LocationShareStatus.permanentlyDenied =>
+        'Location permission is blocked. Enable it in Android Settings > Apps > BusBuddy > Permissions.',
+      LocationShareStatus.locationDisabled =>
+        'Turn on Location in Android settings, then try again.',
+      LocationShareStatus.timeout =>
+        'Could not get a location fix in time. Move to an area with a location signal and try again.',
+      LocationShareStatus.unavailable =>
+        'Phone location is unavailable. No location was shared.',
+      LocationShareStatus.unsupported =>
+        'Location sharing is available on Android only.',
+      LocationShareStatus.cancelled => 'Location request cancelled.',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+    if (result.status == LocationShareStatus.chooserOpened) {
+      AnnouncementCoordinator.instance.announce(
+        emergency
+            ? 'Emergency location share menu opened. Choose a recipient to continue.'
+            : 'Location share menu opened. Choose a recipient to continue.',
+        priority: emergency
+            ? AnnouncementPriority.urgent
+            : AnnouncementPriority.normal,
+      );
+    }
+  }
+
+  Future<void> _openDialer(Map<String, String> contact) async {
+    final result = await _locationShare.openDialer(contact['phone'] ?? '');
+    if (!mounted) return;
+    final message = switch (result.status) {
+      DialerStatus.opened =>
+        'Dialer opened with ${contact['name']}’s number. Review it and tap Call.',
+      DialerStatus.invalidNumber =>
+        'This contact has an invalid phone number. Edit the contact and try again.',
+      DialerStatus.unavailable => 'The phone dialer could not be opened.',
+      DialerStatus.unsupported => 'Calling is available on Android only.',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   Future<void> _removeContact(Map<String, String> contact) async {
     final colors = AppTheme.colors(context);
@@ -90,6 +187,9 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
 
   @override
   void dispose() {
+    if (_locationRequestPending) {
+      unawaited(_locationShare.cancelCurrentLocation());
+    }
     _contacts.removeListener(_contactsChanged);
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
@@ -120,7 +220,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Astra Gate 12: Emergency contacts receive SMS alerts with your real-time bus telemetry when SOS is triggered.',
+                'Emergency contacts are shared only when you choose a recipient in Android’s share menu.',
                 style: TextStyle(color: colors.textSecondary, fontSize: 12),
               ),
               const SizedBox(height: 14),
@@ -227,7 +327,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Demonstration Mode: This logs a simulated emergency alert with your current corridor stop coordinates. In production, this dispatches SMS and emergency dialer intents to 112 and your trusted contacts.',
+                'After you continue, BusBuddy will request your current phone location and open Android’s share menu with an emergency map link. You choose the recipient and confirm sending there. For immediate assistance in India, call 112.',
                 style: TextStyle(
                   color: colors.textPrimary,
                   fontSize: 13,
@@ -280,31 +380,11 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                 if (_settings.hapticFeedback) {
                   unawaited(HapticFeedback.heavyImpact());
                 }
-                AdaptiveUiService.instance.recordGenericEvent(
-                  actionType: 'sos',
-                  title: 'Emergency SOS Broadcast',
-                  subtitle: 'Safety assistance alert',
-                  type: AdaptiveShortcutType.safety,
-                );
-
-                AnnouncementCoordinator.instance.announce(
-                  'Emergency SOS alert broadcasted. Dial 112 for immediate assistance.',
-                  priority: AnnouncementPriority.urgent,
-                );
-
                 Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      '⚠️ Demo Mode: Simulated SOS recorded. Dial 112 for real emergency assistance.',
-                    ),
-                    backgroundColor: colors.statusAlert,
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
+                unawaited(_shareLocation(emergency: true));
               },
               icon: const Icon(Icons.sos, size: 18),
-              label: const Text('RECORD SIMULATED SOS'),
+              label: const Text('CONTINUE TO SHARE SOS'),
               style: FilledButton.styleFrom(
                 backgroundColor: colors.statusAlert,
                 foregroundColor: Colors.white,
@@ -325,10 +405,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
-        title: const BusBuddyLogo(
-          fontSize: 20,
-          subtitle: 'Safety & Emergency Sharing',
-        ),
+        title: const Text('Safety'),
         centerTitle: true,
         backgroundColor: colors.background,
         foregroundColor: colors.textPrimary,
@@ -369,7 +446,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                         Semantics(
                           header: true,
                           child: Text(
-                            '1-Tap Emergency Broadcast',
+                            'Emergency location share',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: colors.statusAlert,
@@ -379,7 +456,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Send immediate location distress alerts to trusted contacts',
+                          'Choose an app and trusted contact to share a one-time phone location snapshot',
                           style: TextStyle(
                             color: colors.textSecondary,
                             fontSize: 13,
@@ -403,7 +480,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                 onPressed: _triggerSosAlert,
                 icon: const Icon(Icons.sos, size: 24),
                 label: const Text(
-                  'BROADCAST SOS ALERT NOW',
+                  'REVIEW & SHARE SOS LOCATION',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -427,7 +504,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
             // Live Trip Sharing Card
             if (ticket != null) ...[
               Text(
-                'ACTIVE TRIP LIVE SHARING',
+                'ONE-TIME LOCATION SNAPSHOT',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   color: colors.textSecondary,
@@ -479,26 +556,15 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                         minHeight: AppSpacing.minTouchTarget,
                       ),
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          AnnouncementCoordinator.instance.announce(
-                            'Live trip link copied for sharing.',
-                            priority: AnnouncementPriority.normal,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Opening WhatsApp to share live trip link...',
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: () =>
+                            unawaited(_shareLocation(emergency: false)),
                         icon: Icon(
                           Icons.share,
                           color: colors.actionPrimary,
                           size: 18,
                         ),
                         label: Text(
-                          'Share Live Trip via WhatsApp / SMS',
+                          'Share current phone location',
                           style: TextStyle(
                             color: colors.actionPrimary,
                             fontWeight: FontWeight.w700,
@@ -605,19 +671,7 @@ class _SafetySharingPageState extends State<SafetySharingPage> {
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget,
                           ),
-                          onPressed: () {
-                            AnnouncementCoordinator.instance.announce(
-                              'Calling ${contact['name']}',
-                              priority: AnnouncementPriority.high,
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Calling ${contact['name']} (${contact['phone']})...',
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: () => unawaited(_openDialer(contact)),
                         ),
                         IconButton(
                           icon: Icon(

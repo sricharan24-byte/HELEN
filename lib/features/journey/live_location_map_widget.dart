@@ -17,7 +17,6 @@ class LiveLocationMapWidget extends StatefulWidget {
     this.destinationStopId,
     this.height,
     this.isFullScreen = false,
-    this.onToggleFullScreen,
   });
 
   final List<Stop> stops;
@@ -26,7 +25,6 @@ class LiveLocationMapWidget extends StatefulWidget {
   final String? destinationStopId;
   final double? height;
   final bool isFullScreen;
-  final VoidCallback? onToggleFullScreen;
 
   /// Test seam: widget tests replace the network tile provider so pumpAndSettle
   /// never races against tile HTTP responses (the test binding answers every
@@ -373,51 +371,6 @@ class _LiveLocationMapWidgetState extends State<LiveLocationMapWidget> {
                         ),
                         ),
                       ),
-                      if (widget.onToggleFullScreen != null) ...[
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: widget.isFullScreen
-                              ? 'Exit full screen map'
-                              : 'Expand map to full screen',
-                          child: Material(
-                            color: Colors.black.withValues(alpha: 0.75),
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              onTap: widget.onToggleFullScreen,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white30),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      widget.isFullScreen
-                                          ? Icons.fullscreen_exit
-                                          : Icons.fullscreen,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.isFullScreen ? 'Exit' : 'Expand',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                     ),
                   ),

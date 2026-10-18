@@ -72,7 +72,14 @@ bool _jsBridgeInitialized = false;
 ///    finish after the current buffer ends — the audible stutter reported
 ///    from Chrome on 2026-10-11. Healthy queues schedule unchanged; the
 ///    cushion never stacks and costs at most 0.2 s per dry spell.
-const int kJsBridgeVersion = 11;
+/// v12: honest input-device inventory (BUG: mic churn 2026-10-18).
+///    `__bb_input_devices` reports the browser's audio input devices (labels
+///    once microphone permission has been granted) so a failed microphone can
+///    name what Chrome actually sees instead of only asking the passenger to
+///    "check the right input device". Refreshed on every recognition start and
+///    after every recognition error; degrades to an empty string, never a
+///    guess.
+const int kJsBridgeVersion = 12;
 
 int _pageBridgeVersion() {
   try {
@@ -131,6 +138,7 @@ const List<String> _requiredBridgeFns = <String>[
   '__bb_play_model_audio',
   '__bb_stop_model_audio',
   '__bb_get_audio_ctx',
+  '__bb_input_devices',
 ];
 
 void _ensureJsBridge() {
@@ -514,8 +522,29 @@ void _ensureJsBridge() {
           window.__bb_active_utterance = null;
         };
 
+        // The browser's audio input devices, for honest failure messages.
+        // Labels are only populated while the page holds microphone
+        // permission; readers degrade to an empty string, never to a guess.
+        window.__bb_audio_inputs = [];
+        window.__bb_refresh_audio_inputs = function() {
+          try {
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+              navigator.mediaDevices.enumerateDevices().then(function(devices) {
+                window.__bb_audio_inputs = devices
+                  .filter(function(d) { return d.kind === "audioinput"; })
+                  .map(function(d) { return d.label || "(unnamed input)"; });
+              }).catch(function() {});
+            }
+          } catch (_) {}
+        };
+        window.__bb_input_devices = function() {
+          return (window.__bb_audio_inputs || []).join(", ");
+        };
+        window.__bb_refresh_audio_inputs();
+
         window.__bb_start_recognition = function(lang, onResult, onError, onEnd, onStarted) {
           window.__bb_stop_recognition();
+          window.__bb_refresh_audio_inputs();
 
           var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
           if (!SpeechRec) {
@@ -554,6 +583,7 @@ void _ensureJsBridge() {
             rec.onerror = function(event) {
               var err = event.error || "unknown";
               if (err === "no-speech" || err === "aborted") return;
+              window.__bb_refresh_audio_inputs();
               var msg = err === "not-allowed"
                 ? "Microphone permission blocked. Please allow microphone access in your browser address bar."
                 : err === "audio-capture"
@@ -781,6 +811,20 @@ void stopSpeechRecognition() {
     _ensureJsBridge();
     js.context.callMethod('__bb_stop_recognition');
   } catch (_) {}
+}
+
+/// Names the browser's audio input devices so a microphone failure can say what
+/// Chrome actually sees instead of only asking the passenger to check the right
+/// input device. Empty until the page has heard back from `enumerateDevices`
+/// (and blank-labelled while the page holds no microphone permission).
+String speechInputDeviceSummary() {
+  try {
+    _ensureJsBridge();
+    final names = js.context.callMethod('__bb_input_devices');
+    return names == null ? '' : names.toString().trim();
+  } catch (_) {
+    return '';
+  }
 }
 
 /// Invalidates any in-flight speech and prepares the bridge for a fresh turn.

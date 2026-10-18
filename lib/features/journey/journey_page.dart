@@ -7,7 +7,6 @@ import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/tokens/status_level.dart';
 import 'journey_controller.dart';
 
@@ -30,10 +29,7 @@ class JourneyPage extends StatelessWidget {
         return Scaffold(
           backgroundColor: colors.background,
           appBar: AppBar(
-            title: const BusBuddyLogo(
-              fontSize: 20,
-              subtitle: 'Journey',
-            ),
+            title: const Text('Journey'),
             centerTitle: true,
             backgroundColor: colors.background,
             foregroundColor: colors.textPrimary,

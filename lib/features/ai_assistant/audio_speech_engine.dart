@@ -235,6 +235,16 @@ class AudioSpeechEngine {
     required VoidCallback onEnd,
     VoidCallback? onStarted,
   }) {
+    final override = testStartListeningOverride;
+    if (override != null) {
+      override(
+        onResult: onResult,
+        onError: onError,
+        onEnd: onEnd,
+        onStarted: onStarted,
+      );
+      return;
+    }
     if (kIsWeb) {
       speech_impl.startSpeechRecognition(
         onResult: onResult,
@@ -255,6 +265,32 @@ class AudioSpeechEngine {
       onEnd();
     }
   }
+
+  /// Names the browser's current audio input devices (web only; empty
+  /// elsewhere), so a microphone failure can say what Chrome actually sees
+  /// instead of only asking the passenger to check the right input device.
+  String inputDeviceSummary() {
+    final override = testInputDeviceSummaryOverride;
+    if (override != null) return override;
+    return kIsWeb ? speech_impl.speechInputDeviceSummary() : '';
+  }
+
+  /// Test seam: drives the recognition lifecycle exactly as the platform bridge
+  /// would (onStarted / onResult / onError / onEnd), so widget tests can pin
+  /// error and silence behaviour without a browser. Null in production.
+  @visibleForTesting
+  static void Function({
+    required void Function(String text, bool isFinal) onResult,
+    required void Function(String error) onError,
+    required VoidCallback onEnd,
+    VoidCallback? onStarted,
+  })?
+  testStartListeningOverride;
+
+  /// Test seam: names input devices for failure-message pins. Null in
+  /// production, where the live value comes from the browser.
+  @visibleForTesting
+  static String? testInputDeviceSummaryOverride;
 
   /// Transcript-free Android path for callers that cannot stream microphone
   /// audio into a live session: it still runs the honest permission flow, then

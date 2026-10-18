@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/a11y/route_speech_label.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/ticket_model.dart';
 
 /// Digital Ticket Pass details screen matching Image 2 reference UI with QR code and ticket perforation notches.
@@ -30,10 +30,7 @@ class TicketDetailsPage extends StatelessWidget {
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: const BusBuddyLogo(
-          fontSize: 20,
-          subtitle: 'Ticket Details',
-        ),
+        title: const Text('Ticket Details'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -122,6 +119,10 @@ class TicketDetailsPage extends StatelessWidget {
                                 ),
                                 Text(
                                   '${ticket.origin.name} → ${ticket.destination.name}',
+                                  semanticsLabel: routeSpeechLabel(
+                                    origin: ticket.origin.name,
+                                    destination: ticket.destination.name,
+                                  ),
                                   style: TextStyle(
                                     color: colors.textSecondary,
                                     fontSize: 15,

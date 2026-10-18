@@ -8,7 +8,8 @@ import 'native_platform_io.dart';
 // Same seam the speech engine uses: the web backend below needs dart:js, and
 // the stub keeps this file compiling (and inert) on Android and desktop.
 import 'web_speech_stub.dart'
-    if (dart.library.html) 'web_speech_real.dart' as speech_impl;
+    if (dart.library.html) 'web_speech_real.dart'
+    as speech_impl;
 
 /// Plays Gemini Live's **own** audio — the 24 kHz mono PCM16 the model streams
 /// back — instead of re-speaking the reply text with the device
@@ -21,13 +22,10 @@ import 'web_speech_stub.dart'
 /// asked for, and the Live API already sends it
 /// (`responseModalities: ['AUDIO']`).
 ///
-/// The single-speaker contract from Chunk 43 still holds, and this class is
-/// what keeps it true:
+/// The Gemini Live screen uses model PCM as its only spoken reply path:
 ///
-///  * **Exactly one voice.** [hasModelAudioThisTurn] is the decision input for
-///    the caller: if the model streamed audio for this turn, the reply is NOT
-///    also handed to TTS. Device TTS remains the fallback for turns that carry
-///    no audio at all (plain text turns, REST fallback, a dead socket).
+///  * **One voice.** When model PCM arrives, it is the reply; the Live screen
+///    never sends text-only replies to device TTS.
 ///  * **No overlap.** [addChunk] opens playback lazily on the first chunk, so a
 ///    turn that never produces audio never touches the playback backend and
 ///    never competes with TTS.
@@ -37,13 +35,11 @@ import 'web_speech_stub.dart'
 /// Android plays through the native `AudioTrack`; web plays the same PCM
 /// through the Web Audio context that already backs the listening chime (so the
 /// existing gesture unlock primes it). Desktop and tests support neither and
-/// report [isSupported] false, leaving TTS in charge.
+/// report [isSupported] false; the Live screen keeps replies as text there.
 class ModelVoicePlayer {
-  ModelVoicePlayer({
-    NativeAudioChannel? channel,
-    bool Function()? isSupported,
-  })  : _channel = channel ?? NativeAudioChannel(),
-        _isSupported = isSupported ?? _defaultSupported {
+  ModelVoicePlayer({NativeAudioChannel? channel, bool Function()? isSupported})
+    : _channel = channel ?? NativeAudioChannel(),
+      _isSupported = isSupported ?? _defaultSupported {
     if (kIsWeb) {
       // Web has no platform event: the drain is scheduled off the
       // AudioContext queue in the JS bridge.
@@ -66,6 +62,9 @@ class ModelVoicePlayer {
 
   bool _playing = false;
   bool _hasModelAudioThisTurn = false;
+  bool _nativePlaybackStarted = false;
+  int _playbackGeneration = 0;
+  Future<void> _pendingNativeWrites = Future<void>.value();
 
   /// True where model audio can actually be played: Android (native
   /// `AudioTrack`) and web (Web Audio).
@@ -89,27 +88,51 @@ class ModelVoicePlayer {
 
   /// Forwards one streamed PCM chunk to the active playback backend.
   ///
-  /// Returns without touching audio on unsupported platforms, so a desktop build
-  /// keeps using TTS and never has a half-open playback session.
-  Future<void> addChunk(String base64Pcm16) async {
-    if (base64Pcm16.isEmpty) return;
+  /// Returns without touching audio on unsupported platforms; the Live screen
+  /// keeps those replies visible as text instead of falling back to TTS.
+  Future<void> addChunk(String base64Pcm16) {
+    if (base64Pcm16.isEmpty) return Future<void>.value();
     if (kIsWeb) {
-      // A chunk that will not schedule (no AudioContext yet, undecodable
-      // payload) leaves the flag clear, which is exactly how this turn falls
-      // back to TTS instead of dropping the reply on the floor.
+      // A chunk that will not schedule (no AudioContext, undecodable payload)
+      // leaves the flag clear so the caller can keep the text reply visible.
       if (speech_impl.playModelAudio(base64Pcm16)) {
         _hasModelAudioThisTurn = true;
         _playing = true;
       }
-      return;
+      return Future<void>.value();
     }
-    if (!isSupported) return;
+    if (!isSupported) return Future<void>.value();
     _hasModelAudioThisTurn = true;
-    if (!_playing) {
-      _playing = true;
-      await _channel.startPlayback();
-    }
-    await _channel.writePlaybackChunk(base64Pcm16);
+    _playing = true;
+    final generation = _playbackGeneration;
+    final write = _pendingNativeWrites.then((_) async {
+      if (generation != _playbackGeneration) return;
+      if (!_nativePlaybackStarted) {
+        final started = await _channel.startPlayback();
+        if (!started || generation != _playbackGeneration) return;
+        _nativePlaybackStarted = true;
+      }
+      await _channel.writePlaybackChunk(base64Pcm16);
+    });
+    _pendingNativeWrites = write.catchError((Object error) {
+      debugPrint('[ModelVoice] Ordered PCM write failed: $error');
+    });
+    return write;
+  }
+
+  /// Marks the end of Gemini's stream after every received PCM chunk is sent.
+  /// Android waits for this marker before reporting that playback drained.
+  Future<void> finishTurn() async {
+    if (kIsWeb || !isSupported || !_playing) return;
+    final generation = _playbackGeneration;
+    final finish = _pendingNativeWrites.then((_) async {
+      if (generation != _playbackGeneration) return;
+      await _channel.finishPlayback();
+    });
+    _pendingNativeWrites = finish.catchError((Object error) {
+      debugPrint('[ModelVoice] Playback finish failed: $error');
+    });
+    await finish;
   }
 
   /// Barge-in and teardown: drop everything queued plus whatever is playing.
@@ -121,12 +144,15 @@ class ModelVoicePlayer {
     }
     if (!isSupported) return;
     if (!_playing) return;
+    _playbackGeneration++;
     _playing = false;
+    _nativePlaybackStarted = false;
     await _channel.stopPlayback();
   }
 
   void _handleDrained() {
     _playing = false;
+    _nativePlaybackStarted = false;
     if (!_drained.isClosed) _drained.add(null);
   }
 

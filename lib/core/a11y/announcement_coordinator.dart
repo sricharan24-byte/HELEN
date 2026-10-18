@@ -43,6 +43,7 @@ class QueuedAnnouncement {
     required this.textDirection,
     required this.routeId,
     required this.createdAt,
+    this.speak = true,
     this.ttl = const Duration(seconds: 15),
   });
 
@@ -51,6 +52,7 @@ class QueuedAnnouncement {
   final TextDirection textDirection;
   final String? routeId;
   final DateTime createdAt;
+  final bool speak;
   final Duration ttl;
 
   bool get isExpired => DateTime.now().difference(createdAt) > ttl;
@@ -200,6 +202,7 @@ class AnnouncementCoordinator {
     String? routeId,
     Duration debounceWindow = defaultDebounceWindow,
     TextDirection? textDirection,
+    bool speak = true,
   }) {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return false;
@@ -244,6 +247,7 @@ class AnnouncementCoordinator {
               textDirection: effectiveDir,
               routeId: routeId,
               createdAt: now,
+              speak: speak,
             ),
           );
         }
@@ -251,15 +255,28 @@ class AnnouncementCoordinator {
       }
     }
 
-    return _dispatch(trimmed, effectiveDir, priority, now);
+    return _dispatch(trimmed, effectiveDir, priority, now, speak: speak);
   }
 
-  bool _dispatch(String message, TextDirection dir, AnnouncementPriority priority, DateTime timestamp) {
+  bool _dispatch(
+    String message,
+    TextDirection dir,
+    AnnouncementPriority priority,
+    DateTime timestamp, {
+    bool speak = true,
+  }) {
     _lastAnnouncedMessage = message;
     _lastAnnouncedTimestamp = timestamp;
 
     try {
-      if (isSpeechEnabled && !isAssistantActive) {
+      // A screen reader already owns spoken accessibility announcements.
+      // Keep app TTS for passengers without platform screen-reader speech so
+      // TalkBack never overlaps the same event with a second voice.
+      final screenReaderOwnsSpeech = SemanticsBinding.instance.semanticsEnabled;
+      if (speak &&
+          isSpeechEnabled &&
+          !isAssistantActive &&
+          !screenReaderOwnsSpeech) {
         if (speechSpeaker != null) {
           speechSpeaker!(message);
         } else if (testAnnounceHandler == null && semanticsAnnounceHandler == null) {
@@ -311,7 +328,13 @@ class AnnouncementCoordinator {
         if (next.routeId != null && _activeRouteId != null && next.routeId != _activeRouteId && next.priority != AnnouncementPriority.urgent) {
           continue;
         }
-        _dispatch(next.message, next.textDirection, next.priority, DateTime.now());
+        _dispatch(
+          next.message,
+          next.textDirection,
+          next.priority,
+          DateTime.now(),
+          speak: next.speak,
+        );
         break;
       }
     }

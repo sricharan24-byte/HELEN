@@ -77,22 +77,22 @@ void main() {
       expect(find.text('Travel Together, Go Further'), findsOneWidget);
     });
 
-    testWidgets('displays active ticket greeting banner (Image 2)', (
+    testWidgets('shows active journey context without a greeting', (
       tester,
     ) async {
       final ticketController = bookCorridorTicketController();
       await tester.pumpWidget(testApp(ticketController: ticketController));
       await tester.pumpAndSettle();
 
-      expect(find.text('Good morning, Pavan!'), findsOneWidget);
-      expect(find.text("Here's your journey today."), findsOneWidget);
+      expect(find.text('Good morning, Pavan!'), findsNothing);
+      expect(find.text("Here's your journey today."), findsNothing);
       // The booking armed an expiry Timer: dispose before the body ends
       // (testWidgets verifies timers before teardowns run).
       ticketController.dispose();
     });
 
     testWidgets(
-      'displays idle greeting banner when no active ticket (Image 1)',
+      'shows no greeting or prompt when no active ticket',
       (tester) async {
         final ticketRepo = LocalTicketRepository();
         final ticketController = TicketController(ticketRepo);
@@ -101,12 +101,21 @@ void main() {
         await tester.pumpWidget(testApp(ticketController: ticketController));
         await tester.pumpAndSettle();
 
-        expect(find.text('Good morning!'), findsOneWidget);
-        expect(find.text('What would you like to do?'), findsOneWidget);
+        expect(find.text('Good morning!'), findsNothing);
+        expect(find.text('What would you like to do?'), findsNothing);
         // 'My Journey' option was removed from the home screen options.
         expect(find.text('No active journey'), findsNothing);
       },
     );
+  });
+
+  testWidgets('omits the accessibility slogan footer', (tester) async {
+    await tester.pumpWidget(testApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('More Accessible Cities'), findsNothing);
+    expect(find.text('for a Brighter Tomorrow'), findsNothing);
+    expect(find.byIcon(Icons.directions_bus_filled_outlined), findsNothing);
   });
 
   // ── My Journey Card ──────────────────────────────────────────────────
@@ -168,8 +177,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('My Journey'), findsNothing);
-      expect(find.text('Good morning!'), findsOneWidget);
-      expect(find.text('What would you like to do?'), findsOneWidget);
+      expect(find.text('Good morning!'), findsNothing);
+      expect(find.text('What would you like to do?'), findsNothing);
     });
 
     testWidgets(
@@ -229,7 +238,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('My Journey'), findsNothing);
-        expect(find.text('Good morning!'), findsOneWidget);
+        expect(find.text('Good morning!'), findsNothing);
         expect(ticketController.hasActiveTicket, isFalse);
       },
     );

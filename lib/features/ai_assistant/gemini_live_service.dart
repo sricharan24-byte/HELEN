@@ -166,9 +166,9 @@ class GeminiLiveService {
       return GeminiLiveResponse(
         userTranscript: query,
         spokenResponse:
-            'Opening Emergency Safety Broadcast gateway. Please tap confirm on your screen to notify your trusted contacts.',
+            'Opening emergency location sharing. Review the details, then choose who to notify.',
         displayText:
-            '🚨 Emergency Safety Gateway\nTap below to confirm and broadcast your location.',
+            'Emergency location sharing\nReview and continue to choose a recipient.',
         intent: GeminiLiveIntent.emergencySos,
         actionType: 'emergency_sos',
       );

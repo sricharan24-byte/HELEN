@@ -22,6 +22,10 @@ void stopSpeech() {}
 
 void stopSpeechRecognition() {}
 
+/// Web-only input-device inventory; empty off the web so failure messages
+/// never invent device names.
+String speechInputDeviceSummary() => '';
+
 void resetTurnAudio() {}
 
 void unlockAudioContext() {}

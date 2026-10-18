@@ -16,7 +16,6 @@ import '../tickets/ticket_controller.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../domain/assistant/assistant_command.dart';
 import 'booking_context.dart';
 import 'booking_draft_preview.dart';
@@ -24,8 +23,8 @@ import 'android_voice_turn.dart';
 import 'app_automation_controller.dart';
 import 'audio_speech_engine.dart';
 import 'ai_control_glow.dart';
-import 'gemini_live_service.dart';
 import 'gemini_live_session.dart';
+import 'gemini_live_service.dart';
 import 'gemini_live_transport.dart';
 import 'model_voice_player.dart';
 import 'wake_word_service.dart';
@@ -55,11 +54,10 @@ class GeminiLiveScreen extends StatefulWidget {
 
 class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     with SingleTickerProviderStateMixin {
-  final GeminiLiveService _liveService = const GeminiLiveService();
   final AudioSpeechEngine _audioEngine = AudioSpeechEngine();
 
-  /// Gemini's own streamed audio (Android `AudioTrack`). This is the natural
-  /// voice; `_audioEngine` stays as the fallback for turns that carry no audio.
+  /// Gemini's own streamed audio (Android `AudioTrack`). This is the only
+  /// spoken reply path while the Live screen is open.
   final ModelVoicePlayer _modelVoice = ModelVoicePlayer();
   final AppAutomationController _automation = AppAutomationController();
 
@@ -90,6 +88,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       'Tap the microphone or a chip below to ask BusBuddy something.';
   String _spokenOutput =
       'Hi, I\'m BusBuddy! Where would you like to travel today?';
+  bool _modelReplyInProgress = false;
   GeminiLiveResponse? _lastResponse;
   String _liveStatus = 'Ready';
 
@@ -127,6 +126,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         if (!mounted) return;
         // Streaming text goes to the transcript only. The voice is spoken
         // exactly once from onTurnComplete — never a half-built string.
+        _modelReplyInProgress = true;
         setState(() {
           if (_liveTranscription.startsWith('Listening') ||
               _liveTranscription.startsWith('Recognized') ||
@@ -144,11 +144,13 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _turnCounter++;
         // Slot-tool protocol turns are silent: the follow-up answer turn
         // carries the voice, so speaking one would repeat the same words.
-        final bool silentProtocol = AssistantCommandGateway.isSilentProtocol(
-          actionType,
-        );
+        final bool silentProtocol =
+            AssistantCommandGateway.isSilentProtocol(actionType) &&
+            fullText.trim().isEmpty;
+        final modelAudioArrived = _modelVoice.hasModelAudioThisTurn;
         setState(() {
-          _isSpeaking = true;
+          _isSpeaking = modelAudioArrived;
+          _modelReplyInProgress = modelAudioArrived;
           if (fullText.isNotEmpty) {
             _spokenOutput = fullText;
             _liveTranscription = fullText;
@@ -156,8 +158,9 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             if (actionType != null) {
               switch (actionType) {
                 case 'track_bus':
-                  _spokenOutput =
-                      'Here is the live bus tracker on your screen.';
+                  _spokenOutput = _activeTicket == null
+                      ? 'You need an active ticket before I can show its live map. Opening booking now.'
+                      : 'Here is the live bus tracker on your screen.';
                   break;
                 case 'book_ticket':
                   _spokenOutput = 'Opening ticket booking for you now.';
@@ -168,35 +171,43 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   break;
                 case 'emergency_sos':
                   _spokenOutput =
-                      'Emergency safety broadcast has been triggered.';
+                      'Opening emergency location sharing for you to review.';
                   break;
                 default:
                   _spokenOutput =
                       'Here are the transit details for your journey.';
               }
             } else {
-              // No text and no tool call. With outputAudioTranscription now
-              // requested this should not happen, and when it does we must not
-              // invent a reply: claiming to "assist with your journey" while
-              // saying nothing about what was asked is the same class of lie
-              // as the microphone flag in BUS-P1-08. Say plainly that the
-              // answer could not be read out.
+              // No text and no tool call. Keep the fallback honest instead of
+              // claiming to know what Gemini answered.
               _spokenOutput =
-                  'I received a reply but could not read it aloud. '
+                  'I received a reply without text. '
                   'Please try asking again, or type your question.';
             }
           }
         });
 
-        // Single speaker: Gemini Live's natural model audio is the sole voice.
-        // Offline TTS is completely suppressed so it never interrupts or layers with Gemini Live.
+        // Gemini audio is the only voice on this screen. A late model audio
+        // packet can arrive after turnComplete, so starting offline TTS here
+        // can overlap the model before onAudioPcmChunk gets a chance to stop it.
         if (!silentProtocol && _spokenOutput.isNotEmpty) {
           debugPrint(
-            '[SingleVoice] turn $_turnCounter: Gemini Live response; offline TTS suppressed',
+            modelAudioArrived
+                ? '[SingleVoice] turn $_turnCounter: playing Gemini audio'
+                : '[SingleVoice] turn $_turnCounter: text only; offline TTS stays muted',
           );
-          _pauseVoiceTurn();
-          _armWatchdog();
+          if (modelAudioArrived) {
+            _pauseVoiceTurn();
+            // Native playback must know the model has finished sending chunks;
+            // an empty queue between packets is not the end of the response.
+            // ignore: discarded_futures
+            _modelVoice.finishTurn();
+            _armWatchdog();
+          } else if (_continuousListening && !_isListening) {
+            _scheduleRestartListening(delayMs: 350, playChimeTone: false);
+          }
         }
+        _modelVoice.beginTurn();
 
         if (actionType != null && !_actionExecutedThisTurn) {
           _executeAction(actionType);
@@ -204,10 +215,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       },
       onAction: (actionType, args) {
         if (!mounted) return;
+        if (actionType == 'prepare_booking') return;
         _executeAction(actionType, args);
       },
       onUserTranscription: (text) {
         if (!mounted) return;
+        _rememberMapRequest(text);
         // Display only. The microphone audio already reached the model, so this
         // text must never be re-submitted as a new text turn. Rendered with a
         // voice-over icon (see _isVoiceTranscript) instead of the old emoji.
@@ -228,10 +241,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             '[ModelVoice] turn $_turnCounter: playing Gemini\'s own voice '
             '(model audio, TTS will be skipped)',
           );
+          // Defensive stop in case another screen left an offline utterance
+          // active before this Live session began receiving PCM.
+          _audioEngine.stop();
+          AudioSpeechEngine.muteOfflineTts(true);
           _speechTimer?.cancel();
           _pauseVoiceTurn();
           setState(() {
             _isSpeaking = true;
+            _modelReplyInProgress = true;
           });
         }
         // ignore: discarded_futures
@@ -249,6 +267,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
+          _modelReplyInProgress = false;
         });
         // The passenger talked over the assistant: keep their microphone stream
         // feeding the session so the interruption is understood as a question.
@@ -266,6 +285,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _restartListenTimer?.cancel();
         setState(() {
           _isSpeaking = false;
+          _modelReplyInProgress = false;
           _isListening = false;
           _liveStatus = 'Error';
           _liveTranscription = 'Connection notice: $err';
@@ -302,7 +322,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     AppSettingsController.instance.addListener(_onSettingsChanged);
     unawaited(_connectValidated());
 
-    // Suppress offline TTS completely: only Gemini Live's natural voice speaks.
+    // Prefer Gemini's natural voice, with app TTS for turns that carry no audio.
     AudioSpeechEngine.muteOfflineTts(true);
     AnnouncementCoordinator.instance.isAssistantActive = true;
     _audioEngine.stop();
@@ -319,10 +339,12 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     // fires exactly once per utterance (utterance onend/onerror).
     _audioEngine.setAudioEndedCallback(() {
       if (!mounted) return;
+      AudioSpeechEngine.muteOfflineTts(true);
       _speechTimer?.cancel();
       _watchdogTimer?.cancel();
       setState(() {
         _isSpeaking = false;
+        _modelReplyInProgress = false;
       });
       // Android never restarts a stream that stayed open: it just resumes
       // feeding frames, which is why the pause happens in the speak path.
@@ -346,6 +368,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _watchdogTimer?.cancel();
       setState(() {
         _isSpeaking = false;
+        _modelReplyInProgress = false;
       });
       _resumeVoiceTurn();
       if (_continuousListening && !_isListening) {
@@ -373,11 +396,17 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
   /// microphone almost certainly cannot hear the passenger, and saying so
   /// beats restarting "Listening…" forever.
   int _silentListenCycles = 0;
+
+  /// Set when a recognition error ended the current cycle. That handler already
+  /// stopped listening and named the real reason, so the recognition `onend`
+  /// that follows must not overwrite it with a generic "tap to speak" line.
+  bool _listenEndedWithError = false;
   bool _actionExecutedThisTurn = false;
   DateTime? _lastVoiceInputTime;
   String _lastProcessedQuery = '';
 
   bool _continuousListening = true;
+  bool _openMapAfterBookingRequested = false;
   Timer? _restartListenTimer;
   Timer? _speechTimer;
   Timer? _micStartGuard;
@@ -514,6 +543,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       if (_isSpeaking) {
         setState(() {
           _isSpeaking = false;
+          _modelReplyInProgress = false;
         });
         if (_continuousListening && !_isListening) {
           _scheduleRestartListening(delayMs: 350, playChimeTone: true);
@@ -533,6 +563,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     _restartListenTimer?.cancel();
     _lastInterimTranscript = '';
     _processedFinal = false;
+    _listenEndedWithError = false;
     // A fresh start (open, orb tap, Try Again) clears the silent-cycle count;
     // an automatic restart must not, or the counter would never climb above
     // one and the silence feedback could never fire.
@@ -554,7 +585,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       // when no key is configured at all — which is the common first-run case,
       // and the passenger can fix it in seconds from the banner above.
       final noKey = AppSettingsController.instance.geminiApiKey.isEmpty;
-      final keyRejected = !noKey &&
+      final keyRejected =
+          !noKey &&
           (_liveStatus.contains('Invalid') || _liveStatus.contains('Error'));
       _releaseAndroidVoiceTurnUi(
         noKey
@@ -583,6 +615,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     setState(() {
       _isPermissionBlocked = false;
       _isSpeaking = false;
+      _modelReplyInProgress = false;
       // Deliberately NOT claiming listening yet: Chrome may be about to show a
       // permission prompt, or recognition may fail to start. _isListening
       // flips only in onStarted, once capture is genuinely open.
@@ -649,20 +682,28 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           return;
         }
 
-        if (_continuousListening && !_isSpeaking) {
-          _scheduleRestartListening(delayMs: 1200);
-        } else {
-          setState(() {
-            _isListening = false;
-            _liveTranscription = '$err Tap mic orb or select a prompt below.';
-          });
-        }
+        // Any other named failure — `audio-capture`, `network`,
+        // `service-not-allowed` — is not silence, and a restart cannot fix it:
+        // looping into it produced the 2026-10-18 report (the microphone lights
+        // up for a moment, pops in and out, then goes silent) because the real
+        // reason was thrown away and the three-silent-cycles message ended up
+        // blaming the input device. Stop, and say what Chrome actually said.
+        _listenEndedWithError = true;
+        _continuousListening = false;
+        _restartListenTimer?.cancel();
+        setState(() {
+          _isListening = false;
+          _liveTranscription = _microphoneFailureMessage(err);
+        });
       },
       onEnd: () {
         if (!mounted) return;
         if (!_processedFinal && _lastInterimTranscript.trim().isNotEmpty) {
           _processedFinal = true;
           _handleVoiceInput(_lastInterimTranscript);
+        } else if (_listenEndedWithError) {
+          // The error handler already stopped listening and named the reason;
+          // a generic "tap to speak" line here would bury it.
         } else if (!_processedFinal) {
           // A cycle that ended with no transcript at all means the recognizer
           // never heard anything — typically the wrong input device or a muted
@@ -679,13 +720,24 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
             _restartListenTimer?.cancel();
             setState(() {
               _isListening = false;
+              final devices = _audioEngine.inputDeviceSummary();
               _liveTranscription =
                   "I couldn't hear anything. If a microphone is connected, "
-                  'check that the browser is using the right input device, or '
-                  'type your question below.';
+                  'check that the browser is using the right input device'
+                  '${devices.isEmpty ? '' : ' (Chrome sees: $devices)'}'
+                  ', or type your question below.';
             });
           } else if (_continuousListening && !_isSpeaking) {
-            // Silence timeout occurred without speech: seamlessly restart continuous listening!
+            // Silence timeout occurred without speech: restart continuous
+            // listening. Capture is genuinely closed at this point, so the
+            // earned-listening flag must drop with it — leaving it true made
+            // _scheduleRestartListening's `!_isListening` guard swallow every
+            // restart, so the web microphone died after its first silent cycle
+            // while the screen still claimed "Listening…" (reported and
+            // reproduced 2026-10-18).
+            setState(() {
+              _isListening = false;
+            });
             _scheduleRestartListening(delayMs: 150);
           } else {
             setState(() {
@@ -697,6 +749,15 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         }
       },
     );
+  }
+
+  /// Names the real microphone failure and the devices the browser can see, so
+  /// "check that the browser is using the right input device" is something the
+  /// passenger can act on instead of a dead end.
+  String _microphoneFailureMessage(String err) {
+    final devices = _audioEngine.inputDeviceSummary();
+    final seen = devices.isEmpty ? '' : " Chrome's input devices: $devices.";
+    return '$err$seen Tap the microphone orb to try again.';
   }
 
   void _scheduleRestartListening({
@@ -747,6 +808,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         _isPermissionBlocked = false;
         _isListening = false;
         _isSpeaking = false;
+        _modelReplyInProgress = false;
         _liveTranscription = 'Preparing the microphone...';
       });
     }
@@ -795,6 +857,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isPermissionBlocked = false;
       _isListening = true;
       _isSpeaking = false;
+      _modelReplyInProgress = false;
       _liveTranscription = 'Listening... speak your question.';
     });
   }
@@ -889,6 +952,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     }
     _lastVoiceInputTime = now;
     _lastProcessedQuery = clean;
+    _rememberMapRequest(clean);
 
     _turnCounter++;
     _actionExecutedThisTurn = false;
@@ -905,6 +969,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     setState(() {
       _isListening = false;
       _isSpeaking = true;
+      _modelReplyInProgress = false;
       _liveTranscription = 'Recognized: "$clean"';
     });
 
@@ -913,6 +978,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           'Please connect your Google AI Studio API key to chat with Gemini Live.';
       setState(() {
         _isSpeaking = false;
+        _modelReplyInProgress = false;
         _isListening = false;
         _liveStatus = 'Key Needed';
         _liveTranscription = 'Gemini Live API key is required.';
@@ -926,10 +992,25 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       _isSpeaking = true;
       _spokenOutput = 'Thinking... (streaming from Google AI Studio Live API)';
     });
-    // New turn: clear the previous turn's "the model spoke" marker so TTS is
-    // only skipped when THIS turn actually carried model audio.
+    // New turn: clear the previous turn's model-audio marker.
     _modelVoice.beginTurn();
     unawaited(_liveSession.sendQuery(clean));
+  }
+
+  void _rememberMapRequest(String text) {
+    final request = text.toLowerCase().replaceAll('’', "'");
+    if (RegExp(
+      r"\b(don't|dont|do not|without)\b.{0,30}\b(open|show|go|take|navigate|view)\b.{0,30}\b(map|tracker)\b",
+    ).hasMatch(request)) {
+      _openMapAfterBookingRequested = false;
+      _automation.openMapAfterBooking = false;
+      return;
+    }
+    if (RegExp(
+      r'\b(open|show|go to|take me to|navigate to|view|display|bring up|want to see)\b.{0,50}\b(map|tracker)\b',
+    ).hasMatch(request)) {
+      _openMapAfterBookingRequested = true;
+    }
   }
 
   /// The single choke point for opening the socket: validates the key first so
@@ -956,6 +1037,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     if (error != null) {
       setState(() {
         _isSpeaking = false;
+        _modelReplyInProgress = false;
         _isListening = false;
         _liveStatus = 'Key Invalid';
         _liveTranscription =
@@ -1061,6 +1143,21 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       case 'set_payment':
       case 'confirm_booking':
         return _automation.handleToolCall(name, args).toToolResultJson();
+      case 'prepare_booking':
+        final bookingArgs = <String, dynamic>{
+          ...?args,
+          'openMapAfterBooking':
+              _openMapAfterBookingRequested ||
+              args?['openMapAfterBooking'] == true,
+        };
+        final result = _automation.prepareBooking(bookingArgs);
+        final output = result.toToolResultJson();
+        if (result.isComplete) {
+          _executeAction('confirm_booking');
+          output['status'] = 'checkout_pending';
+          _openMapAfterBookingRequested = false;
+        }
+        return output;
       default:
         final meta = AssistantCommandGateway.getMetadata(name);
         if (meta == null) {
@@ -1113,6 +1210,10 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
       }
       if (_actionExecutedThisTurn) return;
       _actionExecutedThisTurn = true;
+      final openMapAfterBooking =
+          _automation.openMapAfterBooking || _openMapAfterBookingRequested;
+      _openMapAfterBookingRequested = false;
+      _automation.openMapAfterBooking = false;
       // Wallet is settled automatically (owner decision, 2026-10-11): the
       // passenger explicitly said "wallet" for this booking, so the auto-opened
       // checkout issues the ticket without a second tap. UPI/card keep the
@@ -1136,6 +1237,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                   : _automation.passengerName,
               autoOpenCheckout: true,
               autoConfirmPayment: walletAutoPay,
+              openMapAfterBooking: openMapAfterBooking,
               voiceFlow: true,
             ),
           ),
@@ -1159,6 +1261,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
     } else if (actionType == 'track_bus') {
       final ticket = _activeTicket;
       if (ticket != null) {
+        _openMapAfterBookingRequested = false;
+        _automation.openMapAfterBooking = false;
         unawaited(
           Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -1191,6 +1295,16 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         ),
       );
     } else if (actionType == 'share_location') {
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => SafetySharingPage(activeTicket: _activeTicket),
+          ),
+        ),
+      );
+    } else if (actionType == 'emergency_sos') {
+      // Push above the assistant instead of replacing it: Gemini's one live
+      // session stays mounted and resumes its microphone after the reply drains.
       unawaited(
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -1235,101 +1349,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
           icon: Icon(Icons.close, color: colors.textPrimary, size: 28),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // Horizontal scroll keeps the badge row reflow-safe at large text
-        // scales (real text, no FittedBox, no clamping).
-        title: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              const BusBuddyLogo(fontSize: 18),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colors.actionPrimary, colors.actionSecondary],
-                  ),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.auto_awesome,
-                      color: colors.onActionPrimary,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'GEMINI LIVE',
-                      style: TextStyle(
-                        color: colors.onActionPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _liveService.isLiveApiKeyConfigured
-                      ? colors.statusSuccess.withValues(alpha: 0.2)
-                      : colors.surface,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  border: Border.all(
-                    color: _liveService.isLiveApiKeyConfigured
-                        ? colors.statusSuccess
-                        : colors.textSecondary,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (AppSettingsController
-                        .instance
-                        .geminiApiKey
-                        .isNotEmpty) ...[
-                      Icon(Icons.bolt, size: 16, color: colors.statusSuccess),
-                      const SizedBox(width: 2),
-                    ],
-                    Text(
-                      AppSettingsController.instance.geminiApiKey.isNotEmpty
-                          ? 'GEMINI LIVE'
-                          : 'NOT CONNECTED',
-                      style: TextStyle(
-                        color:
-                            AppSettingsController
-                                .instance
-                                .geminiApiKey
-                                .isNotEmpty
-                            ? colors.statusSuccess
-                            : colors.textSecondary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.vpn_key, color: colors.actionSecondary, size: 22),
-            tooltip: 'Gemini Live API Settings',
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            onPressed: _showApiKeyDialog,
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -1363,20 +1382,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          AppSettingsController.instance.geminiApiKey.isEmpty
-                              ? Icons.vpn_key
-                              : Icons.check_circle_outline,
-                          color:
-                              AppSettingsController
-                                  .instance
-                                  .geminiApiKey
-                                  .isEmpty
-                              ? colors.actionSecondary
-                              : colors.statusSuccess,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             AppSettingsController.instance.geminiApiKey.isEmpty
@@ -1424,21 +1429,14 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
               ),
               const SizedBox(height: 10),
 
-              // Top Status & Spoken Output Box with TalkBack LiveRegion.
-              // Single-voice: the live region must NEVER carry the reply
-              // sentence. The reply is already spoken by our own PCM/TTS
-              // voice; a screen reader (TalkBack/ChromeVox) announcing the
-              // same sentence through its own voice produces exactly the
-              // "two voices saying the same words" double-audio report.
-              // Announce only the state transition; the full text stays a
-              // regular semantics node the user can navigate to on demand.
+              // Keep the response available to screen-reader users when they
+              // navigate to it, without announcing it automatically after the
+              // streamed Gemini voice has finished.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Semantics(
-                  liveRegion: true,
-                  label: _isSpeaking
-                      ? 'Gemini is speaking'
-                      : 'Gemini Live response ready',
+                  liveRegion: false,
+                  label: 'Gemini Live response',
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -1507,6 +1505,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         ),
                         const SizedBox(height: 8),
                         ExcludeSemantics(
+                          excluding: _isSpeaking,
                           child: Text(
                             _spokenOutput,
                             style: TextStyle(
@@ -1520,6 +1519,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                         if (_lastResponse?.displayText != null) ...[
                           Divider(color: colors.surface, height: 20),
                           ExcludeSemantics(
+                            excluding: _isSpeaking,
                             child: Text(
                               _lastResponse!.displayText,
                               style: TextStyle(
@@ -1614,6 +1614,7 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                                 _restartListenTimer?.cancel();
                                 setState(() {
                                   _isSpeaking = false;
+                                  _modelReplyInProgress = false;
                                 });
                               }
                               _startMicrophoneListening(playChimeTone: true);
@@ -1801,25 +1802,31 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                             ),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(
-                                _liveTranscription,
-                                style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                              child: ExcludeSemantics(
+                                excluding: _modelReplyInProgress,
+                                child: Text(
+                                  _liveTranscription,
+                                  style: TextStyle(
+                                    color: colors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         )
                       else
-                        Text(
-                          _liveTranscription,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: colors.textSecondary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        ExcludeSemantics(
+                          excluding: _modelReplyInProgress,
+                          child: Text(
+                            _liveTranscription,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: colors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                     ],
@@ -1851,14 +1858,6 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
                       ),
                       _buildPromptChip(
                         'Find a bus from VIT to Katpadi',
-                        maxWidth: constraints.maxWidth - AppSpacing.sm,
-                      ),
-                      _buildPromptChip(
-                        'How many stops left?',
-                        maxWidth: constraints.maxWidth - AppSpacing.sm,
-                      ),
-                      _buildPromptChip(
-                        'Share my location',
                         maxWidth: constraints.maxWidth - AppSpacing.sm,
                       ),
                       _buildPromptChip(
@@ -1974,6 +1973,8 @@ class _GeminiLiveScreenState extends State<GeminiLiveScreen>
         return 'View Available Buses';
       case 'share_location':
         return 'Share Location with Contacts';
+      case 'emergency_sos':
+        return 'Review emergency location share';
       case 'customize_home':
         return 'Customize Home Screen';
       case 'reset_home':
@@ -2060,19 +2061,13 @@ class _GeminiSetupDialogState extends State<_GeminiSetupDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       ),
-      title: Row(
-        children: [
-          Icon(Icons.auto_awesome, color: colors.actionSecondary, size: 24),
-          const SizedBox(width: 10),
-          Text(
-            'Gemini Multimodal Live Setup',
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+      title: Text(
+        'Gemini Multimodal Live Setup',
+        style: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
       ),
       content: SingleChildScrollView(
         child: Column(

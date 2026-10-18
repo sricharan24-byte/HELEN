@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../alerts/alerts_page.dart';
 import '../safety/safety_sharing_page.dart';
@@ -30,11 +29,7 @@ class MorePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: colors.background,
         elevation: 0,
-        title: const BusBuddyLogo(
-          fontSize: 20,
-          subtitle: 'Safety, alerts, and settings',
-          crossAxisAlignment: CrossAxisAlignment.start,
-        ),
+        title: const Text('More'),
       ),
       body: SafeArea(
         child: ListView(

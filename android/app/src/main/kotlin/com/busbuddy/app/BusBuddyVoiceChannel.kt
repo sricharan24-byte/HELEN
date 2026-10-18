@@ -44,12 +44,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  * `AudioTrack` — 24 kHz mono PCM16 Gemini Live output, played in the
  *    `VOICE_COMMUNICATION` stream so the device's hardware echo canceller is
  *    active while the assistant talks and the microphone stays open.
- *  * `TextToSpeech` — device text-to-speech for spoken replies and the chime
- *    fallback when a reply is plain text rather than model audio.
+ *  * `TextToSpeech` — auxiliary device announcements and a chime fallback.
+ *    Gemini Live replies use streamed model PCM through `AudioTrack`.
  *
  * Method channel: `busbuddy/voice`
  *  hasMicPermission / requestMicPermission / startMic / stopMic /
- *  startPlayback / writePlayback / stopPlayback / speakTts / stopTts /
+ *  startPlayback / writePlayback / finishPlayback / stopPlayback / speakTts / stopTts /
  *  playTone / dispose
  */
 class BusBuddyVoiceChannel(
@@ -86,12 +86,14 @@ class BusBuddyVoiceChannel(
     private val recording = AtomicBoolean(false)
     private var micSink: EventChannel.EventSink? = null
 
+    @Volatile
     private var audioTrack: AudioTrack? = null
     private val queuedBytes = ArrayDeque<ByteArray>()
     private val playbackActive = AtomicBoolean(false)
     private var totalFramesWritten = 0L
     private var lastWriteNanos = 0L
     private var drainNotice: Runnable? = null
+    private var playbackTurnEnded = false
 
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
@@ -149,6 +151,11 @@ class BusBuddyVoiceChannel(
                 if (!encoded.isNullOrEmpty()) {
                     queuePlayback(decodeBase64(encoded))
                 }
+                result.success(true)
+            }
+            "finishPlayback" -> {
+                synchronized(queuedBytes) { playbackTurnEnded = true }
+                scheduleDrainNotice()
                 result.success(true)
             }
             "stopPlayback" -> {
@@ -337,6 +344,7 @@ class BusBuddyVoiceChannel(
     private fun decodeBase64(value: String): ByteArray =
         Base64.decode(value, Base64.NO_WRAP)
 
+    @Synchronized
     private fun ensureTrack(): AudioTrack {
         audioTrack?.let { return it }
         val attributes = AudioAttributes.Builder()
@@ -359,15 +367,17 @@ class BusBuddyVoiceChannel(
             .setBufferSizeInBytes(minBuffer * 2)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-        track.play()
         audioTrack = track
         totalFramesWritten = 0
         return track
     }
 
     private fun queuePlayback(chunk: ByteArray) {
-        synchronized(queuedBytes) { queuedBytes.addLast(chunk) }
-        cancelDrainNotice()
+        synchronized(queuedBytes) {
+            queuedBytes.addLast(chunk)
+            playbackTurnEnded = false
+            cancelDrainNotice()
+        }
         ensurePlaybackThread()
     }
 
@@ -389,8 +399,12 @@ class BusBuddyVoiceChannel(
                 Log.w(TAG, "Playback write failed", error)
             } finally {
                 playbackActive.set(false)
-                if (playbackActive.get()) {
-                    // A chunk landed while the loop was exiting; restart it.
+                val hasQueuedAudio = synchronized(queuedBytes) {
+                    queuedBytes.isNotEmpty()
+                }
+                if (hasQueuedAudio) {
+                    // A chunk landed as the worker was exiting. Restart after
+                    // dropping the active flag so the final PCM is not stranded.
                     ensurePlaybackThread()
                 } else {
                     scheduleDrainNotice()
@@ -401,11 +415,33 @@ class BusBuddyVoiceChannel(
 
     private fun writeChunk(chunk: ByteArray) {
         val track = ensureTrack()
-        val written = track.write(chunk, 0, chunk.size, AudioTrack.WRITE_BLOCKING)
-        if (written > 0) {
+        var offset = 0
+        while (offset < chunk.size) {
+            // Prime with one bounded segment before starting playback. Writing
+            // a full oversized server chunk with WRITE_BLOCKING to a stopped
+            // track could otherwise fill its buffer and wait forever.
+            val writeSize = if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                chunk.size - offset
+            } else {
+                minOf(MIC_BYTES_PER_CHUNK, chunk.size - offset)
+            }
+            val written = track.write(
+                chunk,
+                offset,
+                writeSize,
+                AudioTrack.WRITE_BLOCKING,
+            )
+            if (written <= 0) {
+                Log.w(TAG, "Playback write returned $written; dropping remaining PCM")
+                break
+            }
+            offset += written
             totalFramesWritten += written / 2L
-            lastWriteNanos = System.nanoTime()
+            if (track.playState != AudioTrack.PLAYSTATE_PLAYING) track.play()
         }
+        if (offset > 0) lastWriteNanos = System.nanoTime()
+        // Starting only after the first bounded PCM segment prevents an empty
+        // streaming track from consuming silence before audio lands.
     }
 
     /** Milliseconds of audio still sitting in the AudioTrack buffer. */
@@ -417,16 +453,29 @@ class BusBuddyVoiceChannel(
     }
 
     private fun scheduleDrainNotice() {
-        if (drainNotice != null) return
-        if (lastWriteNanos == 0L) return
-        val remaining = (pendingPlaybackMs() + 140L).coerceAtMost(8000L)
-        val notice = Runnable {
-            drainNotice = null
-            lastWriteNanos = 0L
-            notifyEvent("onPlaybackDrained")
+        synchronized(queuedBytes) {
+            if (playbackActive.get() || queuedBytes.isNotEmpty()) return
+            if (!playbackTurnEnded) return
+            if (drainNotice != null || lastWriteNanos == 0L) return
+            val remaining = (pendingPlaybackMs() + 140L).coerceAtMost(8000L)
+            val notice = Runnable {
+                val drained = synchronized(queuedBytes) {
+                    drainNotice = null
+                    if (!playbackTurnEnded || playbackActive.get() || queuedBytes.isNotEmpty()) {
+                        false
+                    } else if (pendingPlaybackMs() > 0L) {
+                        scheduleDrainNotice()
+                        false
+                    } else {
+                        lastWriteNanos = 0L
+                        true
+                    }
+                }
+                if (drained) notifyEvent("onPlaybackDrained")
+            }
+            drainNotice = notice
+            mainHandler.postDelayed(notice, remaining)
         }
-        drainNotice = notice
-        mainHandler.postDelayed(notice, remaining)
     }
 
     private fun cancelDrainNotice() {
@@ -437,7 +486,10 @@ class BusBuddyVoiceChannel(
     /** Barge-in: drop everything queued plus whatever the track is playing. */
     private fun stopPlayback(notify: Boolean) {
         playbackActive.set(false)
-        synchronized(queuedBytes) { queuedBytes.clear() }
+        synchronized(queuedBytes) {
+            queuedBytes.clear()
+            playbackTurnEnded = true
+        }
         cancelDrainNotice()
         audioTrack?.let {
             try {
@@ -453,6 +505,7 @@ class BusBuddyVoiceChannel(
         if (notify) notifyEvent("onPlaybackDrained")
     }
 
+    @Synchronized
     private fun releaseTrack() {
         try {
             audioTrack?.stop()
@@ -487,7 +540,9 @@ class BusBuddyVoiceChannel(
             pendingLanguage = language
             pendingRate = rate
             pendingTtsResult = result
-            if (engine == null) initTtsIfNeeded() else result.success(false)
+            // If TextToSpeech is already initializing, its onInit callback
+            // owns this pending reply. Answering here would submit it twice.
+            if (engine == null) initTtsIfNeeded()
             return
         }
         result.success(speakNow(engine, clean, language, rate))

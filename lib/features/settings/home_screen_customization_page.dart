@@ -5,7 +5,6 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../../data/models/home_screen_item.dart';
 
 /// Screen allowing commuters to reorder, show, hide, and reset
@@ -45,6 +44,7 @@ class _HomeScreenCustomizationPageState
     AnnouncementCoordinator.instance.announce(
       'Home screen layout reset to default order and all cards restored.',
       priority: AnnouncementPriority.normal,
+      speak: false,
     );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -61,6 +61,7 @@ class _HomeScreenCustomizationPageState
       AnnouncementCoordinator.instance.announce(
         '${item.title} moved up to position $index of ${_settings.homeScreenItems.length}',
         priority: AnnouncementPriority.normal,
+        speak: false,
       );
     }
   }
@@ -71,6 +72,7 @@ class _HomeScreenCustomizationPageState
       AnnouncementCoordinator.instance.announce(
         '${item.title} moved down to position ${index + 2} of ${_settings.homeScreenItems.length}',
         priority: AnnouncementPriority.normal,
+        speak: false,
       );
     }
   }
@@ -80,6 +82,7 @@ class _HomeScreenCustomizationPageState
     AnnouncementCoordinator.instance.announce(
       '${item.title} is now ${isVisible ? "visible" : "hidden"} on home screen',
       priority: AnnouncementPriority.normal,
+      speak: false,
     );
   }
 
@@ -107,10 +110,7 @@ class _HomeScreenCustomizationPageState
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: const BusBuddyLogo(
-          fontSize: 20,
-          subtitle: 'Customize Home Screen',
-        ),
+        title: const Text('Customize Home'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -225,6 +225,7 @@ class _HomeScreenCustomizationPageState
                       AnnouncementCoordinator.instance.announce(
                         'Card reordered',
                         priority: AnnouncementPriority.low,
+                        speak: false,
                       );
                     },
                     itemBuilder: (context, index) {
@@ -279,6 +280,7 @@ class _HomeScreenCustomizationPageState
                         AnnouncementCoordinator.instance.announce(
                           'Home screen layout saved.',
                           priority: AnnouncementPriority.normal,
+                          speak: false,
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

@@ -32,7 +32,8 @@ with concession fares, emergency safety sharing, and Gemini Live natural-languag
 - **5 official Google voices** — `Aoede` (default), `Kore`, `Charon`, `Puck`, `Fenrir` — via Voice
   Assistant Settings or `--dart-define=GEMINI_VOICE`.
 - **Continuous hands-free listening**: auto-restart on silence (web), stream kept open across turns
-  (Android) with barge-in/interruption support.
+  (Android) with barge-in/interruption support. Microphone failures never end silently: the screen
+  shows the browser's own reason and the input devices it can actually see.
 - **Natural transit answers**: tool calls execute in the background; the assistant never reads raw
   function names or JSON aloud.
 - **Single-speaker output**: model audio when Gemini streams it; device TTS only for audio-less
@@ -183,6 +184,15 @@ flutter test
      ```
      *(The key and voice persona can also be set interactively in Voice Assistant Settings; the
      key is never written to disk.)*
+   - If Chrome fails to attach (`Failed to launch browser after 3 tries`, typical on a loaded
+     machine), the reliable fallback is `flutter run -d web-server --web-port=8080`, then open
+     `http://localhost:8080` — hard-refresh (Ctrl+Shift+R) after a rebuild.
+   - On an Android phone (sideload — debug-signed unless a release keystore is configured):
+     ```bash
+     flutter build apk --release --dart-define=GEMINI_API_KEY=your_key
+     ```
+     *APK at `build/app/outputs/flutter-apk/app-release.apk`; without the `--dart-define` the key
+     is entered in the app instead.*
    - On Linux desktop:
      ```bash
      flutter run -d linux

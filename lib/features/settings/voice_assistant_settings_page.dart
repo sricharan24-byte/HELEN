@@ -14,7 +14,6 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 
 /// Voice Assistant settings page matching BusBuddy UI design screenshot 3.
 class VoiceAssistantSettingsPage extends StatefulWidget {
@@ -324,7 +323,7 @@ class _VoiceAssistantSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const BusBuddyLogo(fontSize: 20, subtitle: 'Voice Assistant'),
+        title: const Text('Voice Assistant'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -468,6 +467,7 @@ class _VoiceAssistantSettingsPageState
                             val
                                 ? 'Wake phrase "Hey BusBuddy" enabled'
                                 : 'Wake phrase disabled',
+                            speak: false,
                           );
                         },
                       ),
@@ -1039,6 +1039,7 @@ class _VoiceAssistantSettingsPageState
                               'recent trips may be shared with Gemini during '
                               'bookings.'
                         : 'Booking personalization disabled.',
+                    speak: false,
                   );
                 },
               ),

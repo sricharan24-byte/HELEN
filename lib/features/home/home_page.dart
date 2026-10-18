@@ -358,50 +358,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Greeting Banner ──────────────────────────────────────
-                  Row(
-                    children: [
-                      Icon(
-                        hasActiveTicket
-                            ? Icons.wb_sunny_outlined
-                            : Icons.waving_hand_outlined,
-                        color: hasActiveTicket
-                            ? colors.statusWarning
-                            : colors.actionSecondary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              hasActiveTicket
-                                  ? 'Good morning, Pavan!'
-                                  : 'Good morning!',
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              hasActiveTicket
-                                  ? "Here's your journey today."
-                                  : 'What would you like to do?',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
                   // ── Adaptive UI Suggested Shortcuts Carousel ────────────
                   AdaptiveShortcutsView(
                     onExecuteShortcut: _handleAdaptiveShortcut,
@@ -697,53 +653,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ...customCards,
                     const SizedBox(height: 10),
                   ],
-
-                  // ── Footer ───────────────────────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.eco_outlined,
-                              color: colors.textMuted,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'More Accessible Cities',
-                                    style: TextStyle(
-                                      color: colors.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    'for a Brighter Tomorrow',
-                                    style: TextStyle(
-                                      color: colors.textMuted,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.directions_bus_filled_outlined,
-                        color: colors.border,
-                        size: 32,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
                 ],
               ),
             ),

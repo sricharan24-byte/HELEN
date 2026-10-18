@@ -6,9 +6,10 @@
 > git history has every revision. Keep new entries short:
 > date · what landed · commits · verification · what is still **not verified**.
 
-**Last verified state — 2026-10-18**: `flutter analyze` clean · `flutter test` **475/475 green**
-(docs compacted after the last code change `d0e866a`; nothing but docs since) ·
-`tool/ci/verify_docs.sh` passed.
+**Last verified state — 2026-10-18**: `flutter analyze` clean · `flutter test` **476/476 green**
+(from the earlier web microphone fix; not rerun after the audio ordering change) · Android debug
+APK built, installed and launched on the connected phone. Gemini audio quality still needs the
+passenger's on-device confirmation.
 
 ## ⚠️ Open / unverified items — do not claim otherwise
 
@@ -17,18 +18,77 @@
   the tool after booking intent and honoring the returned context.
 - **Model-audio playback** ("natural voice") with a live Gemini session — the wire path and both
   bridges are unit-tested; audibility unverified (ADR-004 §3.1, §3.4, §3.5).
-- **Android voice round trip** — mic permission dialog on a real device, audio-in → reply,
-  hardware echo cancellation, TalkBack: all need a physical device + valid key (ADR-004 §3.1).
-  The 2026-09-30 API 34 emulator run proved build/install/permission-contract/honest-failure
-  paths only (no working TTS engine, no hardware AEC, no TalkBack).
-- **Android mic capture device round trip** (2026-10-09 startup-handoff fix) — no usable Android
-  build in this environment.
+- **Android voice round trip** — debug build installed and launched on a physical Samsung phone;
+  live Gemini audio quality, spoken-question round trip, hardware echo cancellation and TalkBack
+  have not yet been confirmed with a valid key and passenger listening (ADR-004 §§3.1, 3.7).
+- **Android mic capture round trip** (2026-10-09 startup-handoff fix) — the app now runs on a
+  physical device, but a live mic + valid-key session still needs confirmation.
+- **Release APK never installed** — built 2026-10-18 (universal, debug-signed); no phone was
+  connected, so install, launch and on-device voice are unverified.
 - **Web** — Chrome *granted-permission* → spoken question → reply round trip still pending a
-  real-profile retest (2026-10-11).
+  real-profile retest (2026-10-11; the 2026-10-18 churn fix reproduced the failure signature and
+  fixed it headlessly, but the fixed path has not yet run with a real mic + key).
 - **Mobile-UI plan Task 4** — rendered visual pass at 360×800 / 390×844; no screenshot pipeline
   here.
 
 ## 🛠️ Sessions — newest first
+
+### 2026-10-18 — Gemini Live PCM stutter repair
+
+- Fixed a Dart ordering race: later PCM chunks could reach Android before the first chunk, which
+  waited for `startPlayback`. Native drain events also treated temporary gaps between chunks as
+  the end of Gemini's reply, risking an early microphone resume. PCM writes now serialize; the
+  screen sends `finishPlayback` at `turnComplete`; Android drains only after that marker, an empty
+  queue and a caught-up `AudioTrack` playback head. The prior Android worker/partial-write fixes
+  remain in place.
+- **Verification**: `flutter analyze` clean · debug APK built, installed and app relaunched on the
+  connected phone. Automated tests were not rerun. **Still needs the passenger's ears**: live
+  Gemini audio smoothness on-device.
+
+### 2026-10-18 — Gemini voice overlap and map request repair
+
+- Kept offline TTS muted throughout `GeminiLiveScreen`; text-only replies remain visible and
+  continuous listening resumes without waiting for a TTS callback. Gemini PCM remains the only
+  spoken reply source.
+- Capture explicit map requests from typed input and Gemini's spoken-input transcription, carry
+  them across missing booking details, and pass them through checkout; live map navigation still
+  waits for ticket creation. A direct tracking request without an active ticket now says why it
+  opens booking.
+- **Verification**: `dart format` · `flutter analyze --no-pub` clean · debug APK built. Automated
+  tests and physical-device audio/map behavior were not run/verified.
+
+### 2026-10-18 — Web microphone churn fixed (reported: mic "turns on for a sec and stops")
+
+- **Reproduced** headlessly in Chrome against this repo's own bridge JS: `onstart` → Chrome
+  `audio-capture` ~10 ms later → the screen threw the reason away and restarted silently every
+  ~150 ms → stopped with the generic "I couldn't hear anything". The reported signature exactly.
+- **Bug 1 (the dead microphone):** `onEnd`'s silent branch never cleared `_isListening`, so
+  `_scheduleRestartListening`'s `!_isListening` guard swallowed every restart — on the web the
+  mic closed after the first silent cycle while the screen still claimed "Listening…", and the
+  3-silent-cycles stop was unreachable. The flag now drops with capture.
+- **Bug 2 (the swallowed reason):** a named failure (`audio-capture`, `network`,
+  `service-not-allowed`) now stops the loop and shows Chrome's own message plus
+  `Chrome's input devices: …`; `onEnd` can no longer overwrite it. Bridge **v12** adds
+  `__bb_input_devices` (refreshed at install/start/error).
+- **Verification**: `flutter analyze` clean · `flutter test` **476/476 green** · extracted bridge
+  JS `node --check` clean and exercised in headless Chrome (real earphone mic → healthy 8 s
+  `no-speech` cycles; monitor source → honest `audio-capture` + device list).
+  **Not verified**: the real-profile Chrome voice round trip (needs the user's mic + key).
+- Written up in **ADR-004 §3.6**; the invariants are pinned in `AGENTS.md` (*Microphone
+  honesty*) and in `voice_session_lifecycle_test.dart`.
+
+### 2026-10-18 — Installable release APK built
+
+- Android SDK licenses accepted (`yes | flutter doctor --android-licenses`) — the Android toolchain
+  then reported ✓, which was the build blocker.
+- `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk` (universal;
+  sha256 `fc671f71…`, 54 MB, 2026-10-18 15:40). Debug-signed — no release keystore is configured,
+  fine for sideloading, not for Play. No Gemini key is baked in (the key is never persisted), so a
+  permanent key needs `--dart-define=GEMINI_API_KEY=…` at build time. `build/` is gitignored, so
+  the artifact is not in the repo.
+- Older APKs in `build/` (2026-10-09) are stale — do not install those.
+- **Not verified**: no phone was connected, so the APK has never been installed or launched on a
+  device. Smaller per-device builds (`--split-per-abi`, arm64 ≈ 20 MB) are one command away.
 
 ### 2026-10-18 — Docs compacted for token cost
 

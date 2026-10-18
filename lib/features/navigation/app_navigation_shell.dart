@@ -8,17 +8,10 @@ import '../../data/repositories/transport_repository.dart';
 import '../home/home_page.dart';
 import '../journey/journey_controller.dart';
 import '../route_details/route_details_page.dart';
-import '../tickets/my_tickets_page.dart';
-import '../tickets/ticket_booking_suite_page.dart';
 import '../tickets/ticket_controller.dart';
-import 'more_page.dart';
 
-/// Four-destination shell (Home / Plan / Tickets / More).
-///
-/// Each destination owns a nested [Navigator], so detail pages open inside the
-/// selected destination's stack, tab switching preserves in-progress state, and
-/// system Back pops the active stack first, then returns to Home, and exits
-/// only from the Home root.
+/// Home-root shell. Feature pages stay on one nested stack so
+/// system Back returns to Home and exits only from the root.
 class AppNavigationShell extends StatefulWidget {
   const AppNavigationShell({
     super.key,
@@ -36,32 +29,10 @@ class AppNavigationShell extends StatefulWidget {
 }
 
 class _AppNavigationShellState extends State<AppNavigationShell> {
-  static const int _homeIndex = 0;
-  static const int _planIndex = 1;
-  static const int _ticketsIndex = 2;
-  static const int _moreIndex = 3;
-
-  final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(
-    4,
-    (_) => GlobalKey<NavigatorState>(),
-  );
-
-  /// One observer per destination — the framework asserts a
-  /// [NavigatorObserver] is attached to a single Navigator.
-  late final List<_ShellNavigatorObserver> _navigatorObservers = List.generate(
-    4,
-    (_) => _ShellNavigatorObserver(_onRouteChanged),
-  );
-
-  /// Destinations build on first visit; the [IndexedStack] then keeps their
-  /// navigator (and its state) alive for the rest of the session, so a booking
-  /// form or ticket tab is never recreated by switching tabs.
-  final Set<int> _visited = {_homeIndex};
-  int _selectedIndex = _homeIndex;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final _ShellNavigatorObserver _navigatorObserver =
+      _ShellNavigatorObserver(_onRouteChanged);
   bool _navigationRefreshScheduled = false;
-
-  GlobalKey<NavigatorState> get _activeNavigatorKey =>
-      _navigatorKeys[_selectedIndex];
 
   void _onRouteChanged() {
     if (!mounted || _navigationRefreshScheduled) return;
@@ -93,7 +64,7 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
 
     widget.controller.selectRoute(route);
     unawaited(
-      _navigatorKeys[_homeIndex].currentState?.push(
+      _navigatorKey.currentState?.push(
         MaterialPageRoute<void>(
           builder: (_) => RouteDetailsPage(
             controller: widget.controller,
@@ -104,135 +75,31 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
     );
   }
 
-  Future<void> _handleBack() async {
-    final navigator = _activeNavigatorKey.currentState;
-    if (navigator != null && navigator.canPop()) {
-      await navigator.maybePop();
-      return;
-    }
-    if (_selectedIndex != _homeIndex) {
-      setState(() => _selectedIndex = _homeIndex);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
-    final activeCanPop = _activeNavigatorKey.currentState?.canPop() ?? false;
+    final canPop = _navigatorKey.currentState?.canPop() ?? false;
 
     return PopScope<Object?>(
-      canPop: !activeCanPop && _selectedIndex == _homeIndex,
+      canPop: !canPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_handleBack());
+        if (!didPop) unawaited(_navigatorKey.currentState?.maybePop());
       },
       child: Scaffold(
         backgroundColor: colors.background,
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _destination(
-              _homeIndex,
-              (_) => HomePage(
-                controller: widget.controller,
-                repository: widget.repository,
-                ticketController: widget.ticketController,
-                onRouteSelected: _showRouteDetails,
-              ),
-            ),
-            _destination(
-              _planIndex,
-              (_) => TicketBookingSuitePage(
-                ticketController: widget.ticketController,
-                journeyController: widget.controller,
-                showBackButton: false,
-              ),
-            ),
-            _destination(
-              _ticketsIndex,
-              (_) => MyTicketsPage(
-                ticketController: widget.ticketController,
-                repository: widget.repository,
-                showBackButton: false,
-              ),
-            ),
-            _destination(
-              _moreIndex,
-              (_) => MorePage(
-                repository: widget.repository,
-                ticketController: widget.ticketController,
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: colors.border)),
-          ),
-          child: NavigationBarTheme(
-            data: NavigationBarThemeData(
-              backgroundColor: colors.surface,
-              elevation: 0,
-              indicatorColor: colors.actionPrimary.withValues(alpha: 0.16),
-              iconTheme: WidgetStateProperty.resolveWith(
-                (states) => IconThemeData(
-                  color: states.contains(WidgetState.selected)
-                      ? colors.actionPrimary
-                      : colors.textSecondary,
-                ),
-              ),
-              labelTextStyle: WidgetStateProperty.resolveWith(
-                (states) => TextStyle(
-                  color: states.contains(WidgetState.selected)
-                      ? colors.actionPrimary
-                      : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            child: NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (index) {
-                if (index == _selectedIndex) return;
-                setState(() {
-                  _selectedIndex = index;
-                  _visited.add(index);
-                });
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.directions_bus_outlined),
-                  selectedIcon: Icon(Icons.directions_bus),
-                  label: 'Plan',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.confirmation_number_outlined),
-                  selectedIcon: Icon(Icons.confirmation_number),
-                  label: 'Tickets',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.more_horiz),
-                  label: 'More',
-                ),
-              ],
+        body: Navigator(
+          key: _navigatorKey,
+          observers: [_navigatorObserver],
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => HomePage(
+              controller: widget.controller,
+              repository: widget.repository,
+              ticketController: widget.ticketController,
+              onRouteSelected: _showRouteDetails,
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _destination(int index, WidgetBuilder builder) {
-    if (!_visited.contains(index)) return const SizedBox.shrink();
-    return Navigator(
-      key: _navigatorKeys[index],
-      observers: [_navigatorObservers[index]],
-      onGenerateRoute: (_) => MaterialPageRoute<void>(builder: builder),
     );
   }
 }

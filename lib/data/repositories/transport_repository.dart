@@ -207,3 +207,12 @@ class LocalTransportRepository implements TransportRepository, AsyncDisposable {
     _activeEngines.clear();
   }
 }
+
+/// Shared local bus choices for any repository implementation. Unknown route
+/// IDs return no options, so callers cannot invent a fallback bus or ETA.
+extension TransportRepositoryBusOptions on TransportRepository {
+  List<BusDepartureOption> availableBusesForRoute(String routeId) =>
+      allRoutes.any((route) => route.id == routeId)
+      ? BusDepartureOption.demoOptions
+      : const [];
+}

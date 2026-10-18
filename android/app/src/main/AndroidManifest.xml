@@ -5,15 +5,13 @@
          INTERNET backs OpenStreetMap tile loading, OSRM route requests, and the
          Gemini Live WebSocket.
 
-         Deliberately removed (no matching native capability consumes them — the
-         dependency tree has no geolocator/permission_handler plugin, and location
-         is fixture-based):
-           - ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
-
-         Re-add a permission only together with a just-in-time runtime request, a
-         contextual purpose rationale shown before the system prompt, and an
-         accessible denial fallback (see docs/audit BUS-P2-01, docs/adr/ADR-004). -->
+         ACCESS_COARSE_LOCATION and ACCESS_FINE_LOCATION support only the
+         foreground, one-shot phone-location share in BusBuddyLocationShareChannel.
+         They are requested only after the passenger chooses Share Location or
+         confirms SOS, after an in-app explanation. No background location is used. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- BUS-P2-01 update (ADR-004, native full-duplex voice): RECORD_AUDIO is now
          backed by a real capability — android.media.AudioRecord in

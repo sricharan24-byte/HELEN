@@ -7,7 +7,6 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../adaptive_ui/adaptive_shortcuts_modal.dart';
 import '../adaptive_ui/adaptive_ui_service.dart';
 import '../ai_assistant/gemini_live_screen.dart';
@@ -157,7 +156,7 @@ class _PersonalizationSettingsPageState
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const BusBuddyLogo(fontSize: 20, subtitle: 'Personalization'),
+        title: const Text('Personalization'),
         centerTitle: true,
       ),
       body: SafeArea(

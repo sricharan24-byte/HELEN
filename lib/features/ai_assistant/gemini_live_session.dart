@@ -72,7 +72,7 @@ class GeminiLiveSession {
 
   /// Live API wire format for streamed microphone audio: 16 kHz mono PCM16,
   /// which is exactly what `BusBuddyVoiceChannel` captures.
-  static const String inputAudioMime = 'audio/pcm; rate=16000';
+  static const String inputAudioMime = 'audio/pcm;rate=16000';
 
   /// Streams one microphone chunk into the live turn (`realtimeInput`).
   ///
@@ -88,9 +88,7 @@ class GeminiLiveSession {
     _transport?.send(
       jsonEncode({
         'realtimeInput': {
-          'mediaChunks': [
-            {'mimeType': inputAudioMime, 'data': base64Pcm},
-          ],
+          'audio': {'mimeType': inputAudioMime, 'data': base64Pcm},
         },
       }),
     );
@@ -125,12 +123,9 @@ class GeminiLiveSession {
       final uri = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=$trimmed',
       );
-      final res = await http.get(
-        uri,
-        headers: {
-          'x-goog-api-key': trimmed,
-        },
-      ).timeout(const Duration(seconds: 10));
+      final res = await http
+          .get(uri, headers: {'x-goog-api-key': trimmed})
+          .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) return null;
       return 'Gemini API error (${res.statusCode}): ${_shortBody(res.body)}';
     } on TimeoutException {
@@ -152,23 +147,25 @@ class GeminiLiveSession {
 
 CRITICAL CONVERSATIONAL RULES:
 1. Speak in a warm, relaxed, human tone like a friendly local transit companion.
-2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "set_trip", "select_bus", "set_passenger", "set_payment", "confirm_booking", "function_call", "toolResponse", or "executing").
+2. NEVER mention or say aloud technical function, tool, or code names (NEVER say "track_bus", "book_ticket", "search_route", "emergency_sos", "set_trip", "select_bus", "set_passenger", "set_payment", "prepare_booking", "confirm_booking", "function_call", "toolResponse", or "executing").
 3. When triggering or confirming an action, phrase your response in natural, conversational English (e.g., "I've pulled up the live bus tracker for you!", "Here is the ticket booking screen.", "Let me check the buses to Katpadi for you.").
 4. Keep spoken responses concise and natural (1 to 2 sentences). Do NOT output markdown, bullet points, asterisks, or system logs.
-5. Key transit facts: General bus fare is ₹20. Student and senior citizen concession fare is ₹12 (40% discount). Main stops: VIT Main Gate, Green Circle, New Bus Stand, Katpadi Railway Station. Frequent buses: Bus 18B, Bus 12A.
+5. Key transit facts: fares shown in the app are demo fares. Main stops include VIT Main Gate, Green Circle, Vellore Fort, and Katpadi Railway Station. Bus arrival times from the local booking list are demo estimates, never live departures.
 6. CONFIRMABLE COMMAND SAFETY GATEWAY (Astra BUS-P0-05): For safety-critical or financial actions (Emergency SOS, location sharing, booking tickets), explain that you are opening the confirmation gateway screen for the passenger to review and confirm. NEVER claim or speak as if an emergency was already broadcast or payment was already taken until confirmed by the user.
 7. VOICE TASK AGENT - BOOK TICKET FLOW (Live function calling):
-   - To book, chain: set_trip(origin, destination) -> select_bus(busId) -> set_passenger(type, name?) -> set_payment(method) -> confirm_booking().
-   - Fill slots from the user's words; ask naturally for anything missing (e.g. "Which bus — 18B in 4 min or 12A in 12 min?", "Student, senior or general?", "UPI, card or wallet?").
-   - Default corridor is VIT Main Gate to Katpadi Railway Station when the user says "Katpadi" without detail.
-   - confirm_booking only OPENS the review screen; payment happens only after the passenger taps confirm.
-   - PAYMENT BEHAVIOUR: wallet is settled automatically inside the app the moment confirm_booking runs — no payment screen appears, so once the tool result says draftComplete you may tell the passenger their ticket is booked and paid. UPI and card open the payment review widget, where the passenger confirms on screen — do not claim those payments are done until the passenger has confirmed there.
+   - For one utterance containing multiple booking details, call prepare_booking once with the stated origin, destination, busPreference/busId, passengerType, passengerName, paymentMethod, and openMapAfterBooking choice. Use the step-by-step setters only for follow-up turns.
+   - Only infer the exact known speech alias "Bello Fort" as "Vellore Fort". For every other unknown or ambiguous stop, ask which stop the passenger means; never choose a partial search result.
+   - For busPreference "earliest", the app chooses the smallest ETA from the options available for the verified route. These ETAs are demo estimates and not live arrivals. Never invent a bus or time.
+   - Passenger name, type, route, bus, and payment are all required before checkout. A draft-ready result means only that checkout can open.
+   - confirm_booking opens the review/checkout flow. A ticket is booked only after the app confirms ticket creation. The current ticket and Wallet flow are demos: no real payment provider or wallet debit is connected. Never say real money was paid.
+   - If the passenger asks to open, show, or view the map and an active ticket exists, call track_bus. If they ask to open the map after a new booking, set openMapAfterBooking to true in prepare_booking.
+   - If the passenger requested the map, open it only after the app has actually created the ticket; otherwise remain in the booking flow.
 8. BOOKING CONTEXT (personalization):
    - Only once a booking intent is clear, call get_booking_context (no arguments, at most once per booking attempt) to load the passenger's saved preferences, saved places, recent trips, and the current draft.
    - Use the returned context ONLY within this booking: greet by preferred name if present, prefill the saved default passenger type, and treat saved places and recent trips as SUGGESTIONS — say where a suggestion came from ("from your saved places" / "from your recent trips") and get the passenger's OK before using it. Never treat a suggestion as a confirmed choice.
    - The draft shows which values the passenger chose versus defaults or suggestions: ask about anything defaulted or ambiguous, and restate corrections after they are applied.
    - If the passenger opted out (no profile fields returned), run the plain generic booking flow without mentioning preferences or history.
-   - Never claim a booking or payment is complete, never invent schedules, GPS positions, or seat availability that the context did not give you. Never reveal, repeat, or list the raw context contents aloud — use it silently to ask better questions.''';
+   - Never treat draftComplete or checkout_pending as a ticket, booking, or payment success. Never claim a booking or payment is complete until a ticket-created result is explicitly returned, never invent schedules, GPS positions, or seat availability that the context did not give you. Never reveal, repeat, or list the raw context contents aloud — use it silently to ask better questions.''';
 
   static String _resolveLiveModel(String requested) {
     var model = requested.trim();
@@ -465,7 +462,9 @@ CRITICAL CONVERSATIONAL RULES:
         // Input transcription: what the passenger just said. Parsed only when
         // the session reports it (it is requested on audio-in sessions), and
         // used purely for the on-screen "I heard you say" line.
-        final userTrans = serverContent['inputTranscription'];
+        final userTrans =
+            serverContent['inputTranscription'] ??
+            serverContent['interimInputTranscription'];
         if (userTrans is Map<String, dynamic>) {
           final text = userTrans['text'];
           if (text is String && text.isNotEmpty) {
@@ -523,7 +522,8 @@ CRITICAL CONVERSATIONAL RULES:
         }
 
         // Turn complete
-        if (serverContent['turnComplete'] == true) {
+        if (serverContent['turnComplete'] == true &&
+            !data.containsKey('toolCall')) {
           debugPrint('[GeminiLive] Turn complete: "$_currentTurnText"');
           onTurnComplete?.call(_currentTurnText, _currentTurnAction);
         }
@@ -563,6 +563,11 @@ CRITICAL CONVERSATIONAL RULES:
             };
             _transport?.send(jsonEncode(toolResponse));
             debugPrint('[GeminiLive] Sent toolResponse frame');
+            // The next assistant message is the user-facing answer after the
+            // tool result. Keep it separate from any tool-protocol text so it
+            // can use the normal single-voice fallback policy.
+            _currentTurnText = '';
+            _currentTurnAction = null;
           }
         }
       }
@@ -593,13 +598,11 @@ CRITICAL CONVERSATIONAL RULES:
     Map<String, Object?> output;
     try {
       final result = onToolCall?.call(name, args);
-      output = result ??
+      output =
+          result ??
           (meta != null
               ? AssistantCommandGateway.buildToolResponseContext(name, args)
-              : const {
-                  'success': false,
-                  'error': 'Unknown tool',
-                });
+              : const {'success': false, 'error': 'Unknown tool'});
     } catch (e) {
       debugPrint('[GeminiLive] Tool $name callback failed: $e');
       output = {'success': false, 'error': 'Tool unavailable'};

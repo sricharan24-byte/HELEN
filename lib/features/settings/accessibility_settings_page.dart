@@ -8,7 +8,6 @@ import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
-import '../../core/widgets/bus_buddy_logo.dart';
 import '../ai_assistant/gemini_live_screen.dart';
 import '../../data/repositories/transport_repository.dart';
 import '../tickets/ticket_controller.dart';
@@ -95,6 +94,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                           AnnouncementCoordinator.instance.announce(
                             'Text size set to $size',
                             priority: AnnouncementPriority.normal,
+                            speak: false,
                           );
                           Navigator.pop(context);
                         },
@@ -144,7 +144,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
             minHeight: AppSpacing.minTouchTarget,
           ),
         ),
-        title: const BusBuddyLogo(fontSize: 20, subtitle: 'Accessibility'),
+        title: const Text('Accessibility'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -267,6 +267,7 @@ class _AccessibilitySettingsPageState extends State<AccessibilitySettingsPage> {
                       AnnouncementCoordinator.instance.announce(
                         'High contrast ${_settings.highContrast == 'On' ? 'enabled (WCAG AAA 7:1 ratio)' : 'disabled'}',
                         priority: AnnouncementPriority.normal,
+                        speak: false,
                       );
                     },
                     colors: colors,

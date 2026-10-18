@@ -4,6 +4,38 @@ export '../../domain/transit/entities/stop.dart';
 
 /// Transport domain models for the BusBuddy corridor.
 
+/// Locally configured bus choices shown in the booking flow. Arrival times are
+/// demo estimates until a live departure feed is connected.
+class BusDepartureOption {
+  const BusDepartureOption({
+    required this.busId,
+    required this.etaMinutes,
+    required this.serviceNote,
+  });
+
+  final String busId;
+  final int etaMinutes;
+  final String serviceNote;
+
+  static const List<BusDepartureOption> demoOptions = [
+    BusDepartureOption(
+      busId: '18B',
+      etaMinutes: 4,
+      serviceNote: 'Frequent service',
+    ),
+    BusDepartureOption(
+      busId: '12A',
+      etaMinutes: 12,
+      serviceNote: 'Frequent service',
+    ),
+    BusDepartureOption(
+      busId: '20C',
+      etaMinutes: 18,
+      serviceNote: 'Limited stops',
+    ),
+  ];
+}
+
 /// An ordered list of stops that forms a rideable route.
 class Route {
   const Route({
@@ -29,9 +61,10 @@ class Route {
     id: json['id'] as String,
     displayName: json['displayName'] as String,
     direction: json['direction'] as String? ?? '',
-    orderedStopIds: (json['orderedStopIds'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList() ??
+    orderedStopIds:
+        (json['orderedStopIds'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
         const [],
   );
 
@@ -194,14 +227,13 @@ class JourneySession {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        routeId,
-        routeName,
-        origin,
-        destination,
-        busId,
-        startTime,
-        isCompleted,
-      );
+    id,
+    routeId,
+    routeName,
+    origin,
+    destination,
+    busId,
+    startTime,
+    isCompleted,
+  );
 }
-

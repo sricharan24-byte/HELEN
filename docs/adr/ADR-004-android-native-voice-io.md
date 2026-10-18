@@ -56,10 +56,11 @@ It is a plain Dart class with injected streams so the whole state machine is uni
 - No transcript is ever fabricated. `inputTranscription` text, when the service reports it, is **display-only** (`🗣️ "…"`) and is never re-submitted as a text turn — the audio it transcribes already reached the model.
 - `AudioRecord` failures (no usable input, access revoked) surface through `NativeAudioChannel.microphoneErrors` → `AudioSpeechEngine.liveMicrophoneErrors` → turn loss, so a "Listening…" promise is never left unfulfillable.
 - `AudioSpeechEngine.startListening` on Android remains an honest fallback path (just-in-time `RECORD_AUDIO` prompt, rationale-aware, "never ask again" detected) for callers that cannot stream audio.
+- On the web a **named** recognition failure (`audio-capture`, `network`, `service-not-allowed`) stops continuous listening and shows Chrome's own reason plus the input devices the browser can see (§3.6). Restarting into the same failure is not a recovery — it only buries the reason.
 
 ### 2.5 Replies stay on the single voice
 
-`responseModalities: ['AUDIO']` is requested, and the model's own audio **is** the reply. `ModelVoicePlayer` (`lib/features/ai_assistant/model_voice_player.dart`) is the only model-audio producer and `AudioSpeechEngine` is the only TTS producer, and exactly one of them speaks per turn: when Gemini streamed audio, `hasModelAudioThisTurn` makes the screen skip TTS entirely; TTS speaks only the turns that carried no audio (plain text turn, REST fallback, socket without audio). The turn ends on the playback drain — `onPlaybackDrained` from the Android `AudioTrack`, or the Web Audio queue drain in the browser — because with no TTS utterance running the TTS ended-callback would never fire.
+`responseModalities: ['AUDIO']` is requested, and Gemini's own audio is the only voice in the Live screen. `ModelVoicePlayer` (`lib/features/ai_assistant/model_voice_player.dart`) plays model PCM. Offline `AudioSpeechEngine` TTS stays muted for the entire Live screen, including text-only turns, whose response remains visible in the transcript. This avoids a late PCM packet overlapping a TTS fallback. Audio turns end on the playback drain — `onPlaybackDrained` from the Android `AudioTrack`, or the Web Audio queue drain in the browser — because no TTS utterance runs in this screen. Text-only turns do not wait for a playback drain and continuous listening can resume after turn completion.
 
 The single-speaker rule moved with the voice rather than being duplicated, so this is still exactly one voice: the natural one. What stays forbidden is speaking a reply through both paths in one turn, and adding a second audio owner (`TtsFallbackArbiter`-style) — deleted in Chunk 43, must not return.
 
@@ -163,7 +164,7 @@ The failure message was also corrected: it claimed "BusBuddy is still connecting
 
 Until this, Chrome threw every model-audio chunk away (`ModelVoicePlayer.isSupported` was Android-only) and spoke replies through `speechSynthesis`. On a host with no system TTS engine — a bare Linux Chrome install, for instance — that engine is silent, so the browser build could show a flawless text transcript with no voice at all. That is the report this section answers.
 
-The web half now schedules the same 24 kHz mono PCM16 through the Web Audio context the listening chime already uses, so the existing gesture unlock primes it and there is no second audio stack to keep alive: `__bb_play_model_audio` / `__bb_stop_model_audio` in `web_speech_real.dart`, start times chained off a queue cursor for gapless playback, and a queue-drain timer as the end-of-turn signal. A chunk that will not schedule (no AudioContext, undecodable payload) returns false, which leaves `hasModelAudioThisTurn` clear and hands that turn back to TTS rather than dropping the reply.
+The web half now schedules the same 24 kHz mono PCM16 through the Web Audio context the listening chime already uses, so the existing gesture unlock primes it and there is no second audio stack to keep alive: `__bb_play_model_audio` / `__bb_stop_model_audio` in `web_speech_real.dart`, start times chained off a queue cursor for gapless playback, and a queue-drain timer as the end-of-turn signal. A chunk that will not schedule (no AudioContext, undecodable payload) returns false; the text reply stays visible and offline TTS remains muted on the Live screen.
 
 **Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js.
 
@@ -189,9 +190,42 @@ The fix keeps the eval but stops trusting it:
 - After every install the required entry points are verified; anything missing resets the flag so the next call retries rather than trusting a stamp written by a failed eval. A throwing install resets it too.
 - A missing entry point is reported once, by name, naming the fix ("hot restart, or reload the page") instead of repeating a `NoSuchMethodError` per chunk.
 
-**Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js. The bridge JS is additionally extracted from the Dart source and executed in Node against stubbed browser globals: all six entry points install, `__bb_play_model_audio` returns true for a real 24 kHz PCM16 base64 chunk, the queue cursor advances so consecutive chunks schedule back to back, `__bb_stop_model_audio` clears the queue, and the drain callback fires once playback completes.
+**Proven:** `flutter analyze` clean, `flutter test` 389 green, `flutter build web --profile` compiles under dart2js. The bridge JS is additionally extracted from the Dart source and executed in Node against stubbed browser globals: every required entry point installs (seven as of bridge v12 — the 2026-10-18 device inventory added `__bb_input_devices`; §3.6), `__bb_play_model_audio` returns true for a real 24 kHz PCM16 base64 chunk, the queue cursor advances so consecutive chunks schedule back to back, `__bb_stop_model_audio` clears the queue, and the drain callback fires once playback completes.
 
 **Still not proven:** that it is audible in a real browser, and that it sounds natural. The diagnostic split is now explicit — `[ModelVoice] turn N: playing Gemini's own voice` means chunks are arriving and being scheduled, `[WebSpeech] page bridge has no …` means the page JS is missing (hot restart), and `[BusBuddy ModelAudio]` warnings mean the AudioContext itself failed.
+
+### 3.6 Bug found by the headless-Chrome run: the web microphone died after its first silent cycle (2026-10-18)
+
+Reported from a real Chrome session: the microphone "turns on for a second", "pops in and out", and then nothing reaches the model when the passenger speaks. A headless-Chrome probe running the bridge JS **extracted from the Dart source** (the §3.5 technique) reproduced the failure signature exactly: `onstart`, then Chrome's `audio-capture` roughly 10 ms later, then a silent restart every ~150 ms, ending in the generic "I couldn't hear anything" message. Two independent defects were behind it, both invisible to the suite because the test host's speech engine never fires `onStarted`:
+
+- **The restart guard could never pass.** `_scheduleRestartListening` refuses to restart while `_isListening` is true, but the silent branch of `onEnd` never cleared that flag. In a real browser the first silent cycle therefore closed the microphone for good while the screen still said "Listening…", and the three-silent-cycles stop was unreachable — the app could not report the silence it was experiencing.
+- **A named failure was thrown away.** `onError` restarted silently in continuous mode, discarding Chrome's own reason, so the eventual stop message blamed the input device for an error it never named. The bridge had mapped `audio-capture` and `service-not-allowed` to real sentences since v10; the screen simply dropped them.
+
+Fixes: `_isListening` now drops when capture closes (the flag keeps its meaning — capture genuinely *is* closed between cycles); a named failure stops the loop and shows Chrome's message plus `Chrome's input devices: …`, and the trailing `onEnd` cannot overwrite it; bridge **v12** adds `__bb_input_devices` (refreshed at install/start/error; blank-labelled until microphone permission exists) so "check the right input device" names a device instead of a guess.
+
+**Proven:** `flutter analyze` clean; `flutter test` 476 green, including new pins that a named failure stops the loop and names the reason and that pure silence still stops after three cycles; the extracted v12 JS passes `node --check` and runs in headless Chrome — against the real earphone microphone it completes healthy 8 s `no-speech` cycles with no error, and against an input Chrome refuses (a monitor source) it reports the mapped `audio-capture` sentence with the device list instead of churning.
+
+**Still not proven:** the granted-permission spoken-question round trip in a real profile with a real voice — the same gap as §3.4/§3.5, now with honest, device-naming on-screen failures to diagnose it.
+
+### 3.7 Android Gemini playback ordering and drain (2026-10-18)
+
+The Android stutter report led to an async ordering issue in `ModelVoicePlayer.addChunk`: the first
+PCM chunk waited for the `startPlayback` method-channel reply before sending its audio, while later
+chunks could send immediately. A streamed response could therefore reach `AudioTrack` out of
+order. Separately, the native queue worker reported `onPlaybackDrained` whenever its queue became
+temporarily empty, even if Gemini had not finished sending the response; that could resume the
+microphone in the middle of a reply.
+
+`ModelVoicePlayer` now serializes Android start/write calls through one future chain. At Gemini
+`turnComplete`, it sends `finishPlayback` after the queued writes. The native side only schedules a
+drain after the end marker, an empty queue, and `AudioTrack` playback-head catch-up; new PCM cancels
+the pending drain. The Android worker-exit restart guard, bounded first write and partial-write
+loop are also retained so the final PCM is not stranded or dropped.
+
+**Verified:** `flutter analyze` reports no issues; `flutter build apk --debug` succeeds; the APK
+was installed and BusBuddy relaunched on the connected Samsung phone. **Not yet verified:** a live
+Gemini response sounding clear after this change; that needs the passenger to listen on the phone.
+No automated tests were run for this change.
 
 ---
 
@@ -202,4 +236,3 @@ The fix keeps the eval but stops trusting it:
 **Negative / accepted risks**: spoken turns are half-duplex by design (frames pause during replies); echo is mitigated by AEC plus pausing rather than by a strict duplex protocol; the Live API audio-in path is exercised only by unit tests until a device run confirms it end-to-end.
 
 **Follow-ups**: confirm the natural voice with a live session on web and on an Android device; optionally request `inputAudioTranscription` explicitly once confirmed against the live service.
-
