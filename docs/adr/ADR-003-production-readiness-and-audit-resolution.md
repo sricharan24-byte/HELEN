@@ -98,7 +98,7 @@ To reach 100% production readiness, all identified blockers and critical tasks w
 
 ## 5. Astra Phase 2 P2 Items — Session 2026-09-20 (BUS-P2-01 / BUS-P2-02 / BUS-P2-04)
 
-> Recorded while work is in progress. `progress.md` § "Session Log — 2026-09-20" is the operational companion; this section is the decision record.
+> Recorded while work is in progress. `docs/archive/progress-sessions-full.md` § "Session Log — 2026-09-20" is the operational companion; this section is the decision record.
 
 ### 5.1 Prerequisite: zero-failing-test baseline
 
