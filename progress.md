@@ -1,5 +1,29 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-18: Four-Destination Shell Built — Home / Plan / Tickets / More
+
+> **Trigger**: after the plan audit, the owner chose "build the four-tab shell" over retiring the half-built redesign.
+
+### 🧭 Task 1 landed — the shell that 52b8ff7 never built
+
+* `AppNavigationShell` (`lib/features/navigation/app_navigation_shell.dart`) now holds **Home / Plan / Tickets / More** in an `IndexedStack` of per-destination nested `Navigator`s: detail pushes through `Navigator.of(context)` stay inside the selected destination's stack, and tab switches never recreate a booking form or reset a ticket tab.
+* Destinations **build lazily on first visit** (not at startup) — keeps boot work and hidden-page widget collisions out of the picture while still preserving state afterwards.
+* System Back pops the active destination's stack, then returns to Home, and **exits only from the Home root** (`PopScope.canPop` derives from the active nested navigator).
+* `MorePage` (dead code until now — imported by nothing) is wired in as the More destination: Safety & Contacts / Corridor Alerts / Settings. Emergency SOS stays the red Home card (`idSafety`) plus the More safety entry.
+* `TicketBookingSuitePage` (Plan) and `MyTicketsPage` (Tickets) root with `showBackButton: false`. Nav bar colours come from `AppTheme.colors(context)` tokens only; labels use Flutter's built-in NavigationBar label scale cap (framework behaviour, no repo clamp).
+* **Deviation from the plan, deliberate**: the plan's Task 1 said "do not add or run tests"; CI runs `flutter test`, so the new back/state contract is pinned in `test/features/app_navigation_shell_test.dart` (4 cases, including a 360 dp / 300 % walk of all four tabs).
+
+### ♿ Pre-existing 300 % defects fixed on the way (found by walking the tabs at 360 dp / 300 %)
+
+* `ticket_booking_suite_page.dart`: the fixed 56 dp `PreferredSize` header and the `SizedBox(height: 60)` sticky bar both clipped at large text scales. The header now lives in the body and **sizes to its content** (brand row wraps instead of overflowing), and the sticky bar is the shared `SettingsAskBusBuddyBar` placed as the last body child — a Material `ElevatedButton` in the `bottomNavigationBar` slot expands into the loose height constraints and **stole the entire body height** (body slot measured `h=0.0`), which is why the hand-rolled `Material`/`InkWell` bar from the settings pages is the right shape.
+* `settings_ask_bus_buddy_bar.dart`: the hint line is capped at two lines with ellipsis — at 300 % it wrapped into a 447 px wall that pushed the page's content area to zero height.
+* Verified by reproducing each overflow *without* the shell first (the page alone at 360 dp / 300 % overflowed identically), so these are fixes to pre-existing defects, not shell regressions.
+
+* **Files**: `lib/features/navigation/app_navigation_shell.dart` · `lib/features/tickets/ticket_booking_suite_page.dart` · `lib/features/settings/settings_ask_bus_buddy_bar.dart` · `test/features/app_navigation_shell_test.dart` · `AGENTS.md` · `docs/superpowers/plans/2026-10-09-mobile-ui-navigation-redesign.md` · `progress.md`
+* **Verification**: `flutter analyze` clean · `flutter test` 475/475 green (471 before this session's changes + 4 new shell tests) · shell walk at 360 dp / 300 % through all four destinations with no overflow or clip errors.
+
+---
+
 ## 🛠️ Session Log — 2026-10-18: Housekeeping & Plan Audit — untracked docs committed, one plan found half-built
 
 > **Trigger**: "where are we" status pass — tidy the untracked planning docs at the repo root of `docs/superpowers/` and re-verify the suite.

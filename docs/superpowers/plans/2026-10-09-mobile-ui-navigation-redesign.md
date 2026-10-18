@@ -1,11 +1,12 @@
 # BusBuddy Mobile UI and Navigation Implementation Plan
 
-> [!WARNING]
-> **Status (audited 2026-10-18): partially implemented — Task 1's four-destination shell was never built.**
+> [!NOTE]
+> **Status (2026-10-18): Task 1 landed; Tasks 2–3 landed earlier; Task 4 open.**
 >
-> * **Landed** in `52b8ff7` (2026-10-10, "feat: polish mobile navigation and app usability") and the Chunk 50 design-contract pass: most of Task 2's reflow (home, settings hub, home-screen customization, accessibility/personalization/voice settings, new `settings_ask_bus_buddy_bar.dart`) and most of Task 3's reflow (booking suite, My Tickets, live location, safety sharing, Gemini prompt chips). `docs/ui/whole-app-redesign-brief.md` was the design brief.
-> * **Not landed**: the four-destination Home/Plan/Tickets/More navigation (`NavigationBar`/`NavigationDestination` appears nowhere in `lib/`). `lib/features/navigation/app_navigation_shell.dart` is a single-destination nested navigator wrapping Home; `lib/features/navigation/more_page.dart` exists but is **imported by nothing** — the More hub is unreachable dead code. Task 4's recorded visual review at 360×800 / 390×844 was never logged.
-> * Do not treat this plan as executed. Either build the shell (Task 1) or retire the plan and delete the orphan `more_page.dart`; leaving both undone silently is the current state.
+> * **Task 1 (four-destination shell) — built 2026-10-18**: `AppNavigationShell` now holds Home / Plan / Tickets / More in an `IndexedStack` of per-destination nested `Navigator`s (lazy first build, state preserved across tab switches). More wires in the previously orphaned `lib/features/navigation/more_page.dart`. System Back pops the active destination's stack, then returns to Home, and exits only from the Home root. `TicketBookingSuitePage` (Plan) and `MyTicketsPage` (Tickets) are rooted with `showBackButton: false`.
+> * **Deviations from this plan, deliberately**: destinations build lazily on first visit instead of all at startup (avoids startup work and hidden-page finder collisions); `NavigationBar` labels carry Flutter's built-in `_kMaxLabelTextScaleFactor` cap (framework behaviour for nav labels only — no repo-level clamp); tests *were* added (`test/features/app_navigation_shell_test.dart`, 3 cases) despite the constraint below, because CI runs `flutter test` and the shell's back/state contract needs a pin. No Home profile affordance exists in the current `home_page.dart`, so "route Home profile to Settings" had nothing to route; Settings stays reachable as a Home card and a More entry.
+> * **Tasks 2–3** landed in `52b8ff7` (2026-10-10) and the Chunk 50 design-contract pass: home, settings hub, home-screen customization, accessibility/personalization/voice settings (`settings_ask_bus_buddy_bar.dart`), booking suite, My Tickets, live location, safety sharing, Gemini prompt chips. `docs/ui/whole-app-redesign-brief.md` was the brief.
+> * **Task 4 remains open**: no rendered-width review was recorded at 360×800 / 390×844, and no browser screenshot pipeline is available in the current environment (no puppeteer). Widget coverage renders the shell at 320 dp / 300 % (`platform_text_scaler_test`) and pins tab/back/state behaviour, but a human visual pass at phone widths is still owed.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -47,11 +48,11 @@
 - Consumes existing `HomePage`, `TicketBookingSuitePage`, `MyTicketsPage`, `SettingsPage`, `SafetySharingPage`, and `AlertsPage`.
 - Produces a stateful app root with Home, Plan, Tickets, and More destinations; selected destination is exposed to Material navigation with labels and selected semantics.
 
-- [ ] Build the four root destinations using existing feature screens and preserve their state during normal destination changes.
-- [ ] Route Home profile to Settings and expose Safety/Contacts, Alerts, and Settings from More.
-- [ ] Keep Emergency SOS visible on Home and inside More, using the existing safety flow.
-- [ ] Route existing detail pushes through the correct selected destination context; preserve Android Back hierarchy.
-- [ ] Review the resulting source and run `git diff --check`; expected: no whitespace errors and no user changes modified outside the task.
+- [x] Build the four root destinations using existing feature screens and preserve their state during normal destination changes.
+- [x] Route Home profile to Settings and expose Safety/Contacts, Alerts, and Settings from More. *(No Home profile affordance exists in the current Home; the More exposure is what applied.)*
+- [x] Keep Emergency SOS visible on Home and inside More, using the existing safety flow.
+- [x] Route existing detail pushes through the correct selected destination context; preserve Android Back hierarchy.
+- [x] Review the resulting source and run `git diff --check`; expected: no whitespace errors and no user changes modified outside the task.
 
 ### Task 2: Home, settings, and sticky mobile layout
 

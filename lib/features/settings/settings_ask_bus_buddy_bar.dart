@@ -66,6 +66,8 @@ class SettingsAskBusBuddyBar extends StatelessWidget {
                         ),
                         Text(
                           message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: colors.onActionPrimary.withValues(
                               alpha: 0.8,

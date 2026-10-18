@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/a11y/announcement_coordinator.dart';
 import '../../core/settings/app_settings_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/tokens/app_semantic_colors.dart';
 import '../../core/tokens/app_spacing.dart';
 import '../../core/widgets/bus_buddy_logo.dart';
 import '../../core/di/service_locator.dart';
@@ -16,6 +17,7 @@ import '../ai_assistant/gemini_live_screen.dart';
 import '../journey/journey_controller.dart';
 import '../journey/live_location_screen.dart';
 import '../saved/saved_place_chips.dart';
+import '../settings/settings_ask_bus_buddy_bar.dart';
 import 'booking_checkout_dialog.dart';
 import 'ticket_controller.dart';
 
@@ -582,70 +584,83 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
     final colors = AppTheme.colors(context);
     return Scaffold(
       backgroundColor: colors.background,
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(widget.showTopPrototypeTabs ? 124 : 56),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      // Header lives in the body: it sizes to its content, so the brand mark
+      // and step label reflow instead of clipping at large text scales.
+      body: Column(
+        children: [
+          SafeArea(bottom: false, child: _buildHeader(colors)),
+          Expanded(
+            child: IndexedStack(
+              index: _activeStepIndex,
+              children: [_buildBookingStepView(), _buildResultsStepView()],
+            ),
+          ),
+          // Last body child (like the settings pages) so it shrink-wraps to its
+          // content instead of expanding into a bounded bottom-bar slot.
+          _buildStickyAskBusBuddyBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(AppSemanticColors colors) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.showTopPrototypeTabs)
+          Container(
+            color: colors.background,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                _buildStepTab(0, '1. Booking'),
+                _buildStepTab(1, '2. Results'),
+              ],
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
             children: [
-              if (widget.showTopPrototypeTabs)
-                Container(
-                  color: colors.background,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+              if (widget.showBackButton) ...[
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
                   ),
-                  child: Row(
-                    children: [
-                      _buildStepTab(0, '1. Booking'),
-                      _buildStepTab(1, '2. Results'),
-                    ],
-                  ),
+                  icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+                  onPressed: () => unawaited(Navigator.of(context).maybePop()),
                 ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                child: Row(
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              // Bounded so the brand mark can break onto its own line at large
+              // text scales instead of overflowing the header.
+              Expanded(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: 4,
                   children: [
-                    if (widget.showBackButton) ...[
-                      IconButton(
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
-                        ),
-                        icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                        onPressed: () =>
-                            unawaited(Navigator.of(context).maybePop()),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                    ],
                     const BusBuddyLogo(fontSize: 20),
-                    const Spacer(),
                     Text(
                       _activeStepIndex == 0
                           ? 'Book a Ticket'
                           : 'Available Buses',
+                      textAlign: TextAlign.end,
                       style: TextStyle(
                         color: colors.textSecondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 8),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-      body: IndexedStack(
-        index: _activeStepIndex,
-        children: [_buildBookingStepView(), _buildResultsStepView()],
-      ),
-      bottomNavigationBar: _buildStickyAskBusBuddyBar(),
+      ],
     );
   }
 
@@ -1376,70 +1391,19 @@ class _TicketBookingSuitePageState extends State<TicketBookingSuitePage> {
 
   // Sticky Bottom Ask BusBuddy Action Bar
   Widget _buildStickyAskBusBuddyBar() {
-    final colors = AppTheme.colors(context);
-    final prompts = [
+    const prompts = [
       'Speak your destination',
       'Select a bus or ask for schedule',
       'Need anything? Just ask.',
     ];
-    final activePrompt = prompts[_activeStepIndex.clamp(0, 1)];
 
+    // Shared bar: hand-rolled Material/InkWell (not a Material button), which
+    // sizes to its content instead of expanding into bounded constraints.
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: SizedBox(
-          height: 60,
-          child: ElevatedButton(
-            onPressed: _openAiAssistant,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colors.actionPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              ),
-              elevation: 4,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colors.onActionPrimary.withValues(alpha: 0.24),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.mic,
-                    color: colors.onActionPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ask BusBuddy',
-                        style: TextStyle(
-                          color: colors.onActionPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        activePrompt,
-                        style: TextStyle(
-                          color: colors.onActionPrimary.withValues(alpha: 0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      top: false,
+      child: SettingsAskBusBuddyBar(
+        message: prompts[_activeStepIndex.clamp(0, 1)],
+        onTap: _openAiAssistant,
       ),
     );
   }
