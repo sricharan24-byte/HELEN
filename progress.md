@@ -1,5 +1,19 @@
 # BusBuddy Implementation Progress Log
 
+## 🛠️ Session Log — 2026-10-18: Housekeeping & Plan Audit — untracked docs committed, one plan found half-built
+
+> **Trigger**: "where are we" status pass — tidy the untracked planning docs at the repo root of `docs/superpowers/` and re-verify the suite.
+
+* **Re-verified at HEAD `44de6d6`**: `flutter analyze` clean, `flutter test` **471/471 green** (Oct 18 re-run; last recorded run was the same count on Oct 11).
+* **Committed the three untracked planning docs** with honest status notes instead of leaving them as untracked files: the executed Gemini booking-personalization plan (all 29 steps ticked — commits `32e7d8e` … `1b43714` plus follow-ups, with the live-end-to-end caveat preserved) and the mobile UI/navigation redesign plan + spec. (The booking-personalization *spec* was already committed in `51cc8b0`.)
+* **Audit finding — the mobile UI/navigation redesign is partially implemented and was silently reading as if it were not**: Task 1's four-destination Home/Plan/Tickets/More navigation was **never built** (`NavigationBar`/`NavigationDestination` appears nowhere in `lib/`; `app_navigation_shell.dart` is a single-destination nested navigator over Home). `lib/features/navigation/more_page.dart` exists but is imported by nothing — an unreachable More hub. The responsive-layout work (plan Tasks 2–3) did land in `52b8ff7` + the Chunk 50 polish pass. Recorded in the plan's status note; **awaiting an owner decision to build the shell or retire the plan and delete the orphan**.
+* `plugins/dsh-cost-meter/` left untracked deliberately — it is a dsh web-client plugin, not BusBuddy source.
+
+* **Files**: `docs/superpowers/plans/2026-10-09-gemini-booking-personalization.md` · `docs/superpowers/plans/2026-10-09-mobile-ui-navigation-redesign.md` · `docs/superpowers/specs/2026-10-09-mobile-ui-navigation-redesign.md` · `progress.md`
+* **Verification**: `flutter analyze` clean · `flutter test` 471/471 green.
+
+---
+
 ## 🛠️ Session Log — 2026-10-11: Voice booking fixes — name prefill, wallet auto-pay, arrival no longer kills the assistant
 
 > **Trigger**: three live-testing reports: the passenger name was never filled; the passenger wanted wallet to pay automatically (UPI/card keep the widget); and paying closed the Gemini Live screen ("stales") because the trip's arrival popped the whole navigation stack.
