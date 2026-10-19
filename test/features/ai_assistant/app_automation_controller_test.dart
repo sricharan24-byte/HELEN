@@ -1,13 +1,21 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/models/transport_models.dart';
+import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/domain/ticketing/entities/ticket.dart';
 import 'package:busbuddy/features/ai_assistant/app_automation_controller.dart';
 
 void main() {
   group('booking slot provenance', () {
+    AppAutomationController controllerWithRepository() => AppAutomationController(
+          repository: LocalTransportRepository(
+            dataSource: LocalTransportDataSource(),
+          ),
+        );
+
     test('passengerToolCallsMarkSlotSourcesAsPassenger', () {
-      final automation = AppAutomationController();
+      final automation = controllerWithRepository();
 
       automation.handleToolCall('set_trip', {
         'origin': 'VIT Main Gate',
@@ -104,7 +112,7 @@ void main() {
     });
 
     test('recentTripSuggestionWaitsForPassengerAcceptance', () {
-      final automation = AppAutomationController();
+      final automation = controllerWithRepository();
       const origin = Stop(
         id: 'vit-main-gate',
         name: 'VIT Main Gate',
@@ -137,9 +145,12 @@ void main() {
       expect(staged.missingSlots, contains('trip'));
       expect(staged.missingSlots, contains('bus'));
 
-      // Even with type and payment supplied, the staged suggestion alone
-      // still cannot complete the booking.
-      automation.handleToolCall('set_passenger', {'type': 'student'});
+      // Even with type, name and payment supplied, the staged suggestion
+      // alone still cannot complete the booking.
+      automation.handleToolCall('set_passenger', {
+        'type': 'student',
+        'name': 'Pavan',
+      });
       automation.handleToolCall('set_payment', {'method': 'card'});
       expect(automation.bookingReadiness().isComplete, isFalse);
 
@@ -192,7 +203,7 @@ void main() {
     });
 
     test('appFallbacksDoNotSatisfyReadiness', () {
-      final automation = AppAutomationController();
+      final automation = controllerWithRepository();
       // Fresh controller carries app fallback values (Bus 18B / UPI).
       expect(automation.busId, contains('18B'));
       expect(automation.paymentMethod, PaymentMethod.upi);
@@ -211,11 +222,12 @@ void main() {
 
       automation.handleToolCall('select_bus', {'busId': '18B'});
       automation.handleToolCall('set_payment', {'method': 'upi'});
+      automation.handleToolCall('set_passenger', {'name': 'Pavan'});
       expect(automation.bookingReadiness().isComplete, isTrue);
     });
 
     test('bookingReadinessRequiresTripBusPassengerAndPayment', () {
-      final automation = AppAutomationController();
+      final automation = controllerWithRepository();
 
       var ready = automation.handleToolCall('confirm_booking', null);
       expect(ready.missingSlots, containsAll(<String>[
@@ -243,6 +255,10 @@ void main() {
       expect(ready.isComplete, isFalse);
       expect(ready.missingSlots, isNot(contains('passenger')));
 
+      automation.handleToolCall('set_passenger', {
+        'type': 'student',
+        'name': 'Pavan',
+      });
       automation.handleToolCall('set_payment', {'method': 'wallet'});
       ready = automation.handleToolCall('confirm_booking', null);
       expect(ready.isComplete, isTrue);
@@ -250,7 +266,7 @@ void main() {
     });
 
     test('bookingDraftSnapshotIncludesOnlySlotValueAndSource', () {
-      final automation = AppAutomationController();
+      final automation = controllerWithRepository();
       automation.handleToolCall('set_trip', {
         'origin': 'VIT Main Gate',
         'destination': 'Katpadi Railway Station',
@@ -276,7 +292,7 @@ void main() {
       for (final slot in slots.values) {
         expect((slot as Map).keys, unorderedEquals(<String>['value', 'source']));
       }
-      expect(slots['bus'], {'value': 'Bus 18B', 'source': 'passenger'});
+      expect(slots['bus'], {'value': '18B', 'source': 'passenger'});
       expect(slots['passengerType'], {
         'value': 'student',
         'source': 'passenger',

@@ -142,11 +142,11 @@ void main() {
 
       await tester.tap(find.text('Find Buses'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Select This Bus >'));
+      await tester.tap(find.text('Select This Bus').first);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Pavan');
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('& Issue'));
+      await tester.tap(find.textContaining('Create Demo Ticket'));
       await tester.pumpAndSettle();
 
       expect(find.byType(LiveLocationScreen), findsOneWidget);
@@ -172,11 +172,11 @@ void main() {
 
       await tester.tap(find.text('Find Buses'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Select This Bus >'));
+      await tester.tap(find.text('Select This Bus').first);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Pavan');
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('& Issue'));
+      await tester.tap(find.textContaining('Create Demo Ticket'));
       await tester.pumpAndSettle();
 
       expect(find.byType(LiveLocationScreen), findsOneWidget);

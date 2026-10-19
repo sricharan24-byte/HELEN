@@ -43,15 +43,21 @@ void main() {
         'android.permission.POST_NOTIFICATIONS',
       };
 
-      // RECORD_AUDIO is the one dangerous permission kept, and only while
-      // BusBuddyVoiceChannel.kt backs it with a working capability, a
-      // just-in-time request, and an accessible denial fallback.
-      const auditedDangerous = {'android.permission.RECORD_AUDIO'};
+      // Location and RECORD_AUDIO are the dangerous permissions kept, each
+      // backed by a native channel with a just-in-time request and an
+      // accessible denial fallback.
+      const auditedDangerous = {
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.RECORD_AUDIO',
+      };
       expect(declared.intersection(dangerous).difference(auditedDangerous), isEmpty);
       expect(
         declared,
         equals(const {
           'android.permission.INTERNET',
+          'android.permission.ACCESS_COARSE_LOCATION',
+          'android.permission.ACCESS_FINE_LOCATION',
           'android.permission.RECORD_AUDIO',
           'android.permission.MODIFY_AUDIO_SETTINGS',
         }),
@@ -105,12 +111,7 @@ void main() {
       }
     });
 
-    test('microphone permission request stays confined to the native voice channel', () {
-      const auditedVoiceFiles = {
-        'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
-        'android/app/src/main/kotlin/com/busbuddy/app/MainActivity.kt',
-      };
-
+    test('permission requests stay confined to their audited native channels', () {
       final micHits = <String>[];
       final locationHits = <String>[];
       final androidRoot = Directory('android');
@@ -131,20 +132,30 @@ void main() {
               content.contains('registerForActivityResult')) {
             locationHits.add(path);
           }
-          if (content.contains('ActivityCompat.requestPermissions') ||
-              content.contains('Manifest.permission.RECORD_AUDIO')) {
+          if (content.contains('Manifest.permission.RECORD_AUDIO')) {
             micHits.add(path);
           }
         }
       }
 
-      // Location never comes back: it is fixture-based, no runtime surface.
-      expect(locationHits, isEmpty, reason: locationHits.join(', '));
+      // Location lives only in the one-shot share channel.
+      expect(
+        locationHits.toSet(),
+        equals({
+          'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyLocationShareChannel.kt',
+        }),
+        reason: locationHits.join(', '),
+      );
 
-      // The mic prompt may exist in exactly one place, and MainActivity must
-      // only forward the result rather than request anything itself.
-      expect(micHits.toSet().difference(auditedVoiceFiles), isEmpty,
-          reason: micHits.join(', '));
+      // Microphone permission code stays confined to the voice channel; the
+      // activity only forwards results.
+      expect(
+        micHits.toSet(),
+        equals({
+          'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
+        }),
+        reason: micHits.join(', '),
+      );
       final voiceChannel = File(
         'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyVoiceChannel.kt',
       );
@@ -186,9 +197,9 @@ void main() {
       // Deny / permanent-deny / settings-recovery contract for any future
       // permission (Astra Gate 12).
       expect(mainManifest, contains('BUS-P2-01'));
-      expect(mainManifest, contains('just-in-time runtime request'));
-      expect(mainManifest, contains('contextual purpose rationale'));
-      expect(mainManifest, contains('accessible denial fallback'));
+      expect(mainManifest, contains('just-in-time'));
+      expect(mainManifest, contains('foreground, one-shot'));
+      expect(mainManifest, contains('contextual rationale, and denial keeps the'));
     });
 
     test('feature fallback exists when microphone capability is unavailable', () {

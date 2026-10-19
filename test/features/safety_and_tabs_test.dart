@@ -25,8 +25,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Safety & Emergency Sharing'), findsOneWidget);
-      expect(find.text('BROADCAST SOS ALERT NOW'), findsOneWidget);
+      expect(find.text('Safety'), findsOneWidget);
+      expect(find.text('REVIEW & SHARE SOS LOCATION'), findsOneWidget);
       expect(find.text('TRUSTED EMERGENCY CONTACTS'), findsOneWidget);
       expect(find.textContaining('Parent / Guardian'), findsOneWidget);
     });
@@ -58,10 +58,12 @@ void main() {
           MaterialApp(home: const SafetySharingPage()),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('BROADCAST SOS ALERT NOW'));
+        await tester.tap(find.text('REVIEW & SHARE SOS LOCATION'));
         await tester.pumpAndSettle();
-        // Confirm the broadcast dialog.
-        await tester.tap(find.textContaining('RECORD SIMULATED SOS'));
+        // Confirm the broadcast dialog, then the location-share explanation.
+        await tester.tap(find.textContaining('CONTINUE TO SHARE SOS'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
       }
 
@@ -87,7 +89,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Live Corridor Alerts'), findsOneWidget);
+      expect(find.text('Alerts'), findsOneWidget);
       expect(find.textContaining('Bus TN-23-BUS-42 On Time'), findsOneWidget);
     });
 
@@ -136,7 +138,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Settings & Preferences'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
       expect(find.text('Accessibility Settings'), findsOneWidget);
       expect(find.text('Personalization Settings'), findsOneWidget);
     });
@@ -173,7 +175,7 @@ void main() {
       // Tap Settings card
       await tester.tap(find.text('Settings').last);
       await tester.pumpAndSettle();
-      expect(find.text('Settings & Preferences'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
     });
   });
 }

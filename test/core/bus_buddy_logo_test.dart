@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:busbuddy/core/theme/app_theme.dart';
 import 'package:busbuddy/core/widgets/bus_buddy_logo.dart';
 
 void main() {
   group('BusBuddyLogo Component Tests', () {
-    testWidgets('renders Bus in white and Buddy in brand blue (#007AFF)', (tester) async {
+    testWidgets('renders Bus in the primary text color and Buddy in brand blue', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -22,13 +23,16 @@ void main() {
 
       final Text busText = tester.widget(busFinder);
       final Text buddyText = tester.widget(buddyFinder);
+      final colors = AppTheme.colors(
+        tester.element(find.byType(BusBuddyLogo)),
+      );
 
-      expect(busText.style?.color, equals(Colors.white));
-      expect(busText.style?.fontWeight, equals(FontWeight.w900));
+      expect(busText.style?.color, equals(colors.textPrimary));
+      expect(busText.style?.fontWeight, equals(FontWeight.w800));
       expect(busText.style?.fontSize, equals(24));
 
-      expect(buddyText.style?.color, equals(const Color(0xFF007AFF)));
-      expect(buddyText.style?.fontWeight, equals(FontWeight.w900));
+      expect(buddyText.style?.color, equals(colors.actionPrimary));
+      expect(buddyText.style?.fontWeight, equals(FontWeight.w800));
       expect(buddyText.style?.fontSize, equals(24));
     });
 

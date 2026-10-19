@@ -71,7 +71,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Route Details rendered under High-Contrast theme
-      expect(find.text('Route Details & Live GPS'), findsOneWidget);
+      expect(find.text('Route Details'), findsOneWidget);
       expect(find.text('LIVE GPS'), findsOneWidget);
       expect(find.text('Stops along this route'), findsOneWidget);
 

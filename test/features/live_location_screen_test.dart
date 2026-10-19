@@ -52,8 +52,8 @@ void main() {
     // Verify driver info card
     expect(find.textContaining('Driver: M. Ramanathan'), findsOneWidget);
 
-    // Verify emergency safety share button
-    expect(find.text('Share Live Location with Emergency Contacts'), findsOneWidget);
+    // Verify the safety share button reflects the real phone-location share.
+    expect(find.text('Share Current Phone Location'), findsOneWidget);
   });
 
   testWidgets('LiveLocationScreen shows refresh action and live-data timestamp', (tester) async {

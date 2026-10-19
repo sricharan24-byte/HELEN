@@ -1,4 +1,6 @@
+import 'package:busbuddy/data/datasources/local_transport_data_source.dart';
 import 'package:busbuddy/data/models/ticket_model.dart';
+import 'package:busbuddy/data/repositories/transport_repository.dart';
 import 'package:busbuddy/domain/assistant/assistant_command.dart';
 import 'package:busbuddy/features/ai_assistant/app_automation_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,7 +39,11 @@ void main() {
     });
 
     test('full slot chain reaches gateway without issuing ticket', () {
-      final automation = AppAutomationController();
+      final automation = AppAutomationController(
+        repository: LocalTransportRepository(
+          dataSource: LocalTransportDataSource(),
+        ),
+      );
 
       var r = automation.handleToolCall('set_trip', {
         'origin': 'VIT Main Gate',
@@ -50,7 +56,10 @@ void main() {
       r = automation.handleToolCall('select_bus', {'busId': '18B'});
       expect(automation.busId, contains('18B'));
 
-      r = automation.handleToolCall('set_passenger', {'type': 'student'});
+      r = automation.handleToolCall('set_passenger', {
+        'type': 'student',
+        'name': 'Pavan',
+      });
       expect(automation.passengerType, equals(PassengerType.student));
 
       r = automation.handleToolCall('set_payment', {'method': 'upi'});

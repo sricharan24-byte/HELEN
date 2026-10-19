@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:busbuddy/core/a11y/announcement_coordinator.dart';
@@ -10,6 +11,28 @@ void main() {
   group('Astra Gate 12: Safety & Emergency Accessibility Tests', () {
     setUp(AnnouncementCoordinator.instance.resetForTesting);
 
+    void mockAndroidLocationShare() {
+      const channel = MethodChannel('busbuddy/location_share');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        switch (call.method) {
+          case 'getCurrentLocation':
+            return <String, dynamic>{
+              'status': 'success',
+              'latitude': 12.9698,
+              'longitude': 79.1559,
+            };
+          case 'shareText':
+            return <String, dynamic>{'status': 'chooser_opened'};
+        }
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+    }
+
     testWidgets('renders Gate 12 non-voice emergency SOS and triggers urgent announcement', (tester) async {
       String? lastAnnouncement;
       AnnouncementPriority? lastPriority;
@@ -18,6 +41,7 @@ void main() {
         lastAnnouncement = message;
         lastPriority = priority;
       };
+      mockAndroidLocationShare();
 
       await tester.pumpWidget(
         MaterialApp(
@@ -28,7 +52,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Find the SOS broadcast button
-      final sosButton = find.text('BROADCAST SOS ALERT NOW');
+      final sosButton = find.text('REVIEW & SHARE SOS LOCATION');
       expect(sosButton, findsOneWidget);
 
       // Tap SOS button to open confirmation dialog
@@ -39,14 +63,17 @@ void main() {
       expect(find.textContaining('Non-voice alternative'), findsOneWidget);
       expect(find.text('Trigger SOS Alert?'), findsOneWidget);
 
-      // Confirm SOS alert
-      final recordSosButton = find.text('RECORD SIMULATED SOS');
+      // Confirm SOS alert, then confirm the one-shot location share.
+      final recordSosButton = find.text('CONTINUE TO SHARE SOS');
       expect(recordSosButton, findsOneWidget);
       await tester.tap(recordSosButton);
       await tester.pumpAndSettle();
+      expect(find.text('Share emergency location?'), findsOneWidget);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
 
       // Verify urgent announcement was dispatched to AnnouncementCoordinator
-      expect(lastAnnouncement, contains('Emergency SOS alert broadcasted'));
+      expect(lastAnnouncement, contains('Emergency location share menu opened'));
       expect(lastPriority, equals(AnnouncementPriority.urgent));
     });
 
@@ -80,11 +107,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify active trip section is rendered
-      expect(find.text('ACTIVE TRIP LIVE SHARING'), findsOneWidget);
+      expect(find.text('ONE-TIME LOCATION SNAPSHOT'), findsOneWidget);
       expect(find.text('Bus Bus 23'), findsOneWidget);
 
-      // Verify WhatsApp share button has adequate touch target height >= 48dp
-      final shareBtnFinder = find.widgetWithText(OutlinedButton, 'Share Live Trip via WhatsApp / SMS');
+      // Verify share button has adequate touch target height >= 48dp
+      final shareBtnFinder = find.widgetWithText(OutlinedButton, 'Share current phone location');
       expect(shareBtnFinder, findsOneWidget);
       final shareBtnSize = tester.getSize(shareBtnFinder);
       expect(shareBtnSize.height, greaterThanOrEqualTo(48.0));
@@ -120,8 +147,8 @@ void main() {
       await tester.tap(find.text('Add Contact'));
       await tester.pumpAndSettle();
 
-      // Check dialog content explaining Astra Gate 12
-      expect(find.textContaining('Astra Gate 12: Emergency contacts'), findsOneWidget);
+      // Check dialog content explaining the one-shot share
+      expect(find.textContaining('Emergency contacts are shared only when'), findsOneWidget);
 
       // Enter name and phone
       await tester.enterText(find.widgetWithText(TextField, 'Contact Name / Title'), 'Security Desk');

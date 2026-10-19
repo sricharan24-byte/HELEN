@@ -31,11 +31,12 @@ void main() {
           (w) => w is Semantics && w.properties.liveRegion == true,
         ),
       );
-      expect(liveRegions, isNotEmpty);
 
+      // The reply is spoken by Gemini/PCM (or the single fallback TTS path).
+      // Anything marked as a live region must never carry it, and the current
+      // screen deliberately owns no live region at all.
       for (final region in liveRegions) {
         final label = region.properties.label ?? '';
-        // State announcements only — never the reply sentence itself.
         expect(
           label.contains('announcement'),
           isFalse,
@@ -48,6 +49,9 @@ void main() {
           reason: 'live region label must be a stable state label: "$label"',
         );
       }
+      expect(liveRegions, isEmpty);
+      // The reply text stays reachable as ordinary semantics content.
+      expect(find.textContaining("Hi, I'm BusBuddy"), findsOneWidget);
     });
   });
 }

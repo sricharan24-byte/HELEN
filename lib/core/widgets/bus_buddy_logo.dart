@@ -10,22 +10,20 @@ class BusBuddyLogo extends StatelessWidget {
     this.fontSize = 20,
     this.subtitle,
     this.subtitleColor,
-    this.mainAxisSize = MainAxisSize.min,
     this.crossAxisAlignment = CrossAxisAlignment.center,
   });
 
   final double fontSize;
   final String? subtitle;
   final Color? subtitleColor;
-  final MainAxisSize mainAxisSize;
   final CrossAxisAlignment crossAxisAlignment;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colors(context);
-    final logoRow = Row(
-      mainAxisSize: mainAxisSize,
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final logoRow = Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.sm,
       children: [
         Container(
           padding: const EdgeInsets.all(AppSpacing.xs),
@@ -39,7 +37,6 @@ class BusBuddyLogo extends StatelessWidget {
             color: colors.onActionPrimary,
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
         Text(
           'Bus',
           style: TextStyle(

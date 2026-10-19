@@ -54,7 +54,7 @@ void main() {
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     });
 
-    test('declares INTERNET plus the audited voice permissions', () {
+    test('declares INTERNET plus the audited voice and location permissions', () {
       final declared = RegExp(r'android:name="(android\.permission\.[A-Z_]+)"')
           .allMatches(manifest)
           .map((m) => m.group(1)!)
@@ -63,15 +63,27 @@ void main() {
         declared,
         equals(const {
           'android.permission.INTERNET',
+          'android.permission.ACCESS_COARSE_LOCATION',
+          'android.permission.ACCESS_FINE_LOCATION',
           'android.permission.RECORD_AUDIO',
           'android.permission.MODIFY_AUDIO_SETTINGS',
         }),
       );
     });
 
-    test('location stays absent and microphone is capability-backed', () {
-      expect(manifest, isNot(contains('android.permission.ACCESS_FINE_LOCATION')));
-      expect(manifest, isNot(contains('android.permission.ACCESS_COARSE_LOCATION')));
+    test('location is capability-backed and microphone is capability-backed', () {
+      // Foreground, one-shot location sharing only: the native channel backs
+      // both permissions and no background location is declared.
+      expect(manifest, isNot(contains('ACCESS_BACKGROUND_LOCATION')));
+      final location = File(
+        'android/app/src/main/kotlin/com/busbuddy/app/BusBuddyLocationShareChannel.kt',
+      );
+      expect(location.existsSync(), isTrue);
+      final locationSource = location.readAsStringSync();
+      expect(locationSource, contains('LocationManager'));
+      expect(locationSource, contains('Manifest.permission.ACCESS_FINE_LOCATION'));
+      expect(locationSource, contains('ActivityCompat.requestPermissions'));
+
       // RECORD_AUDIO is allowed only while a real native capability exists:
       // AudioRecord capture plus a just-in-time runtime request (BUS-P2-01).
       final voice = File(
@@ -85,9 +97,10 @@ void main() {
       expect(manifest, contains('just-in-time'));
     });
 
-    test('documents re-add rationale for removed permissions', () {
+    test('documents re-add rationale for added permissions', () {
       expect(manifest, contains('BUS-P2-01'));
-      expect(manifest, contains('just-in-time runtime request'));
+      expect(manifest, contains('just-in-time'));
+      expect(manifest, contains('foreground, one-shot'));
     });
   });
 

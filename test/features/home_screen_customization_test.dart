@@ -24,7 +24,7 @@ void main() {
 
         // App bar is a single reflow-safe page title (the two-line
         // 'Bus'+'Buddy' brand Column overflowed at 300% text scale).
-        expect(find.text('Customize Home Screen'), findsOneWidget);
+        expect(find.text('Customize Home'), findsOneWidget);
         expect(find.text('Customize Your Home'), findsOneWidget);
         expect(
           find.textContaining('Drag cards using ≡ to reorder'),

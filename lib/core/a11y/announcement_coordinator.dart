@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../features/ai_assistant/audio_speech_engine.dart';
 
@@ -272,7 +272,11 @@ class AnnouncementCoordinator {
       // A screen reader already owns spoken accessibility announcements.
       // Keep app TTS for passengers without platform screen-reader speech so
       // TalkBack never overlaps the same event with a second voice.
-      final screenReaderOwnsSpeech = SemanticsBinding.instance.semanticsEnabled;
+      // `semanticsEnabled` is true whenever a semantics tree exists (including
+      // every widget test and Flutter web), so it would silence TTS for
+      // passengers who are not running a screen reader. `accessibleNavigation`
+      // is the platform's actual "screen reader attached" signal.
+      final screenReaderOwnsSpeech = _screenReaderOwnsSpeech;
       if (speak &&
           isSpeechEnabled &&
           !isAssistantActive &&
@@ -312,6 +316,20 @@ class AnnouncementCoordinator {
 
   void _cleanQueue() {
     _queue.removeWhere((item) => item.isExpired);
+  }
+
+  /// Whether a platform screen reader is attached. Safe in plain unit tests
+  /// and before the binding is initialized.
+  bool get _screenReaderOwnsSpeech {
+    try {
+      return WidgetsBinding
+          .instance
+          .platformDispatcher
+          .accessibilityFeatures
+          .accessibleNavigation;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _drainQueue() {

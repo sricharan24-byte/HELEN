@@ -31,7 +31,11 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
-      final automation = AppAutomationController();
+      final automation = AppAutomationController(
+        repository: LocalTransportRepository(
+          dataSource: LocalTransportDataSource(),
+        ),
+      );
       await tester.pumpWidget(
         MaterialApp(home: Scaffold(body: BookingDraftPreview(
           automation: automation,
@@ -53,7 +57,7 @@ void main() {
       expect(find.text('Not set yet'), findsNWidgets(6));
       // The header lists what is still missing (the Semantics summary says
       // "Still needed: …"; the visible header shows the label list).
-      expect(find.text('bus, passenger type and payment method'), findsOneWidget);
+      expect(find.text('bus, passenger name, passenger type and payment method'), findsOneWidget);
       expect(find.textContaining('payment method'), findsOneWidget);
     });
 

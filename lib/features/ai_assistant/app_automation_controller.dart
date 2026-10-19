@@ -202,6 +202,18 @@ class AppAutomationController extends ChangeNotifier {
         slotSources[slot] = BookingValueSource.passenger;
       }
     }
+    // Readiness requires a real route between the accepted stops; resolve it
+    // now instead of leaving "route" missing after the passenger accepts.
+    if (route == null && origin != null && destination != null) {
+      final repo = repository;
+      if (repo != null) {
+        final routes = repo.findRoutes(
+          originId: origin!.id,
+          destinationId: destination!.id,
+        );
+        route = routes.isNotEmpty ? routes.first : null;
+      }
+    }
     _hasStagedSuggestion = false;
     notifyListeners();
   }

@@ -34,7 +34,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Title and Subtitle
-    expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
+    expect(find.text('Review Demo Ticket'), findsOneWidget);
     expect(find.textContaining('Bus 18B'), findsOneWidget);
 
     // Verify Default Passenger Type (General - ₹25) and Total Fare
@@ -54,7 +54,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap Pay & Issue button
-    await tester.tap(find.textContaining('& Issue'));
+    await tester.tap(find.textContaining('Create Demo Ticket'));
     await tester.pumpAndSettle();
 
     // Verify Ticket object was passed to callback with correct values.
@@ -100,7 +100,7 @@ void main() {
     expect(find.text('REQUIRED'), findsOneWidget);
 
     // Tap Pay & Issue without entering passenger name
-    await tester.tap(find.textContaining('& Issue'));
+    await tester.tap(find.textContaining('Create Demo Ticket'));
     await tester.pumpAndSettle();
 
     // Verify ticket was NOT booked and error text is shown
@@ -115,7 +115,7 @@ void main() {
     expect(find.text('Passenger name is required'), findsNothing);
 
     // Tap Pay & Issue now
-    await tester.tap(find.textContaining('& Issue'));
+    await tester.tap(find.textContaining('Create Demo Ticket'));
     await tester.pumpAndSettle();
 
     // Verify ticket is now booked with entered name

@@ -92,17 +92,17 @@ void main() {
 
       // Verify Bus Cards (18B, 12A, 20C)
       expect(find.text('18B'), findsOneWidget);
-      expect(find.text('Arriving Soon'), findsOneWidget);
-      expect(find.text('4 minutes away'), findsOneWidget);
-      expect(find.text('Select This Bus >'), findsOneWidget);
+      expect(find.text('Soonest demo estimate'), findsOneWidget);
+      expect(find.text('About 4 minutes (estimate)'), findsOneWidget);
+      expect(find.text('Select This Bus'), findsNWidgets(3));
 
       expect(find.text('12A'), findsOneWidget);
-      expect(find.text('In 12 min'), findsOneWidget);
-      expect(find.text('12 minutes away'), findsOneWidget);
+      expect(find.text('Demo estimate'), findsNWidgets(2));
+      expect(find.text('About 12 minutes (estimate)'), findsOneWidget);
 
       expect(find.text('20C'), findsOneWidget);
-      expect(find.text('In 18 min'), findsOneWidget);
-      expect(find.text('18 minutes away'), findsOneWidget);
+      expect(find.text('Demo estimate'), findsNWidgets(2));
+      expect(find.text('About 18 minutes (estimate)'), findsOneWidget);
     },
   );
 
@@ -124,11 +124,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Select Bus 18B to open checkout modal
-    await tester.tap(find.text('Select This Bus >'));
+    await tester.tap(find.text('Select This Bus').first);
     await tester.pumpAndSettle();
 
     // Verify checkout modal bottom sheet appears with passenger and payment options
-    expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
+    expect(find.text('Review Demo Ticket'), findsOneWidget);
     expect(find.text('General'), findsOneWidget);
     expect(find.text('Student'), findsOneWidget);
     expect(find.text('Senior'), findsOneWidget);
@@ -138,7 +138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap Pay & Issue button to complete booking
-    await tester.tap(find.textContaining('& Issue'));
+    await tester.tap(find.textContaining('Create Demo Ticket'));
     await tester.pumpAndSettle();
 
     // The ticket is issued into the dedicated tracking screen.

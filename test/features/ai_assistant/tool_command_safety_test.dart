@@ -88,11 +88,19 @@ void main() {
       () {
         const service = GeminiLiveService();
 
-        // SOS Emergency
+        // SOS Emergency: the gateway prompt must ask the passenger to review
+        // and choose a recipient, never claim an alert was already sent.
         final sosResponse = service.processVoiceQuery(
           'Emergency help! Call 112',
         );
-        expect(sosResponse.spokenResponse.toLowerCase(), contains('confirm'));
+        expect(
+          sosResponse.spokenResponse.toLowerCase(),
+          contains('review'),
+        );
+        expect(
+          sosResponse.spokenResponse.toLowerCase(),
+          contains('choose'),
+        );
         expect(
           sosResponse.spokenResponse.toLowerCase(),
           isNot(contains('has been activated')),
@@ -125,7 +133,7 @@ void main() {
 
     test('gateway confirmation prompts use truthful button labels', () {
       final sosMeta = AssistantCommandGateway.getMetadata('emergency_sos');
-      expect(sosMeta?.gatewayScreenPrompt, contains('Confirm SOS'));
+      expect(sosMeta?.gatewayScreenPrompt, contains('Review emergency'));
 
       final bookMeta = AssistantCommandGateway.getMetadata('book_ticket');
       expect(bookMeta?.gatewayScreenPrompt, contains('Confirm Booking'));

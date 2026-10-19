@@ -65,6 +65,10 @@ fi
 # no more, no less. Match only real <uses-permission> tags (not comments that
 # mention removed permissions as rationale).
 #   INTERNET              — OSM tiles, OSRM routing, Gemini Live WebSocket
+#   ACCESS_COARSE_LOCATION / ACCESS_FINE_LOCATION — foreground, one-shot phone
+#                           location share in BusBuddyLocationShareChannel;
+#                           requested only after the passenger chooses Share
+#                           Location or confirms SOS, with a denial fallback
 #   RECORD_AUDIO          — AudioRecord capture streamed to the live session
 #                           (ADR-004); requested just-in-time behind an announced
 #                           rationale, with a text-only denial fallback
@@ -74,11 +78,11 @@ fi
 # update ADR-004, the manifest rationale comment, and
 # test/platform/docs_verification_test.dart in the same change.
 manifest=android/app/src/main/AndroidManifest.xml
-expected_perms=$'android.permission.INTERNET\nandroid.permission.MODIFY_AUDIO_SETTINGS\nandroid.permission.RECORD_AUDIO'
+expected_perms=$'android.permission.ACCESS_COARSE_LOCATION\nandroid.permission.ACCESS_FINE_LOCATION\nandroid.permission.INTERNET\nandroid.permission.MODIFY_AUDIO_SETTINGS\nandroid.permission.RECORD_AUDIO'
 declared_perms="$(grep -oE 'android:name="android\.permission\.[A-Z_]+"' "$manifest" \
   | sed 's/android:name="//;s/"//' | sort -u || true)"
 if [[ "$declared_perms" == "$expected_perms" ]]; then
-  note "manifest permission minimization holds (audited set: INTERNET, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)"
+  note "manifest permission minimization holds (audited set: INTERNET, location, RECORD_AUDIO, MODIFY_AUDIO_SETTINGS)"
 else
   err "manifest permission set drifted from the BUS-P2-01/ADR-004 contract: got [$declared_perms]"
 fi

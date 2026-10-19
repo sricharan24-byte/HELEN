@@ -94,7 +94,7 @@ void main() {
       );
       expect(response.intent, equals(GeminiLiveIntent.emergencySos));
       expect(response.actionType, equals('emergency_sos'));
-      expect(response.spokenResponse, contains('Emergency Safety Broadcast'));
+      expect(response.spokenResponse, contains('emergency location sharing'));
     });
 
     test('conversational queries with help do not trigger emergencySos', () {
@@ -186,8 +186,7 @@ void main() {
         // Timer is pending when the widget tree is disposed.
         await tester.pump(const Duration(seconds: 6));
 
-        expect(find.text('NOT CONNECTED'), findsOneWidget);
-        expect(find.byIcon(Icons.auto_awesome), findsWidgets);
+        expect(find.textContaining('Gemini Live key not set'), findsOneWidget);
         expect(find.text('Where is my bus?'), findsWidgets);
         expect(find.text('Find a bus from VIT to Katpadi'), findsOneWidget);
       },
@@ -404,7 +403,10 @@ void main() {
       await tester.pump();
       serverSayToolCall('b-1', 'select_bus', {'busId': '18B'});
       await tester.pump();
-      serverSayToolCall('p-1', 'set_passenger', {'type': 'student'});
+      serverSayToolCall('p-1', 'set_passenger', {
+        'type': 'student',
+        'name': 'Pavan',
+      });
       await tester.pump();
 
       // The passenger never chose a payment method — confirm must not open

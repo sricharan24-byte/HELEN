@@ -120,7 +120,7 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);
-          expect(find.text('Confirm Ticket & Pay'), findsOneWidget);
+          expect(find.text('Review Demo Ticket'), findsOneWidget);
           expect(find.text('TOTAL FARE'), findsOneWidget);
         },
       );
@@ -153,8 +153,8 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);
-          expect(find.text('Safety & Emergency Sharing'), findsOneWidget);
-          expect(find.text('BROADCAST SOS ALERT NOW'), findsOneWidget);
+          expect(find.text('Safety'), findsOneWidget);
+          expect(find.text('REVIEW & SHARE SOS LOCATION'), findsOneWidget);
         },
       );
 
@@ -177,7 +177,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 300));
 
           expect(tester.takeException(), isNull);
-          expect(find.text('GEMINI LIVE'), findsWidgets);
+          expect(find.textContaining('Gemini Live key not set'), findsOneWidget);
           expect(find.text('Where is my bus?'), findsOneWidget);
         },
       );
